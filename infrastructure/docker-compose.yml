@@ -1,0 +1,323 @@
+version: "3.9"
+
+# =============================================================================
+# ChessQuery – Infraestructura local (desarrollo / demo)
+#
+# Object Storage: MinIO expuesto como S3-compatible.
+#   - Los microservicios usan el AWS SDK apuntando a S3_ENDPOINT_URL en local.
+#   - En producción basta con quitar S3_ENDPOINT_URL y cambiar las credenciales
+#     a las de AWS IAM; el SDK se comporta igual.
+#
+# Microservicios Java y BFFs NO incluidos; se agregarán con sus Dockerfiles.
+# =============================================================================
+
+networks:
+  chessquery-net:
+    driver: bridge
+
+# ---------------------------------------------------------------------------
+# Volumes persistentes
+# ---------------------------------------------------------------------------
+volumes:
+  auth_db_data:
+  user_db_data:
+  tournament_db_data:
+  game_db_data:
+  analytics_db_data:
+  notif_db_data:
+  etl_db_data:
+  rabbitmq_data:
+  redis_data:
+  minio_data:
+
+# ---------------------------------------------------------------------------
+# Services
+# ---------------------------------------------------------------------------
+services:
+
+  # -------------------------------------------------------------------------
+  # BASES DE DATOS – PostgreSQL 16
+  # -------------------------------------------------------------------------
+
+  auth_db:
+    image: postgres:16-alpine
+    container_name: chessquery_auth_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-chessquery}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-chessquery_dev}
+      POSTGRES_DB: auth_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - auth_db_data:/var/lib/postgresql/data
+    networks:
+      - chessquery-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-chessquery} -d auth_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  user_db:
+    image: postgres:16-alpine
+    container_name: chessquery_user_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-chessquery}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-chessquery_dev}
+      POSTGRES_DB: user_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - user_db_data:/var/lib/postgresql/data
+    networks:
+      - chessquery-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-chessquery} -d user_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  tournament_db:
+    image: postgres:16-alpine
+    container_name: chessquery_tournament_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-chessquery}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-chessquery_dev}
+      POSTGRES_DB: tournament_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - tournament_db_data:/var/lib/postgresql/data
+    networks:
+      - chessquery-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-chessquery} -d tournament_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  game_db:
+    image: postgres:16-alpine
+    container_name: chessquery_game_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-chessquery}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-chessquery_dev}
+      POSTGRES_DB: game_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - game_db_data:/var/lib/postgresql/data
+    networks:
+      - chessquery-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-chessquery} -d game_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  analytics_db:
+    image: postgres:16-alpine
+    container_name: chessquery_analytics_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-chessquery}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-chessquery_dev}
+      POSTGRES_DB: analytics_db
+    ports:
+      - "5436:5432"
+    volumes:
+      - analytics_db_data:/var/lib/postgresql/data
+    networks:
+      - chessquery-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-chessquery} -d analytics_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  notif_db:
+    image: postgres:16-alpine
+    container_name: chessquery_notif_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-chessquery}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-chessquery_dev}
+      POSTGRES_DB: notif_db
+    ports:
+      - "5437:5432"
+    volumes:
+      - notif_db_data:/var/lib/postgresql/data
+    networks:
+      - chessquery-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-chessquery} -d notif_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  etl_db:
+    image: postgres:16-alpine
+    container_name: chessquery_etl_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-chessquery}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-chessquery_dev}
+      POSTGRES_DB: etl_db
+    ports:
+      - "5438:5432"
+    volumes:
+      - etl_db_data:/var/lib/postgresql/data
+    networks:
+      - chessquery-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-chessquery} -d etl_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # -------------------------------------------------------------------------
+  # MENSAJERÍA – RabbitMQ 3.13 con Management Plugin
+  # -------------------------------------------------------------------------
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: chessquery_rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-chessquery}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-chessquery_dev}
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # Management UI  →  http://localhost:15672
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - chessquery-net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # Contenedor one-shot: crea el exchange y las colas con sus bindings.
+  rabbitmq_setup:
+    image: rabbitmq:3.13-management-alpine
+    container_name: chessquery_rabbitmq_setup
+    restart: "no"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBITMQ_USER: ${RABBITMQ_USER:-chessquery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-chessquery_dev}
+      RABBITMQ_HOST: rabbitmq
+    volumes:
+      - ./scripts/init-rabbitmq.sh:/init-rabbitmq.sh:ro
+    entrypoint: ["sh", "/init-rabbitmq.sh"]
+    networks:
+      - chessquery-net
+
+  # -------------------------------------------------------------------------
+  # CACHÉ – Redis 7
+  # -------------------------------------------------------------------------
+
+  redis:
+    image: redis:7-alpine
+    container_name: chessquery_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-chessquery_dev}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - chessquery-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-chessquery_dev}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # -------------------------------------------------------------------------
+  # OBJECT STORAGE – MinIO (S3-compatible)
+  #
+  # Compatibilidad con AWS S3 SDK:
+  #   Los microservicios configuran:
+  #     AWS_ACCESS_KEY_ID     = ${S3_ACCESS_KEY}
+  #     AWS_SECRET_ACCESS_KEY = ${S3_SECRET_KEY}
+  #     S3_ENDPOINT_URL       = http://minio:9000   (solo en local; vacío en prod)
+  #     S3_REGION             = us-east-1           (MinIO lo acepta; en prod usar la región real)
+  #     S3_BUCKET             = chessquery-pgn
+  #   Con path-style habilitado en el SDK (forcePathStyle: true / path_style: true).
+  #   En producción: quitar S3_ENDPOINT_URL y usar credenciales IAM de AWS.
+  # -------------------------------------------------------------------------
+
+  minio:
+    image: minio/minio:latest
+    container_name: chessquery_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      # Estas vars replican los nombres estándar del AWS SDK para que el
+      # cambio a S3 real solo requiera actualizar el .env de producción.
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin}
+    ports:
+      - "9000:9000"   # S3 API  →  http://localhost:9000
+      - "9001:9001"   # Console →  http://localhost:9001
+    volumes:
+      - minio_data:/data
+    networks:
+      - chessquery-net
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  # Contenedor one-shot: crea el bucket al primer arranque.
+  minio_setup:
+    image: minio/mc:latest
+    container_name: chessquery_minio_setup
+    restart: "no"
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: ${S3_BUCKET:-chessquery-pgn}
+    volumes:
+      - ./scripts/init-minio.sh:/init-minio.sh:ro
+    entrypoint: ["sh", "/init-minio.sh"]
+    networks:
+      - chessquery-net
+
+  # -------------------------------------------------------------------------
+  # PROXY – Nginx (reverse proxy + frontend estático)
+  # -------------------------------------------------------------------------
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: chessquery_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # Descomentar cuando el frontend esté disponible:
+      # - ../frontend/dist:/usr/share/nginx/html:ro
+    networks:
+      - chessquery-net
+    depends_on:
+      - rabbitmq
+      - redis
+      - minio
