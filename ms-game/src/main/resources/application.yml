@@ -1,0 +1,109 @@
+spring:
+  application:
+    name: ms-game
+
+  # ── Datasource ──────────────────────────────────────────────────────────────
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5435/game_db}
+    username: ${DB_USER:chessquery}
+    password: ${DB_PASSWORD:chessquery_dev}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 30000
+
+  # ── JPA ─────────────────────────────────────────────────────────────────────
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  # ── Flyway ──────────────────────────────────────────────────────────────────
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  # ── RabbitMQ ─────────────────────────────────────────────────────────────────
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:chessquery}
+    password: ${RABBITMQ_PASSWORD:chessquery_dev}
+    listener:
+      simple:
+        acknowledge-mode: auto
+
+# ── Servidor ────────────────────────────────────────────────────────────────
+server:
+  port: ${SERVER_PORT:8083}
+  error:
+    include-message: never
+
+# ── SpringDoc / Swagger ─────────────────────────────────────────────────────
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+
+# ── Logging ─────────────────────────────────────────────────────────────────
+logging:
+  level:
+    cl.chessquery.game: DEBUG
+    org.springframework.amqp: WARN
+    software.amazon.awssdk: WARN
+
+# ── AWS / MinIO ──────────────────────────────────────────────────────────────
+cloud:
+  aws:
+    s3:
+      endpoint: ${S3_ENDPOINT_URL:http://localhost:9000}
+    credentials:
+      access-key: ${S3_ACCESS_KEY:minioadmin}
+      secret-key: ${S3_SECRET_KEY:minioadmin}
+    region:
+      static: ${AWS_REGION:us-east-1}
+
+s3:
+  bucket: ${S3_BUCKET:chessquery-pgn}
+
+---
+# ── Perfil Docker ────────────────────────────────────────────────────────────
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: jdbc:postgresql://game_db:5432/game_db
+  rabbitmq:
+    host: rabbitmq
+
+cloud:
+  aws:
+    s3:
+      endpoint: http://minio:9000
+
+---
+# ── Perfil test (H2, Flyway deshabilitado, RabbitMQ y S3 mockeados) ────────
+spring:
+  config:
+    activate:
+      on-profile: test
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    enabled: false
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
