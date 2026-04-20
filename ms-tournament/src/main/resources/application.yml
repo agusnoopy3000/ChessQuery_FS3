@@ -1,0 +1,104 @@
+spring:
+  application:
+    name: ms-tournament
+
+  # ── Datasource ──────────────────────────────────────────────────────────────
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5434/tournament_db}
+    username: ${DB_USER:chessquery}
+    password: ${DB_PASSWORD:chessquery_dev}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 30000
+
+  # ── JPA ─────────────────────────────────────────────────────────────────────
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  # ── Flyway ──────────────────────────────────────────────────────────────────
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  # ── RabbitMQ ─────────────────────────────────────────────────────────────────
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:chessquery}
+    password: ${RABBITMQ_PASSWORD:chessquery_dev}
+    listener:
+      simple:
+        acknowledge-mode: auto
+
+# ── Servidor ────────────────────────────────────────────────────────────────
+server:
+  port: ${SERVER_PORT:8082}
+  error:
+    include-message: never
+
+# ── SpringDoc / Swagger ─────────────────────────────────────────────────────
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+
+# ── Logging ─────────────────────────────────────────────────────────────────
+logging:
+  level:
+    cl.chessquery.tournament: DEBUG
+    org.springframework.amqp: WARN
+
+# ── Resilience4j Circuit Breaker ─────────────────────────────────────────────
+resilience4j:
+  circuitbreaker:
+    instances:
+      ms-users:
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        slidingWindowSize: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+
+# ── MS-Users URL ─────────────────────────────────────────────────────────────
+ms-users:
+  url: ${MS_USERS_URL:http://ms-users:8081}
+
+---
+# ── Perfil Docker ────────────────────────────────────────────────────────────
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: jdbc:postgresql://tournament_db:5432/tournament_db
+  rabbitmq:
+    host: rabbitmq
+
+---
+# ── Perfil test (H2, Flyway deshabilitado, RabbitMQ mockeado) ─────────────
+spring:
+  config:
+    activate:
+      on-profile: test
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    enabled: false
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
