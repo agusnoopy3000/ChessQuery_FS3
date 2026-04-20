@@ -1,3 +1,13 @@
 # Environment files
 infrastructure/.env
 infrastructure/.env.example
+
+# Build artifacts
+**/target/
+.DS_Store
+
+# Python
+**/.venv/
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
