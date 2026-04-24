@@ -181,7 +181,7 @@ services:
   # MICROSERVICIOS JAVA
   # -------------------------------------------------------------------------
 
-  ms_auth:
+  ms-auth:
     build:
       context: ../ms-auth
       dockerfile: Dockerfile
@@ -201,7 +201,7 @@ services:
     networks:
       - chessquery-net
 
-  ms_users:
+  ms-users:
     build:
       context: ../ms-users
       dockerfile: Dockerfile
@@ -225,7 +225,7 @@ services:
     networks:
       - chessquery-net
 
-  ms_tournament:
+  ms-tournament:
     build:
       context: ../ms-tournament
       dockerfile: Dockerfile
@@ -238,7 +238,7 @@ services:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USER: ${RABBITMQ_USER:-chessquery}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-chessquery_dev}
-      MS_USERS_URL: http://ms_users:8081
+      MS_USERS_URL: http://ms-users:8081
       SERVER_PORT: "8082"
     ports:
       - "8082:8082"
@@ -250,7 +250,7 @@ services:
     networks:
       - chessquery-net
 
-  ms_game:
+  ms-game:
     build:
       context: ../ms-game
       dockerfile: Dockerfile
@@ -282,7 +282,7 @@ services:
     networks:
       - chessquery-net
 
-  ms_analytics:
+  ms-analytics:
     build:
       context: ../ms-analytics
       dockerfile: Dockerfile
@@ -310,7 +310,7 @@ services:
   # MICROSERVICIO PYTHON — ETL
   # -------------------------------------------------------------------------
 
-  ms_etl:
+  ms-etl:
     build:
       context: ../ms-etl
       dockerfile: Dockerfile
@@ -326,7 +326,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       REDIS_PASSWORD: ${REDIS_PASSWORD:-chessquery_dev}
-      MS_USERS_URL: http://ms_users:8081
+      MS_USERS_URL: http://ms-users:8081
       ETL_FIDE_SHOULD_FAIL: ${ETL_FIDE_SHOULD_FAIL:-false}
       ETL_AJEFECH_SHOULD_FAIL: ${ETL_AJEFECH_SHOULD_FAIL:-false}
       ETL_LICHESS_SHOULD_FAIL: ${ETL_LICHESS_SHOULD_FAIL:-false}
@@ -354,7 +354,7 @@ services:
   # BFFs (NestJS)
   # -------------------------------------------------------------------------
 
-  bff_player:
+  bff-player:
     build:
       context: ../bff-player
       dockerfile: Dockerfile
@@ -362,20 +362,20 @@ services:
     restart: unless-stopped
     environment:
       PORT: "3001"
-      MS_USERS_URL: http://ms_users:8081
-      MS_TOURNAMENT_URL: http://ms_tournament:8082
-      MS_GAME_URL: http://ms_game:8083
-      MS_ANALYTICS_URL: http://ms_analytics:8084
+      MS_USERS_URL: http://ms-users:8081
+      MS_TOURNAMENT_URL: http://ms-tournament:8082
+      MS_GAME_URL: http://ms-game:8083
+      MS_ANALYTICS_URL: http://ms-analytics:8084
     ports:
       - "3001:3001"
     depends_on:
-      - ms_users
-      - ms_game
-      - ms_analytics
+      - ms-users
+      - ms-game
+      - ms-analytics
     networks:
       - chessquery-net
 
-  bff_organizer:
+  bff-organizer:
     build:
       context: ../bff-organizer
       dockerfile: Dockerfile
@@ -383,19 +383,19 @@ services:
     restart: unless-stopped
     environment:
       PORT: "3002"
-      MS_USERS_URL: http://ms_users:8081
-      MS_TOURNAMENT_URL: http://ms_tournament:8082
-      MS_GAME_URL: http://ms_game:8083
-      MS_ANALYTICS_URL: http://ms_analytics:8084
+      MS_USERS_URL: http://ms-users:8081
+      MS_TOURNAMENT_URL: http://ms-tournament:8082
+      MS_GAME_URL: http://ms-game:8083
+      MS_ANALYTICS_URL: http://ms-analytics:8084
     ports:
       - "3002:3002"
     depends_on:
-      - ms_users
-      - ms_tournament
+      - ms-users
+      - ms-tournament
     networks:
       - chessquery-net
 
-  bff_admin:
+  bff-admin:
     build:
       context: ../bff-admin
       dockerfile: Dockerfile
@@ -403,19 +403,19 @@ services:
     restart: unless-stopped
     environment:
       PORT: "3003"
-      MS_USERS_URL: http://ms_users:8081
-      MS_TOURNAMENT_URL: http://ms_tournament:8082
-      MS_GAME_URL: http://ms_game:8083
-      MS_ANALYTICS_URL: http://ms_analytics:8084
-      MS_ETL_URL: http://ms_etl:8086
+      MS_USERS_URL: http://ms-users:8081
+      MS_TOURNAMENT_URL: http://ms-tournament:8082
+      MS_GAME_URL: http://ms-game:8083
+      MS_ANALYTICS_URL: http://ms-analytics:8084
+      MS_ETL_URL: http://ms-etl:8086
     ports:
       - "3003:3003"
     depends_on:
-      - ms_users
-      - ms_tournament
-      - ms_game
-      - ms_analytics
-      - ms_etl
+      - ms-users
+      - ms-tournament
+      - ms-game
+      - ms-analytics
+      - ms-etl
     networks:
       - chessquery-net
 
@@ -423,7 +423,7 @@ services:
   # API GATEWAY (Spring Cloud Gateway, puerto 8080)
   # -------------------------------------------------------------------------
 
-  api_gateway:
+  api-gateway:
     build:
       context: ../api-gateway
       dockerfile: Dockerfile
@@ -431,10 +431,10 @@ services:
     restart: unless-stopped
     environment:
       SERVER_PORT: "8080"
-      MS_AUTH_URL: http://ms_auth:9090
-      BFF_PLAYER_URL: http://bff_player:3001
-      BFF_ORGANIZER_URL: http://bff_organizer:3002
-      BFF_ADMIN_URL: http://bff_admin:3003
+      MS_AUTH_URL: http://ms-auth:9090
+      BFF_PLAYER_URL: http://bff-player:3001
+      BFF_ORGANIZER_URL: http://bff-organizer:3002
+      BFF_ADMIN_URL: http://bff-admin:3003
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       REDIS_PASSWORD: ${REDIS_PASSWORD:-chessquery_dev}
@@ -442,10 +442,10 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - ms_auth
-      - bff_player
-      - bff_organizer
-      - bff_admin
+      - ms-auth
+      - bff-player
+      - bff-organizer
+      - bff-admin
       - redis
     networks:
       - chessquery-net
@@ -592,4 +592,4 @@ services:
       - rabbitmq
       - redis
       - minio
-      - api_gateway
+      - api-gateway
