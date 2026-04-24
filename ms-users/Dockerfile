@@ -1,5 +1,5 @@
 # ─── Stage 1: build ────────────────────────────────────────────────────────
-FROM maven:3.9-eclipse-temurin-17-alpine AS builder
+FROM maven:3.9-eclipse-temurin-17 AS builder
 WORKDIR /app
 
 COPY pom.xml .
@@ -9,10 +9,10 @@ COPY src ./src
 RUN mvn package -DskipTests -q
 
 # ─── Stage 2: runtime ──────────────────────────────────────────────────────
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
 
-RUN addgroup -S chessquery && adduser -S chessquery -G chessquery
+RUN groupadd --system chessquery && useradd --system --gid chessquery --shell /bin/false chessquery
 USER chessquery
 
 COPY --from=builder /app/target/ms-users-*.jar app.jar

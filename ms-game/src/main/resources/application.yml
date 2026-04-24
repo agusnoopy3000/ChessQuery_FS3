@@ -72,6 +72,19 @@ cloud:
 s3:
   bucket: ${S3_BUCKET:chessquery-pgn}
 
+# ── Actuator / Monitoring ───────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
 ---
 # ── Perfil Docker ────────────────────────────────────────────────────────────
 spring:

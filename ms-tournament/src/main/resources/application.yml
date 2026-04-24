@@ -72,6 +72,19 @@ resilience4j:
 ms-users:
   url: ${MS_USERS_URL:http://ms-users:8081}
 
+# ── Actuator / Monitoring ───────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
 ---
 # ── Perfil Docker ────────────────────────────────────────────────────────────
 spring:
