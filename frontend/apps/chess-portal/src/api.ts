@@ -279,6 +279,108 @@ export const playerApi = {
     api
       .get('/api/player/rankings', { params: { category, region } })
       .then((r) => asArray<unknown>(r.data).map(normalizePlayer)),
+
+  lichess: (id: string | number): Promise<LichessProfilePayload> =>
+    api.get(`/api/player/${id}/lichess`).then((r) => normalizeLichess(r.data)),
+};
+
+export interface LichessRatingInfo {
+  variant: string;
+  rating: number | null;
+  games: number | null;
+  rd: number | null;
+  prog: number | null;
+}
+
+export interface LichessGameSummary {
+  id: string;
+  url: string | null;
+  speed: string | null;
+  perf: string | null;
+  rated: boolean | null;
+  status: string | null;
+  winner: string | null;
+  createdAt: number | null;
+  moves: number | null;
+  whiteName: string | null;
+  whiteRating: number | null;
+  blackName: string | null;
+  blackRating: number | null;
+}
+
+export interface LichessProfilePayload {
+  username: string | null;
+  found: boolean;
+  error: string | null;
+  displayName: string | null;
+  profileUrl: string | null;
+  createdAt: number | null;
+  seenAt: number | null;
+  playTimeTotal: number | null;
+  ratings: LichessRatingInfo[];
+  counts: Record<string, number>;
+  games: LichessGameSummary[];
+}
+
+const normalizeLichess = (value: unknown): LichessProfilePayload => {
+  const raw = asRecord(value);
+  const user = asRecord(raw.user);
+  const profile = asRecord(user.profile);
+  const ratingsRaw = asRecord(user.ratings);
+  const countsRaw = asRecord(user.counts);
+
+  const ratings: LichessRatingInfo[] = Object.entries(ratingsRaw).map(([variant, info]) => {
+    const entry = asRecord(info);
+    return {
+      variant,
+      rating: asNumber(entry.rating) ?? null,
+      games: asNumber(entry.games) ?? null,
+      rd: asNumber(entry.rd) ?? null,
+      prog: asNumber(entry.prog) ?? null,
+    };
+  });
+
+  const counts: Record<string, number> = {};
+  for (const [k, v] of Object.entries(countsRaw)) {
+    const n = asNumber(v);
+    if (n != null) counts[k] = n;
+  }
+
+  const games: LichessGameSummary[] = asArray<unknown>(raw.games).map((g) => {
+    const gr = asRecord(g);
+    const white = asRecord(gr.white);
+    const black = asRecord(gr.black);
+    return {
+      id: asString(gr.id) ?? '',
+      url: asString(gr.url) ?? null,
+      speed: asString(gr.speed) ?? null,
+      perf: asString(gr.perf) ?? null,
+      rated: typeof gr.rated === 'boolean' ? (gr.rated as boolean) : null,
+      status: asString(gr.status) ?? null,
+      winner: asString(gr.winner) ?? null,
+      createdAt: asNumber(gr.createdAt) ?? null,
+      moves: asNumber(gr.moves) ?? null,
+      whiteName: asString(white.name) ?? null,
+      whiteRating: asNumber(white.rating) ?? null,
+      blackName: asString(black.name) ?? null,
+      blackRating: asNumber(black.rating) ?? null,
+    };
+  });
+
+  const username = asString(raw.username) ?? null;
+  return {
+    username,
+    found: !!user.username,
+    error: asString(raw.error) ?? null,
+    displayName: asString(user.username) ?? username,
+    profileUrl: asString(user.url) ?? (username ? `https://lichess.org/@/${username}` : null),
+    createdAt: asNumber(user.createdAt) ?? null,
+    seenAt: asNumber(user.seenAt) ?? null,
+    playTimeTotal: asNumber(user.playTimeTotal) ?? null,
+    ratings,
+    counts,
+    games,
+  };
 };
 
 export const tournamentApi = {

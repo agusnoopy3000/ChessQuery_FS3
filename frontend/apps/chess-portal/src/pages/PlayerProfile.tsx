@@ -23,7 +23,7 @@ import {
 import { Game, RatingHistoryPoint } from '@chessquery/shared';
 import { playerApi } from '../api';
 
-type Tab = 'overview' | 'rating' | 'games';
+type Tab = 'overview' | 'rating' | 'games' | 'lichess';
 
 export const PlayerProfilePage = () => {
   const { id } = useParams<{ id: string }>();
@@ -40,6 +40,13 @@ export const PlayerProfilePage = () => {
     queryKey: ['player', id, 'rating-history'],
     queryFn: () => playerApi.ratingHistory(id!),
     enabled: !!id && tab === 'rating',
+  });
+
+  const lichess = useQuery({
+    queryKey: ['player', id, 'lichess'],
+    queryFn: () => playerApi.lichess(id!),
+    enabled: !!id && tab === 'lichess',
+    retry: false,
   });
 
   if (profile.isLoading) {
@@ -112,7 +119,7 @@ export const PlayerProfilePage = () => {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)' }}>
-        {(['overview', 'rating', 'games'] as Tab[]).map((t) => (
+        {(['overview', 'rating', 'games', 'lichess'] as Tab[]).map((t) => (
           <button
             key={t}
             type="button"
@@ -128,7 +135,7 @@ export const PlayerProfilePage = () => {
               fontSize: 13,
             }}
           >
-            {t === 'overview' ? 'Resumen' : t === 'rating' ? 'Rating' : 'Partidas'}
+            {t === 'overview' ? 'Resumen' : t === 'rating' ? 'Rating' : t === 'games' ? 'Partidas' : 'Lichess'}
           </button>
         ))}
       </div>
@@ -178,6 +185,131 @@ export const PlayerProfilePage = () => {
             </div>
           )}
         </Card>
+      )}
+
+      {tab === 'lichess' && (
+        <div style={{ display: 'grid', gap: 16 }}>
+          {lichess.isLoading ? (
+            <Skeleton height={220} />
+          ) : lichess.isError ? (
+            <ErrorAlert title="No se pudo consultar Lichess" onRetry={() => lichess.refetch()} />
+          ) : !lichess.data?.username ? (
+            <EmptyState
+              title="Sin cuenta Lichess vinculada"
+              description="Este jugador no tiene lichessUsername registrado en su perfil."
+              icon="♖"
+            />
+          ) : !lichess.data.found ? (
+            <EmptyState
+              title={`Usuario @${lichess.data.username} no encontrado en Lichess`}
+              description={lichess.data.error ?? 'La API Lichess devolvió 404.'}
+              icon="⚠"
+            />
+          ) : (
+            <>
+              <Card padded>
+                <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: 220 }}>
+                    <div style={{ fontSize: 20, fontWeight: 700 }}>
+                      ♖ {lichess.data.displayName ?? lichess.data.username}
+                    </div>
+                    {lichess.data.profileUrl && (
+                      <a
+                        href={lichess.data.profileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ color: 'var(--accent)', fontSize: 13, textDecoration: 'none' }}
+                      >
+                        {lichess.data.profileUrl} ↗
+                      </a>
+                    )}
+                    <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 6 }}>
+                      {lichess.data.playTimeTotal != null
+                        ? `Tiempo jugado: ${Math.round(lichess.data.playTimeTotal / 3600)} h · `
+                        : ''}
+                      {lichess.data.counts?.rated != null
+                        ? `${lichess.data.counts.rated} partidas rated`
+                        : ''}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              <Card header="Ratings por variante (fuente Lichess)">
+                {lichess.data.ratings.length === 0 ? (
+                  <EmptyState title="Sin ratings disponibles" />
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
+                    {lichess.data.ratings.map((r) => (
+                      <div
+                        key={r.variant}
+                        style={{
+                          padding: '12px 14px',
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 10,
+                        }}
+                      >
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                          {r.variant}
+                        </div>
+                        <div style={{ fontSize: 22, fontWeight: 700 }}>{r.rating ?? '—'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          {r.games ?? 0} partidas
+                          {r.prog != null ? ` · ${r.prog >= 0 ? '+' : ''}${r.prog}` : ''}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+
+              <Card header="Últimas partidas en Lichess">
+                {lichess.data.games.length === 0 ? (
+                  <EmptyState title="Sin partidas recientes" />
+                ) : (
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {lichess.data.games.map((g) => (
+                      <a
+                        key={g.id}
+                        href={g.url ?? '#'}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '100px 1fr auto',
+                          alignItems: 'center',
+                          gap: 12,
+                          padding: '10px 14px',
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 8,
+                          textDecoration: 'none',
+                          color: 'var(--text)',
+                        }}
+                      >
+                        <Badge variant={g.rated ? 'info' : 'neutral'}>
+                          {g.perf ?? g.speed ?? '—'}
+                        </Badge>
+                        <div style={{ fontSize: 13 }}>
+                          <span style={{ fontWeight: 600 }}>{g.whiteName ?? '?'}</span>
+                          {g.whiteRating ? ` (${g.whiteRating})` : ''}
+                          {' vs '}
+                          <span style={{ fontWeight: 600 }}>{g.blackName ?? '?'}</span>
+                          {g.blackRating ? ` (${g.blackRating})` : ''}
+                          {g.moves != null ? ` · ${g.moves} jugadas` : ''}
+                        </div>
+                        <Badge variant={g.winner ? 'success' : 'neutral'}>
+                          {g.winner ? (g.winner === 'white' ? '1-0' : '0-1') : '½-½'}
+                        </Badge>
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            </>
+          )}
+        </div>
       )}
 
       {tab === 'games' && (

@@ -121,10 +121,4 @@ export const etlSources = [
     icon: '♘',
     description: 'Fuentes federativas y actividad nacional complementaria.',
   },
-  {
-    key: 'CHESS_RESULTS',
-    label: 'Chess Results',
-    icon: '♔',
-    description: 'Resultados históricos y publicación de competencias.',
-  },
 ];
