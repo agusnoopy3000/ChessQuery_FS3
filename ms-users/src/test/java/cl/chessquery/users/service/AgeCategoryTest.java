@@ -55,7 +55,7 @@ class AgeCategoryTest {
         assertThat(born20).isBetween(cat.minBirthDate(), cat.maxBirthDate());
         // Y no debe capturar a alguien con 50 años
         LocalDate born50 = today.minusYears(50);
-        assertThat(born50).isNotBetween(cat.minBirthDate(), cat.maxBirthDate());
+        assertThat(born50.isBefore(cat.minBirthDate()) || born50.isAfter(cat.maxBirthDate())).isTrue();
     }
 
     @Test
@@ -67,6 +67,6 @@ class AgeCategoryTest {
         assertThat(born16).isBetween(cat.minBirthDate(), cat.maxBirthDate());
         // Alguien que cumple 18 hoy → NO debe estar en SUB_18
         LocalDate born18 = today.minusYears(18);
-        assertThat(born18).isNotBetween(cat.minBirthDate(), cat.maxBirthDate());
+        assertThat(born18.isBefore(cat.minBirthDate()) || born18.isAfter(cat.maxBirthDate())).isTrue();
     }
 }
