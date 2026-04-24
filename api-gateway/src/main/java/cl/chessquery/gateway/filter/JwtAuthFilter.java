@@ -40,7 +40,7 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
 
     public JwtAuthFilter(WebClient.Builder webClientBuilder,
                          ReactiveResilience4JCircuitBreakerFactory cbFactory,
-                         @Value("${gateway.ms-auth.url:http://ms-auth:9090}") String msAuthUrl) {
+                         @Value("${MS_AUTH_URL}") String msAuthUrl) {
         this.authClient = webClientBuilder.baseUrl(msAuthUrl).build();
         this.authCircuitBreaker = cbFactory.create("ms-auth-validate");
     }
