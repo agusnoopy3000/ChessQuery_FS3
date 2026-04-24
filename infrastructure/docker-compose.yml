@@ -1,5 +1,3 @@
-version: "3.9"
-
 # =============================================================================
 # ChessQuery – Infraestructura local (desarrollo / demo)
 #
@@ -180,6 +178,279 @@ services:
       retries: 5
 
   # -------------------------------------------------------------------------
+  # MICROSERVICIOS JAVA
+  # -------------------------------------------------------------------------
+
+  ms_auth:
+    build:
+      context: ../ms-auth
+      dockerfile: Dockerfile
+    container_name: chessquery_ms_auth
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:postgresql://auth_db:5432/auth_db
+      DB_USER: ${DB_USER:-chessquery}
+      DB_PASSWORD: ${DB_PASSWORD:-chessquery_dev}
+      JWT_SECRET: ${JWT_SECRET:-Y2hlc3NxdWVyeS1zZWNyZXQta2V5LTI1Ni1iaXRzLWxvbmctZW5vdWdo}
+      SERVER_PORT: "9090"
+    ports:
+      - "9090:9090"
+    depends_on:
+      auth_db:
+        condition: service_healthy
+    networks:
+      - chessquery-net
+
+  ms_users:
+    build:
+      context: ../ms-users
+      dockerfile: Dockerfile
+    container_name: chessquery_ms_users
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:postgresql://user_db:5432/user_db
+      DB_USER: ${DB_USER:-chessquery}
+      DB_PASSWORD: ${DB_PASSWORD:-chessquery_dev}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER:-chessquery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-chessquery_dev}
+      SERVER_PORT: "8081"
+    ports:
+      - "8081:8081"
+    depends_on:
+      user_db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - chessquery-net
+
+  ms_tournament:
+    build:
+      context: ../ms-tournament
+      dockerfile: Dockerfile
+    container_name: chessquery_ms_tournament
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:postgresql://tournament_db:5432/tournament_db
+      DB_USER: ${DB_USER:-chessquery}
+      DB_PASSWORD: ${DB_PASSWORD:-chessquery_dev}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER:-chessquery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-chessquery_dev}
+      MS_USERS_URL: http://ms_users:8081
+      SERVER_PORT: "8082"
+    ports:
+      - "8082:8082"
+    depends_on:
+      tournament_db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - chessquery-net
+
+  ms_game:
+    build:
+      context: ../ms-game
+      dockerfile: Dockerfile
+    container_name: chessquery_ms_game
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:postgresql://game_db:5432/game_db
+      DB_USER: ${DB_USER:-chessquery}
+      DB_PASSWORD: ${DB_PASSWORD:-chessquery_dev}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER:-chessquery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-chessquery_dev}
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-minioadmin}
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-chessquery-pgn}
+      S3_PATH_STYLE_ACCESS: "true"
+      SERVER_PORT: "8083"
+    ports:
+      - "8083:8083"
+    depends_on:
+      game_db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - chessquery-net
+
+  ms_analytics:
+    build:
+      context: ../ms-analytics
+      dockerfile: Dockerfile
+    container_name: chessquery_ms_analytics
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:postgresql://analytics_db:5432/analytics_db
+      DB_USER: ${DB_USER:-chessquery}
+      DB_PASSWORD: ${DB_PASSWORD:-chessquery_dev}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER:-chessquery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-chessquery_dev}
+      SERVER_PORT: "8084"
+    ports:
+      - "8084:8084"
+    depends_on:
+      analytics_db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - chessquery-net
+
+  # -------------------------------------------------------------------------
+  # MICROSERVICIO PYTHON — ETL
+  # -------------------------------------------------------------------------
+
+  ms_etl:
+    build:
+      context: ../ms-etl
+      dockerfile: Dockerfile
+    container_name: chessquery_ms_etl
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-chessquery}:${DB_PASSWORD:-chessquery_dev}@etl_db:5432/etl_db
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: ${RABBITMQ_USER:-chessquery}
+      RABBITMQ_PASS: ${RABBITMQ_PASSWORD:-chessquery_dev}
+      RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-ChessEvents}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-chessquery_dev}
+      MS_USERS_URL: http://ms_users:8081
+      ETL_FIDE_SHOULD_FAIL: ${ETL_FIDE_SHOULD_FAIL:-false}
+      ETL_AJEFECH_SHOULD_FAIL: ${ETL_AJEFECH_SHOULD_FAIL:-false}
+      ETL_LICHESS_SHOULD_FAIL: ${ETL_LICHESS_SHOULD_FAIL:-false}
+      ETL_CHESS_RESULTS_SHOULD_FAIL: ${ETL_CHESS_RESULTS_SHOULD_FAIL:-false}
+      SERVER_PORT: "8086"
+    ports:
+      - "8086:8086"
+    depends_on:
+      etl_db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - chessquery-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # -------------------------------------------------------------------------
+  # BFFs (NestJS)
+  # -------------------------------------------------------------------------
+
+  bff_player:
+    build:
+      context: ../bff-player
+      dockerfile: Dockerfile
+    container_name: chessquery_bff_player
+    restart: unless-stopped
+    environment:
+      PORT: "3001"
+      MS_USERS_URL: http://ms_users:8081
+      MS_TOURNAMENT_URL: http://ms_tournament:8082
+      MS_GAME_URL: http://ms_game:8083
+      MS_ANALYTICS_URL: http://ms_analytics:8084
+    ports:
+      - "3001:3001"
+    depends_on:
+      - ms_users
+      - ms_game
+      - ms_analytics
+    networks:
+      - chessquery-net
+
+  bff_organizer:
+    build:
+      context: ../bff-organizer
+      dockerfile: Dockerfile
+    container_name: chessquery_bff_organizer
+    restart: unless-stopped
+    environment:
+      PORT: "3002"
+      MS_USERS_URL: http://ms_users:8081
+      MS_TOURNAMENT_URL: http://ms_tournament:8082
+      MS_GAME_URL: http://ms_game:8083
+      MS_ANALYTICS_URL: http://ms_analytics:8084
+    ports:
+      - "3002:3002"
+    depends_on:
+      - ms_users
+      - ms_tournament
+    networks:
+      - chessquery-net
+
+  bff_admin:
+    build:
+      context: ../bff-admin
+      dockerfile: Dockerfile
+    container_name: chessquery_bff_admin
+    restart: unless-stopped
+    environment:
+      PORT: "3003"
+      MS_USERS_URL: http://ms_users:8081
+      MS_TOURNAMENT_URL: http://ms_tournament:8082
+      MS_GAME_URL: http://ms_game:8083
+      MS_ANALYTICS_URL: http://ms_analytics:8084
+      MS_ETL_URL: http://ms_etl:8086
+    ports:
+      - "3003:3003"
+    depends_on:
+      - ms_users
+      - ms_tournament
+      - ms_game
+      - ms_analytics
+      - ms_etl
+    networks:
+      - chessquery-net
+
+  # -------------------------------------------------------------------------
+  # API GATEWAY (Spring Cloud Gateway, puerto 8080)
+  # -------------------------------------------------------------------------
+
+  api_gateway:
+    build:
+      context: ../api-gateway
+      dockerfile: Dockerfile
+    container_name: chessquery_api_gateway
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: "8080"
+      MS_AUTH_URL: http://ms_auth:9090
+      BFF_PLAYER_URL: http://bff_player:3001
+      BFF_ORGANIZER_URL: http://bff_organizer:3002
+      BFF_ADMIN_URL: http://bff_admin:3003
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-chessquery_dev}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost}
+    ports:
+      - "8080:8080"
+    depends_on:
+      - ms_auth
+      - bff_player
+      - bff_organizer
+      - bff_admin
+      - redis
+    networks:
+      - chessquery-net
+
+  # -------------------------------------------------------------------------
   # MENSAJERÍA – RabbitMQ 3.13 con Management Plugin
   # -------------------------------------------------------------------------
 
@@ -321,3 +592,4 @@ services:
       - rabbitmq
       - redis
       - minio
+      - api_gateway
