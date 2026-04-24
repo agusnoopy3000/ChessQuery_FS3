@@ -23,6 +23,7 @@ public class GatewayConfig {
 
     /** Rate limiter: 100 req/min, burst 120, 1 token por request. */
     @Bean
+    @org.springframework.context.annotation.Primary
     public RedisRateLimiter defaultRateLimiter() {
         return new RedisRateLimiter(100, 120, 1);
     }
