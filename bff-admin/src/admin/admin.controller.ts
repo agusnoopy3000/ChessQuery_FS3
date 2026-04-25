@@ -37,6 +37,13 @@ export class AdminController {
     return this.adminService.getEtlStatus();
   }
 
+  @Get('etl/logs')
+  async etlLogs(@Req() req: Request, @Query('limit') limit?: string) {
+    this.assertAdmin(req);
+    const n = limit ? Math.min(parseInt(limit, 10) || 50, 200) : 50;
+    return this.adminService.getEtlLogs(n);
+  }
+
   @Post('etl/sync/:source')
   async etlSync(@Req() req: Request, @Param('source') source: string) {
     this.assertAdmin(req);

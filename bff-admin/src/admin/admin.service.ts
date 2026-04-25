@@ -45,6 +45,11 @@ export class AdminService {
     return this.http.get<unknown>(`${msEtl}/etl/status`);
   }
 
+  async getEtlLogs(limit = 50) {
+    const { msEtl } = this.http.urls;
+    return this.http.get<unknown>(`${msEtl}/etl/logs?limit=${limit}`);
+  }
+
   async triggerEtlSync(source: string) {
     const { msEtl } = this.http.urls;
     return this.http.post<unknown>(`${msEtl}/etl/sync/${encodeURIComponent(source)}`, {});
