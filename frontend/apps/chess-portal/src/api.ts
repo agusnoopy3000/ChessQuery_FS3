@@ -416,6 +416,8 @@ export const organizerApi = {
 export const adminApi = {
   dashboard: (): Promise<AdminDashboard> => api.get('/api/admin/dashboard').then((r) => r.data),
   etlStatus: (): Promise<EtlStatus> => api.get('/api/admin/etl/status').then((r) => r.data),
+  etlLogs: (limit = 50): Promise<unknown[]> =>
+    api.get('/api/admin/etl/logs', { params: { limit } }).then((r) => asArray<unknown>(r.data)),
   sync: (source: string): Promise<EtlSyncResponse> =>
     api.post(`/api/admin/etl/sync/${source}`, {}).then((r) => r.data),
   searchUsers: (q: string): Promise<Player[]> =>

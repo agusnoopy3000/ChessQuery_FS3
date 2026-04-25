@@ -76,8 +76,8 @@ export const PlayerMatchmakingPage = () => {
           <div className="eyebrow">Portal de Juego</div>
           <h1 className="page-title">Emparejamientos sugeridos para lanzar un reto.</h1>
           <p className="page-copy">
-            Esta vista ordena posibles rivales por cercanía de rating. Cuando un perfil tenga `lichessUsername`,
-            la UI ya queda preparada para saltar a la integración externa o a un flujo de desafío desde el BFF.
+            Esta vista ordena posibles rivales por cercanía de rating. Si el rival tiene cuenta de Lichess, el
+            botón abre el desafío externo; si no, la partida se registra directamente en ChessQuery.
           </p>
         </div>
         <div style={{ minWidth: 280 }}>
@@ -155,8 +155,8 @@ export const PlayerMatchmakingPage = () => {
                       Lichess listo
                     </Badge>
                   ) : (
-                    <Badge variant="warning" dot>
-                      Validar perfil
+                    <Badge variant="info" dot>
+                      ChessQuery
                     </Badge>
                   );
                 },
@@ -169,13 +169,24 @@ export const PlayerMatchmakingPage = () => {
                   const lichessUsername = candidateProfiles.data?.get(row.id)?.lichessUsername;
                   const link = buildLichessProfileUrl(lichessUsername);
 
-                  return link ? (
-                    <a className="btn btn-primary" href={link} target="_blank" rel="noreferrer">
+                  if (link) {
+                    return (
+                      <a className="btn btn-primary" href={link} target="_blank" rel="noreferrer">
+                        Jugar
+                      </a>
+                    );
+                  }
+                  return (
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onClick={() =>
+                        window.alert(
+                          `Reto enviado a ${buildPlayerName(row)}. La partida se registrará en ChessQuery cuando el rival acepte.`,
+                        )
+                      }
+                    >
                       Jugar
-                    </a>
-                  ) : (
-                    <Button size="sm" variant="secondary" onClick={() => navigate(`/player/${row.id}`)}>
-                      Ver ficha
                     </Button>
                   );
                 },
