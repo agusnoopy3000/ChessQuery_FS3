@@ -30,14 +30,14 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
      * Ranking por ELO nacional, filtrado por región y rango de fecha de nacimiento
      * (para categorías de edad).
      */
-    @Query("""
-            SELECT p FROM Player p
-            WHERE  (:region IS NULL OR LOWER(p.region) = LOWER(:region))
-            AND    (:minBirth IS NULL OR p.birthDate >= :minBirth)
-            AND    (:maxBirth IS NULL OR p.birthDate <= :maxBirth)
-            AND    p.eloNational IS NOT NULL
-            ORDER  BY p.eloNational DESC
-            """)
+    @Query(value = """
+            SELECT p.* FROM player p
+            WHERE  (CAST(:region AS text) IS NULL OR LOWER(p.region) = LOWER(CAST(:region AS text)))
+            AND    (CAST(:minBirth AS date) IS NULL OR p.birth_date >= CAST(:minBirth AS date))
+            AND    (CAST(:maxBirth AS date) IS NULL OR p.birth_date <= CAST(:maxBirth AS date))
+            AND    p.elo_national IS NOT NULL
+            ORDER  BY p.elo_national DESC
+            """, nativeQuery = true)
     List<Player> findRanking(
             @Param("region")   String region,
             @Param("minBirth") LocalDate minBirth,
