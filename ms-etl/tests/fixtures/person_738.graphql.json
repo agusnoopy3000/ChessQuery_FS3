@@ -1,0 +1,23 @@
+{
+  "data": {
+    "person": {
+      "id": "738",
+      "firstName": "Jorge",
+      "secondName": "Moises",
+      "lastName": "Sepulveda",
+      "lastNameSecond": "Rojas",
+      "fullName": "Jorge Sepulveda Rojas",
+      "birthdayFormated": "24/03/1981",
+      "identificator": "99148608",
+      "identificatorFormat": "9914860-8",
+      "fideIdentificator": "3404803",
+      "federationId": "3404803",
+      "eloNat": "2053",
+      "eloInter": "2159",
+      "clubBasic": {
+        "id": "22",
+        "name": "Club Deportivo Chess Viña del Mar"
+      }
+    }
+  }
+}
