@@ -92,9 +92,9 @@ Ver `docs/ajefech_player_sample.json` (capturado del live).
 ## Datos confirmados (capturados 2026-04-26)
 
 ```
-/player/738    → Jorge Moises Sepulveda Rojas, RUT 9914860-8,
+/player/738    → Jorge Moises Sepulveda Rojas, RUT ,
                  FIDE 3404803, ELO Nat 2053, ELO Inter 2159,
                  Club Deportivo Chess Viña del Mar
-/player/25769  → Agustin Nicolas Garrido Castro, RUT 21051988-2,
+/player/25769  → Agustin Nicolas Garrido Castro, RUT ,
                  FIDE 3478432, ELO Nat 1341, ELO Inter 1586
 ```
