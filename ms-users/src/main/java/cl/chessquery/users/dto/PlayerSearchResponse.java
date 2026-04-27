@@ -10,6 +10,8 @@ public record PlayerSearchResponse(
         String  countryIso,
         Integer eloNational,
         Integer eloFideStandard,
+        Integer eloPlatform,
         String  currentTitle,
+        String  clubName,
         String  enrichmentSource
 ) {}

@@ -327,20 +327,31 @@ export interface LichessProfilePayload {
 const normalizeLichess = (value: unknown): LichessProfilePayload => {
   const raw = asRecord(value);
   const user = asRecord(raw.user);
-  const profile = asRecord(user.profile);
-  const ratingsRaw = asRecord(user.ratings);
+  const ratingsRaw = user.ratings;
   const countsRaw = asRecord(user.counts);
 
-  const ratings: LichessRatingInfo[] = Object.entries(ratingsRaw).map(([variant, info]) => {
-    const entry = asRecord(info);
-    return {
-      variant,
-      rating: asNumber(entry.rating) ?? null,
-      games: asNumber(entry.games) ?? null,
-      rd: asNumber(entry.rd) ?? null,
-      prog: asNumber(entry.prog) ?? null,
-    };
-  });
+  // ms-etl devuelve ratings como array [{variant, rating, games, prog, rd}]
+  const ratings: LichessRatingInfo[] = Array.isArray(ratingsRaw)
+    ? (ratingsRaw as unknown[]).map((info) => {
+        const entry = asRecord(info);
+        return {
+          variant: asString(entry.variant) ?? '',
+          rating: asNumber(entry.rating) ?? null,
+          games: asNumber(entry.games) ?? null,
+          rd: asNumber(entry.rd) ?? null,
+          prog: asNumber(entry.prog) ?? null,
+        };
+      })
+    : Object.entries(asRecord(ratingsRaw)).map(([variant, info]) => {
+        const entry = asRecord(info);
+        return {
+          variant,
+          rating: asNumber(entry.rating) ?? null,
+          games: asNumber(entry.games) ?? null,
+          rd: asNumber(entry.rd) ?? null,
+          prog: asNumber(entry.prog) ?? null,
+        };
+      });
 
   const counts: Record<string, number> = {};
   for (const [k, v] of Object.entries(countsRaw)) {
@@ -369,13 +380,15 @@ const normalizeLichess = (value: unknown): LichessProfilePayload => {
     };
   });
 
-  const username = asString(raw.username) ?? null;
+  const username = asString(raw.username) ?? asString(user.username) ?? null;
+  // ms-etl devuelve `found` explícito; bff lo propaga en `user`
+  const found = user.found === true || (typeof user.username === 'string' && user.username.length > 0);
   return {
     username,
-    found: !!user.username,
+    found,
     error: asString(raw.error) ?? null,
-    displayName: asString(user.username) ?? username,
-    profileUrl: asString(user.url) ?? (username ? `https://lichess.org/@/${username}` : null),
+    displayName: asString(user.displayName ?? user.username) ?? username,
+    profileUrl: asString(user.profileUrl ?? user.url) ?? (username ? `https://lichess.org/@/${username}` : null),
     createdAt: asNumber(user.createdAt) ?? null,
     seenAt: asNumber(user.seenAt) ?? null,
     playTimeTotal: asNumber(user.playTimeTotal) ?? null,
@@ -448,4 +461,12 @@ export const authApi = {
     axios.post(`${baseURL}/auth/login`, { email, password }).then((r) => r.data),
   register: (input: { email: string; password: string; firstName: string; lastName: string; role?: string }) =>
     axios.post(`${baseURL}/auth/register`, input).then((r) => r.data),
+  /** Sincroniza el AuthUser con su Player en ms-users (crea Player con id = userId). */
+  syncProfile: (input: {
+    id: number;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    lichessUsername?: string;
+  }) => api.post('/api/player/sync', input).then((r) => r.data),
 };

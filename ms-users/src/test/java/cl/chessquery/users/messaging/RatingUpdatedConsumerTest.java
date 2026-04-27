@@ -2,6 +2,7 @@ package cl.chessquery.users.messaging;
 
 import cl.chessquery.users.entity.Player;
 import cl.chessquery.users.entity.ProcessedEvent;
+import cl.chessquery.users.repository.ClubRepository;
 import cl.chessquery.users.repository.PlayerRepository;
 import cl.chessquery.users.repository.ProcessedEventRepository;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,7 @@ class RatingUpdatedConsumerTest {
 
     @Mock PlayerRepository playerRepo;
     @Mock ProcessedEventRepository processedRepo;
+    @Mock ClubRepository clubRepo;
     @InjectMocks RatingUpdatedConsumer consumer;
 
     private static ChessEvent event(String eventId, List<Map<String, Object>> players) {

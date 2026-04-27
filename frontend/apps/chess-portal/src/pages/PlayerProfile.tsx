@@ -1,15 +1,5 @@
-import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
-} from 'recharts';
 import {
   Card,
   Badge,
@@ -17,18 +7,39 @@ import {
   Skeleton,
   ErrorAlert,
   EmptyState,
-  Table,
-  TableColumn,
 } from '@chessquery/ui-lib';
-import { Game, RatingHistoryPoint } from '@chessquery/shared';
 import { playerApi } from '../api';
 
-type Tab = 'overview' | 'rating' | 'games' | 'lichess';
+interface LichessRating {
+  variant: string;
+  rating: number | null;
+  games: number | null;
+  prog: number | null;
+}
+
+const VARIANT_LABEL: Record<string, string> = {
+  bullet: 'Bullet',
+  blitz: 'Blitz',
+  rapid: 'Rapid',
+  classical: 'Classical',
+  correspondence: 'Correspondence',
+  ultraBullet: 'UltraBullet',
+  chess960: '960',
+  kingOfTheHill: 'KOTH',
+  threeCheck: '3-Check',
+  antichess: 'Antichess',
+  atomic: 'Atomic',
+  horde: 'Horde',
+  racingKings: 'RKings',
+  crazyhouse: 'Crazyhouse',
+  puzzle: 'Puzzle',
+};
+
+const PRIMARY_VARIANTS = ['bullet', 'blitz', 'rapid', 'classical', 'correspondence'];
 
 export const PlayerProfilePage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<Tab>('overview');
 
   const profile = useQuery({
     queryKey: ['player', id, 'profile'],
@@ -36,24 +47,19 @@ export const PlayerProfilePage = () => {
     enabled: !!id,
   });
 
-  const history = useQuery({
-    queryKey: ['player', id, 'rating-history'],
-    queryFn: () => playerApi.ratingHistory(id!),
-    enabled: !!id && tab === 'rating',
-  });
-
   const lichess = useQuery({
     queryKey: ['player', id, 'lichess'],
     queryFn: () => playerApi.lichess(id!),
-    enabled: !!id && tab === 'lichess',
+    enabled: !!id && !!profile.data?.profile.lichessUsername,
     retry: false,
   });
 
   if (profile.isLoading) {
     return (
       <div style={{ padding: 28, display: 'grid', gap: 12 }}>
-        <Skeleton height={100} />
-        <Skeleton height={320} />
+        <Skeleton height={120} />
+        <Skeleton height={140} />
+        <Skeleton height={220} />
       </div>
     );
   }
@@ -70,268 +76,200 @@ export const PlayerProfilePage = () => {
     );
   }
 
-  const { profile: p, recentGames, stats } = profile.data;
+  const { profile: p } = profile.data;
   const fullName = [p.firstName, p.lastName].filter(Boolean).join(' ') || '—';
+  const initials = (p.firstName?.[0] ?? '?') + (p.lastName?.[0] ?? '');
+
+  const ratings = (lichess.data?.ratings ?? []) as LichessRating[];
+  const platformRatings = ratings.filter((r) => PRIMARY_VARIANTS.includes(r.variant));
+  const platformBest = platformRatings.length > 0
+    ? Math.max(...platformRatings.map((r) => r.rating ?? 0))
+    : null;
 
   return (
-    <div style={{ padding: 28, display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ padding: 28, display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 980, margin: '0 auto' }}>
       <button className="btn btn-ghost" style={{ alignSelf: 'flex-start' }} onClick={() => navigate(-1)}>
         ← Volver
       </button>
 
-      {/* Header */}
+      {/* Header card */}
       <Card padded>
-        <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 22, alignItems: 'center', flexWrap: 'wrap' }}>
           <div
             style={{
-              width: 72,
-              height: 72,
+              width: 88,
+              height: 88,
               borderRadius: '50%',
               background: 'var(--accent-dim)',
               border: '2px solid oklch(68% 0.20 150 / 0.35)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 28,
+              fontSize: 32,
               color: 'var(--accent)',
+              fontFamily: "'Space Grotesk', system-ui, sans-serif",
               fontWeight: 700,
+              flexShrink: 0,
             }}
           >
-            {(p.firstName?.[0] ?? '?') + (p.lastName?.[0] ?? '')}
+            {initials.toUpperCase()}
           </div>
           <div style={{ flex: 1, minWidth: 200 }}>
-            <div style={{ fontSize: 24, fontWeight: 700 }}>{fullName}</div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+            <div
+              style={{
+                fontFamily: "'Space Grotesk', system-ui, sans-serif",
+                fontSize: 28,
+                fontWeight: 700,
+                lineHeight: 1.1,
+              }}
+            >
+              {fullName}
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
               {p.fideTitle && <Badge variant="gold">{p.fideTitle}</Badge>}
               {p.ageCategory && <Badge>{p.ageCategory}</Badge>}
-              {p.clubName && <Badge variant="info">{p.clubName}</Badge>}
-              {p.countryName && <Badge>{p.countryFlag ?? ''} {p.countryName}</Badge>}
+              {p.enrichmentSource && <Badge>{p.enrichmentSource}</Badge>}
+              {p.fideId && (
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  FIDE ID · {p.fideId}
+                </span>
+              )}
             </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {p.eloFideStandard != null && <RatingBadge rating={p.eloFideStandard} label="FIDE" />}
-            {p.eloNational != null && <RatingBadge rating={p.eloNational} label="NAC" />}
-            {p.eloFideRapid != null && <RatingBadge rating={p.eloFideRapid} label="RAPID" />}
-            {p.eloFideBlitz != null && <RatingBadge rating={p.eloFideBlitz} label="BLITZ" />}
           </div>
         </div>
       </Card>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)' }}>
-        {(['overview', 'rating', 'games', 'lichess'] as Tab[]).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            style={{
-              padding: '10px 16px',
-              background: 'transparent',
-              border: 'none',
-              borderBottom: tab === t ? '2px solid var(--accent)' : '2px solid transparent',
-              color: tab === t ? 'var(--accent)' : 'var(--text-muted)',
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: 13,
-            }}
-          >
-            {t === 'overview' ? 'Resumen' : t === 'rating' ? 'Rating' : t === 'games' ? 'Partidas' : 'Lichess'}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'overview' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-          <Card header="Total de partidas"><div style={{ fontSize: 28, fontWeight: 700 }}>{stats?.totalGames ?? 0}</div></Card>
-          <Card header="Victorias"><div style={{ fontSize: 28, fontWeight: 700, color: 'var(--accent)' }}>{stats?.wins ?? 0}</div></Card>
-          <Card header="Tablas"><div style={{ fontSize: 28, fontWeight: 700 }}>{stats?.draws ?? 0}</div></Card>
-          <Card header="Derrotas"><div style={{ fontSize: 28, fontWeight: 700, color: 'var(--red)' }}>{stats?.losses ?? 0}</div></Card>
-          <Card header="% Victoria"><div style={{ fontSize: 28, fontWeight: 700 }}>{stats?.winRate != null ? `${(stats.winRate * 100).toFixed(1)}%` : '—'}</div></Card>
-          {stats?.favoriteOpening && (
-            <Card header="Apertura favorita"><div style={{ fontSize: 15 }}>{stats.favoriteOpening}</div></Card>
-          )}
-        </div>
-      )}
-
-      {tab === 'rating' && (
-        <Card header="Evolución de rating">
-          {history.isLoading ? (
-            <Skeleton height={280} />
-          ) : history.isError ? (
-            <ErrorAlert message="No se pudo cargar el histórico" onRetry={() => history.refetch()} />
-          ) : !history.data || history.data.length === 0 ? (
-            <EmptyState title="Sin historial" description="No hay datos de rating todavía" />
+      {/* Hero stats: ELOs y Club */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: 12,
+        }}
+      >
+        <Card header="ELO Nacional">
+          {p.eloNational != null ? (
+            <RatingBadge rating={p.eloNational} label="NAC" />
           ) : (
-            <div style={{ width: '100%', height: 320 }}>
-              <ResponsiveContainer>
-                <LineChart data={(history.data as RatingHistoryPoint[]).map((h) => ({
-                  date: h.recordedAt?.slice(0, 10),
-                  rating: h.value,
-                }))}>
-                  <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
-                  <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={11} />
-                  <YAxis stroke="var(--text-muted)" fontSize={11} domain={['dataMin - 40', 'dataMax + 40']} />
-                  <Tooltip
-                    contentStyle={{
-                      background: 'var(--surface)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 8,
-                      fontSize: 12,
-                    }}
-                  />
-                  <Line type="monotone" dataKey="rating" stroke="oklch(68% 0.20 150)" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
+            <div style={{ fontSize: 18, color: 'var(--text-muted)' }}>—</div>
+          )}
+        </Card>
+        <Card header="ELO FIDE">
+          {p.eloFideStandard != null ? (
+            <RatingBadge rating={p.eloFideStandard} label="FIDE" />
+          ) : (
+            <div style={{ fontSize: 18, color: 'var(--text-muted)' }}>—</div>
+          )}
+        </Card>
+        <Card header="ELO Plataforma">
+          {platformBest != null ? (
+            <div>
+              <RatingBadge rating={platformBest} label="LICHESS" />
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
+                Mejor variante
+              </div>
+            </div>
+          ) : lichess.isLoading ? (
+            <Skeleton height={26} width={90} />
+          ) : (
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+              {p.lichessUsername ? 'Sin datos en Lichess' : 'Sin cuenta vinculada'}
             </div>
           )}
         </Card>
-      )}
-
-      {tab === 'lichess' && (
-        <div style={{ display: 'grid', gap: 16 }}>
-          {lichess.isLoading ? (
-            <Skeleton height={220} />
-          ) : lichess.isError ? (
-            <ErrorAlert title="No se pudo consultar Lichess" onRetry={() => lichess.refetch()} />
-          ) : !lichess.data?.username ? (
-            <EmptyState
-              title="Sin cuenta Lichess vinculada"
-              description="Este jugador no tiene lichessUsername registrado en su perfil."
-              icon="♖"
-            />
-          ) : !lichess.data.found ? (
-            <EmptyState
-              title={`Usuario @${lichess.data.username} no encontrado en Lichess`}
-              description={lichess.data.error ?? 'La API Lichess devolvió 404.'}
-              icon="⚠"
-            />
-          ) : (
-            <>
-              <Card padded>
-                <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <div style={{ flex: 1, minWidth: 220 }}>
-                    <div style={{ fontSize: 20, fontWeight: 700 }}>
-                      ♖ {lichess.data.displayName ?? lichess.data.username}
-                    </div>
-                    {lichess.data.profileUrl && (
-                      <a
-                        href={lichess.data.profileUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ color: 'var(--accent)', fontSize: 13, textDecoration: 'none' }}
-                      >
-                        {lichess.data.profileUrl} ↗
-                      </a>
-                    )}
-                    <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 6 }}>
-                      {lichess.data.playTimeTotal != null
-                        ? `Tiempo jugado: ${Math.round(lichess.data.playTimeTotal / 3600)} h · `
-                        : ''}
-                      {lichess.data.counts?.rated != null
-                        ? `${lichess.data.counts.rated} partidas rated`
-                        : ''}
-                    </div>
-                  </div>
-                </div>
-              </Card>
-
-              <Card header="Ratings por variante (fuente Lichess)">
-                {lichess.data.ratings.length === 0 ? (
-                  <EmptyState title="Sin ratings disponibles" />
-                ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
-                    {lichess.data.ratings.map((r) => (
-                      <div
-                        key={r.variant}
-                        style={{
-                          padding: '12px 14px',
-                          background: 'var(--surface)',
-                          border: '1px solid var(--border)',
-                          borderRadius: 10,
-                        }}
-                      >
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                          {r.variant}
-                        </div>
-                        <div style={{ fontSize: 22, fontWeight: 700 }}>{r.rating ?? '—'}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                          {r.games ?? 0} partidas
-                          {r.prog != null ? ` · ${r.prog >= 0 ? '+' : ''}${r.prog}` : ''}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Card>
-
-              <Card header="Últimas partidas en Lichess">
-                {lichess.data.games.length === 0 ? (
-                  <EmptyState title="Sin partidas recientes" />
-                ) : (
-                  <div style={{ display: 'grid', gap: 8 }}>
-                    {lichess.data.games.map((g) => (
-                      <a
-                        key={g.id}
-                        href={g.url ?? '#'}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: '100px 1fr auto',
-                          alignItems: 'center',
-                          gap: 12,
-                          padding: '10px 14px',
-                          background: 'var(--surface)',
-                          border: '1px solid var(--border)',
-                          borderRadius: 8,
-                          textDecoration: 'none',
-                          color: 'var(--text)',
-                        }}
-                      >
-                        <Badge variant={g.rated ? 'info' : 'neutral'}>
-                          {g.perf ?? g.speed ?? '—'}
-                        </Badge>
-                        <div style={{ fontSize: 13 }}>
-                          <span style={{ fontWeight: 600 }}>{g.whiteName ?? '?'}</span>
-                          {g.whiteRating ? ` (${g.whiteRating})` : ''}
-                          {' vs '}
-                          <span style={{ fontWeight: 600 }}>{g.blackName ?? '?'}</span>
-                          {g.blackRating ? ` (${g.blackRating})` : ''}
-                          {g.moves != null ? ` · ${g.moves} jugadas` : ''}
-                        </div>
-                        <Badge variant={g.winner ? 'success' : 'neutral'}>
-                          {g.winner ? (g.winner === 'white' ? '1-0' : '0-1') : '½-½'}
-                        </Badge>
-                      </a>
-                    ))}
-                  </div>
-                )}
-              </Card>
-            </>
-          )}
-        </div>
-      )}
-
-      {tab === 'games' && (
-        <Card header="Últimas partidas">
-          {!recentGames || recentGames.length === 0 ? (
-            <EmptyState title="Sin partidas" />
-          ) : (
-            <Table<Game>
-              rows={recentGames}
-              rowKey={(r) => r.id}
-              columns={[
-                { key: 'date', header: 'Fecha', render: (r) => r.playedAt?.slice(0, 10) ?? '—' },
-                { key: 'white', header: 'Blancas', render: (r) => r.whiteName ?? `#${r.whitePlayerId}` },
-                { key: 'black', header: 'Negras', render: (r) => r.blackName ?? `#${r.blackPlayerId}` },
-                { key: 'result', header: 'Resultado', align: 'center', render: (r) => <Badge>{r.result}</Badge> },
-                { key: 'opening', header: 'Apertura', render: (r) => r.openingName ?? '—' },
-                { key: 'type', header: 'Tipo', render: (r) => <Badge variant={r.gameType === 'TOURNAMENT' ? 'info' : 'neutral'}>{r.gameType}</Badge> },
-              ] as TableColumn<Game>[]}
-            />
+        <Card header="Club">
+          <div
+            style={{
+              fontFamily: "'Space Grotesk', system-ui, sans-serif",
+              fontSize: 16,
+              fontWeight: 600,
+              lineHeight: 1.3,
+            }}
+          >
+            {p.clubName ?? '—'}
+          </div>
+          {p.countryName && (
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+              {p.countryFlag ? `${p.countryFlag} ` : ''}{p.countryName}
+            </div>
           )}
         </Card>
-      )}
+      </div>
+
+      {/* Lichess breakdown por modalidad */}
+      <Card header={`Resumen Lichess${p.lichessUsername ? ` · @${p.lichessUsername}` : ''}`}>
+        {!p.lichessUsername ? (
+          <EmptyState
+            title="Sin cuenta Lichess vinculada"
+            description="Este jugador no proporcionó su usuario de Lichess durante el registro."
+            icon="♖"
+          />
+        ) : lichess.isLoading ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
+            {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} height={86} />)}
+          </div>
+        ) : lichess.isError ? (
+          <ErrorAlert title="No se pudo consultar Lichess" onRetry={() => lichess.refetch()} />
+        ) : !lichess.data?.found ? (
+          <EmptyState
+            title={`Usuario @${p.lichessUsername} no encontrado en Lichess`}
+            description={lichess.data?.error ?? 'La API Lichess devolvió 404.'}
+            icon="⚠"
+          />
+        ) : platformRatings.length === 0 ? (
+          <EmptyState title="Sin ratings disponibles" description="El usuario no tiene partidas rateadas." />
+        ) : (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+              gap: 10,
+            }}
+          >
+            {platformRatings.map((r) => (
+              <div
+                key={r.variant}
+                style={{
+                  padding: '14px 16px',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 12,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: 'var(--text-muted)',
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                    fontWeight: 600,
+                  }}
+                >
+                  {VARIANT_LABEL[r.variant] ?? r.variant}
+                </div>
+                <div
+                  style={{
+                    fontFamily: "'Space Grotesk', system-ui, sans-serif",
+                    fontSize: 26,
+                    fontWeight: 700,
+                    marginTop: 2,
+                  }}
+                >
+                  {r.rating ?? '—'}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                  {r.games ?? 0} partidas
+                  {r.prog != null && r.prog !== 0 ? (
+                    <span style={{ marginLeft: 6, color: r.prog > 0 ? 'var(--accent)' : 'var(--red)' }}>
+                      {r.prog > 0 ? '+' : ''}{r.prog}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
     </div>
   );
 };

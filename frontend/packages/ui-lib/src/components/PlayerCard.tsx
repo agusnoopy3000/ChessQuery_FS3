@@ -13,18 +13,18 @@ export interface PlayerCardPlayer {
   fideTitle?: string | null;
   eloFideStandard?: number | null;
   eloNational?: number | null;
+  eloPlatform?: number | null;
   enrichmentSource?: string | null;
 }
 
 export interface PlayerCardProps {
   player: PlayerCardPlayer;
   onClick?: () => void;
-  ratingLabel?: string;
 }
 
-export const PlayerCard = ({ player, onClick, ratingLabel = 'ELO' }: PlayerCardProps) => {
+export const PlayerCard = ({ player, onClick }: PlayerCardProps) => {
   const fullName = player.name ?? [player.firstName, player.lastName].filter(Boolean).join(' ') ?? '—';
-  const rating = player.eloFideStandard ?? player.eloNational ?? null;
+  const initials = (player.firstName?.[0] ?? '?') + (player.lastName?.[0] ?? '');
 
   return (
     <Card
@@ -33,11 +33,11 @@ export const PlayerCard = ({ player, onClick, ratingLabel = 'ELO' }: PlayerCardP
       onClick={onClick}
       padded
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
         <div
           style={{
-            width: 44,
-            height: 44,
+            width: 52,
+            height: 52,
             borderRadius: '50%',
             background: 'var(--accent-dim)',
             border: '2px solid var(--accent-outline)',
@@ -51,15 +51,16 @@ export const PlayerCard = ({ player, onClick, ratingLabel = 'ELO' }: PlayerCardP
             flexShrink: 0,
           }}
         >
-          {fullName.charAt(0).toUpperCase()}
+          {initials.toUpperCase()}
         </div>
+
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <div
               style={{
                 fontFamily: "'Space Grotesk', system-ui, sans-serif",
                 fontWeight: 600,
-                fontSize: 14,
+                fontSize: 15,
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -70,12 +71,17 @@ export const PlayerCard = ({ player, onClick, ratingLabel = 'ELO' }: PlayerCardP
             {player.fideTitle && <Badge variant="gold">{player.fideTitle}</Badge>}
             {player.enrichmentSource && <Badge>{player.enrichmentSource}</Badge>}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
             {player.countryFlag && <span style={{ marginRight: 4 }}>{player.countryFlag}</span>}
             {player.clubName ?? player.countryName ?? 'Sin club'}
           </div>
         </div>
-        {rating != null && <RatingBadge rating={rating} label={ratingLabel} />}
+
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {player.eloNational != null && <RatingBadge rating={player.eloNational} label="NAC" />}
+          {player.eloFideStandard != null && <RatingBadge rating={player.eloFideStandard} label="FIDE" />}
+          {player.eloPlatform != null && <RatingBadge rating={player.eloPlatform} label="LICHESS" />}
+        </div>
       </div>
     </Card>
   );

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Role, useAuth } from '@chessquery/shared';
 import { Badge, Button, Card, ErrorAlert, Input } from '@chessquery/ui-lib';
+import { authApi } from '../api';
 
 const roleOptions: Array<{
   value: Role;
@@ -35,6 +36,7 @@ export const RegisterPage = () => {
     email: '',
     password: '',
     confirm: '',
+    lichessUsername: '',
     role: 'PLAYER' as Role,
   });
   const [error, setError] = useState<string | null>(null);
@@ -64,13 +66,25 @@ export const RegisterPage = () => {
 
     setSubmitting(true);
     try {
-      await register({
+      const user = await register({
         email: form.email.trim(),
         password: form.password,
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         role: form.role,
       });
+      // Sincronizar con ms-users (crea Player con id = user.id e incluye lichessUsername si lo dio)
+      try {
+        await authApi.syncProfile({
+          id: user.id,
+          email: form.email.trim(),
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          lichessUsername: form.lichessUsername.trim() || undefined,
+        });
+      } catch {
+        // No bloqueamos el registro si el sync falla; el usuario podrá editarlo después.
+      }
       navigate('/');
     } catch (err) {
       const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -164,6 +178,13 @@ export const RegisterPage = () => {
                   value={form.confirm}
                   required
                   onChange={(event) => set('confirm', event.target.value)}
+                />
+                <Input
+                  label="Usuario de Lichess (opcional)"
+                  value={form.lichessUsername}
+                  hint="Permite mostrar tu ELO de plataforma por modalidad en tu perfil"
+                  placeholder="ej: DrNykterstein"
+                  onChange={(event) => set('lichessUsername', event.target.value)}
                 />
                 <Button type="submit" size="lg" loading={submitting} fullWidth>
                   Crear cuenta {activeRole.title.toLowerCase()}

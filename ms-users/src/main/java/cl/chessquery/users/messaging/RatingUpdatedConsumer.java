@@ -1,8 +1,10 @@
 package cl.chessquery.users.messaging;
 
 import cl.chessquery.users.config.RabbitMQConfig;
+import cl.chessquery.users.entity.Club;
 import cl.chessquery.users.entity.Player;
 import cl.chessquery.users.entity.ProcessedEvent;
+import cl.chessquery.users.repository.ClubRepository;
 import cl.chessquery.users.repository.PlayerRepository;
 import cl.chessquery.users.repository.ProcessedEventRepository;
 import lombok.RequiredArgsConstructor;
@@ -61,6 +63,7 @@ public class RatingUpdatedConsumer {
 
     private final PlayerRepository playerRepo;
     private final ProcessedEventRepository processedRepo;
+    private final ClubRepository clubRepo;
 
     @RabbitListener(queues = RabbitMQConfig.USERS_RATING_QUEUE)
     @Transactional
@@ -173,6 +176,11 @@ public class RatingUpdatedConsumer {
         if (player.getBirthDate() == null) {
             player.setBirthDate(asLocalDate(p.get("birthDate")));
         }
+        // Resolver club por nombre (find-or-create) si AJEFECH lo proveyó
+        String clubName = asString(p.get("clubName"));
+        if (clubName != null && player.getClub() == null) {
+            player.setClub(findOrCreateClub(clubName));
+        }
         // ELOs: siempre actualiza si hay valor nuevo > 0
         Integer eloNat = asInt(p.get("eloNational"));
         if (eloNat != null && eloNat > 0) player.setEloNational(eloNat);
@@ -186,6 +194,7 @@ public class RatingUpdatedConsumer {
     private Player newPlayerFromPayload(Map<String, Object> p, String source) {
         Integer eloNat = asInt(p.get("eloNational"));
         Integer eloFide = asInt(p.get("eloFideStandard"));
+        String clubName = asString(p.get("clubName"));
         return Player.builder()
                 .firstName(asString(p.get("firstName")))
                 .lastName(asString(p.get("lastName")))
@@ -193,11 +202,17 @@ public class RatingUpdatedConsumer {
                 .fideId(asString(p.get("fideId")))
                 .federationId(asString(p.get("federationId")))
                 .birthDate(asLocalDate(p.get("birthDate")))
+                .club(clubName != null ? findOrCreateClub(clubName) : null)
                 .eloNational(eloNat != null && eloNat > 0 ? eloNat : null)
                 .eloFideStandard(eloFide != null && eloFide > 0 ? eloFide : null)
                 .enrichmentSource(source)
                 .enrichedAt(Instant.now())
                 .build();
+    }
+
+    private Club findOrCreateClub(String name) {
+        return clubRepo.findFirstByNameIgnoreCase(name)
+                .orElseGet(() -> clubRepo.save(Club.builder().name(name).build()));
     }
 
     private void persistProcessed(UUID eventId, String eventType) {

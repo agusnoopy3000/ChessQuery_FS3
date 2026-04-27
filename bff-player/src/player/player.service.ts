@@ -102,6 +102,17 @@ export class PlayerService {
     return this.http.get<unknown>(`${msUsers}/users/ranking${qs}`);
   }
 
+  async syncFromAuth(body: {
+    id: number;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    lichessUsername?: string;
+  }): Promise<unknown> {
+    const { msUsers } = this.http.urls;
+    return this.http.post<unknown>(`${msUsers}/users/sync`, body);
+  }
+
   async getLichessProfile(playerId: string): Promise<{
     username: string | null;
     user: unknown | null;

@@ -44,6 +44,15 @@ public class UserController {
         );
     }
 
+    // ── Sincronización post-registro ─────────────────────────────────────────
+
+    @Operation(summary = "Crea o actualiza el Player con id = auth_user.id tras /auth/register")
+    @PostMapping("/sync")
+    @ResponseStatus(HttpStatus.OK)
+    public PlayerProfileResponse syncFromAuth(@Valid @RequestBody AuthSyncRequest request) {
+        return playerService.syncFromAuth(request);
+    }
+
     // ── Perfil completo ───────────────────────────────────────────────────────
 
     @Operation(summary = "Obtener perfil completo del jugador (country y club resueltos)")

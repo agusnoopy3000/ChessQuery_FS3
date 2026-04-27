@@ -4,6 +4,8 @@ import cl.chessquery.users.dto.*;
 import cl.chessquery.users.entity.*;
 import cl.chessquery.users.exception.ApiException;
 import cl.chessquery.users.repository.*;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,55 @@ public class PlayerService {
     private final RatingHistoryRepository     historyRepo;
     private final PlayerTitleHistoryRepository titleRepo;
     private final EventPublisherService       events;
+
+    @PersistenceContext
+    private EntityManager em;
+
+    // ─── POST /users/sync (upsert post-registro) ─────────────────────────────
+
+    /**
+     * Crea o actualiza el Player con id=auth.userId. Llamado por el portal
+     * tras /auth/register exitoso para persistir firstName/lastName y
+     * lichessUsername opcional. Idempotente: ejecutar varias veces no falla.
+     */
+    @Transactional
+    public PlayerProfileResponse syncFromAuth(AuthSyncRequest req) {
+        // Si ya existe, actualizamos vía JPA (entity managed)
+        Player existing = playerRepo.findById(req.id()).orElse(null);
+        if (existing != null) {
+            if (StringUtils.hasText(req.firstName())) existing.setFirstName(req.firstName());
+            if (StringUtils.hasText(req.lastName()))  existing.setLastName(req.lastName());
+            if (StringUtils.hasText(req.email()) && existing.getEmail() == null) existing.setEmail(req.email());
+            if (StringUtils.hasText(req.lichessUsername())) {
+                existing.setLichessUsername(req.lichessUsername().trim());
+            }
+            playerRepo.save(existing);
+        } else {
+            // INSERT nativo: respeta el id explícito que viene de auth_user.id
+            // (sortear IDENTITY usando OVERRIDING SYSTEM VALUE en PostgreSQL).
+            Instant now = Instant.now();
+            em.createNativeQuery("""
+                    INSERT INTO player (id, first_name, last_name, email, lichess_username, created_at, updated_at)
+                    OVERRIDING SYSTEM VALUE
+                    VALUES (:id, :fn, :ln, :em, :lu, :ts, :ts)
+                    ON CONFLICT (id) DO NOTHING
+                    """)
+                    .setParameter("id", req.id())
+                    .setParameter("fn", StringUtils.hasText(req.firstName()) ? req.firstName() : "Jugador")
+                    .setParameter("ln", StringUtils.hasText(req.lastName())  ? req.lastName()  : String.valueOf(req.id()))
+                    .setParameter("em", req.email())
+                    .setParameter("lu", StringUtils.hasText(req.lichessUsername()) ? req.lichessUsername().trim() : null)
+                    .setParameter("ts", now)
+                    .executeUpdate();
+            em.clear();
+        }
+
+        Player p = playerRepo.findById(req.id())
+                .orElseThrow(() -> new ApiException(500, "SYNC_FAILED", "No se pudo sincronizar el Player"));
+        String title = titleRepo.findByPlayerIdAndIsCurrentTrue(p.getId())
+                .map(t -> t.getTitle().name()).orElse(null);
+        return toProfileResponse(p, title);
+    }
 
     // ─── GET /users/{id}/profile ──────────────────────────────────────────────
 
@@ -209,7 +260,9 @@ public class PlayerService {
                 p.getCountry() != null ? p.getCountry().getIsoCode() : null,
                 p.getEloNational(),
                 p.getEloFideStandard(),
+                p.getEloPlatform(),
                 title,
+                p.getClub() != null ? p.getClub().getName() : null,
                 p.getEnrichmentSource()
         );
     }
