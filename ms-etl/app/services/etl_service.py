@@ -11,6 +11,7 @@ from app.services.circuit_breaker import CircuitBreaker
 from app.services.rabbitmq_publisher import publish_event
 from app.sources.fide_mock import FideMockSource
 from app.sources.ajefech_mock import AjefechMockSource
+from app.sources.ajefech_real import AjefechRealSource
 from app.sources.chess_results_mock import ChessResultsMockSource
 from app.sources.lichess_mock import LichessMockSource
 
@@ -27,9 +28,11 @@ circuit_breakers: dict[str, CircuitBreaker] = {
     "lichess":       CircuitBreaker("lichess"),
 }
 
+AJEFECH_USE_MOCK = os.getenv("AJEFECH_USE_MOCK", "false").lower() == "true"
+
 sources = {
     "fide":          FideMockSource(),
-    "ajefech":       AjefechMockSource(),
+    "ajefech":       AjefechMockSource() if AJEFECH_USE_MOCK else AjefechRealSource(),
     "chess_results": ChessResultsMockSource(),
     "lichess":       LichessMockSource(),
 }
@@ -85,6 +88,7 @@ async def run_sync(source: str, db: Session) -> EtlSyncLog:
                 "playersUpdated": len(records),
                 "ratingType": "NATIONAL",
                 "syncId": log.id,
+                "players": records,
             },
         )
         publish_event(

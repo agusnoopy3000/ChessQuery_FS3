@@ -3,6 +3,7 @@ from app.routers.etl_router import router as etl_router
 from app.routers.scraper_router import router as scraper_router
 from app.database import engine, Base
 from app.models.sync_log import EtlSyncLog  # noqa: F401 - ensure table created
+from app.models.ajefech_snapshot import AjefechPlayerSnapshot  # noqa: F401
 
 Base.metadata.create_all(bind=engine)
 
