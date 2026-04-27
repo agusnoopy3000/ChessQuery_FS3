@@ -63,6 +63,7 @@ cloud:
   aws:
     s3:
       endpoint: ${S3_ENDPOINT_URL:http://localhost:9000}
+      public-endpoint: ${S3_PUBLIC_ENDPOINT_URL:http://localhost:9000}
     credentials:
       access-key: ${S3_ACCESS_KEY:minioadmin}
       secret-key: ${S3_SECRET_KEY:minioadmin}
@@ -71,6 +72,19 @@ cloud:
 
 s3:
   bucket: ${S3_BUCKET:chessquery-pgn}
+
+# ── Actuator / Monitoring ───────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
 ---
 # ── Perfil Docker ────────────────────────────────────────────────────────────

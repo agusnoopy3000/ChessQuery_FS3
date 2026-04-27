@@ -1,0 +1,18 @@
+{
+  "name": "chessquery-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @chessquery/ui-lib && npm run build --workspaces --if-present",
+    "build:portal": "npm run build -w chess-portal",
+    "build:organizer": "npm run build -w organizer-panel",
+    "build:admin": "npm run build -w admin-panel",
+    "dev:portal": "npm run dev -w chess-portal",
+    "dev:organizer": "npm run dev -w organizer-panel",
+    "dev:admin": "npm run dev -w admin-panel"
+  }
+}

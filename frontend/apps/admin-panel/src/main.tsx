@@ -23,9 +23,15 @@ const api = createApiClient({
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false },
+    queries: {
+      staleTime: 30_000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
   },
 });
+
+export { api, storage };
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

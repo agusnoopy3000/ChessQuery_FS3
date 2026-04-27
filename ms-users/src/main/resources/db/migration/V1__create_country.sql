@@ -4,7 +4,7 @@
 
 CREATE TABLE country (
     id               SERIAL      PRIMARY KEY,
-    iso_code         CHAR(3)     NOT NULL UNIQUE,
+    iso_code         VARCHAR(3)  NOT NULL UNIQUE,
     name             VARCHAR(100) NOT NULL,
     fide_federation  VARCHAR(10)
 );

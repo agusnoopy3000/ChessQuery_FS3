@@ -8,6 +8,7 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3ClientBuilder;
+import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 import java.net.URI;
@@ -17,6 +18,9 @@ public class S3Config {
 
     @Value("${cloud.aws.s3.endpoint:}")
     private String endpoint;
+
+    @Value("${cloud.aws.s3.public-endpoint:}")
+    private String publicEndpoint;
 
     @Value("${cloud.aws.credentials.access-key:minioadmin}")
     private String accessKey;
@@ -51,10 +55,16 @@ public class S3Config {
 
         S3Presigner.Builder builder = S3Presigner.builder()
                 .credentialsProvider(credentials)
-                .region(Region.of(region));
+                .region(Region.of(region))
+                .serviceConfiguration(S3Configuration.builder()
+                        .pathStyleAccessEnabled(true)
+                        .build());
 
-        if (endpoint != null && !endpoint.isBlank()) {
-            builder.endpointOverride(URI.create(endpoint));
+        String presignEndpoint = (publicEndpoint != null && !publicEndpoint.isBlank())
+                ? publicEndpoint
+                : endpoint;
+        if (presignEndpoint != null && !presignEndpoint.isBlank()) {
+            builder.endpointOverride(URI.create(presignEndpoint));
         }
 
         return builder.build();

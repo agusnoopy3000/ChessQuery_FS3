@@ -8,8 +8,12 @@ import pika
 
 logger = logging.getLogger(__name__)
 
-RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://chessquery:chessquery_dev@localhost:5672/")
-EXCHANGE = "ChessEvents"
+_HOST = os.getenv("RABBITMQ_HOST", "localhost")
+_PORT = os.getenv("RABBITMQ_PORT", "5672")
+_USER = os.getenv("RABBITMQ_USER", "chessquery")
+_PASS = os.getenv("RABBITMQ_PASS", os.getenv("RABBITMQ_PASSWORD", "chessquery_dev"))
+RABBITMQ_URL = os.getenv("RABBITMQ_URL", f"amqp://{_USER}:{_PASS}@{_HOST}:{_PORT}/")
+EXCHANGE = os.getenv("RABBITMQ_EXCHANGE", "ChessEvents")
 
 
 def _get_connection():

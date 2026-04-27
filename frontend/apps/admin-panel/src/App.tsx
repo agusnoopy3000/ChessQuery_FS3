@@ -1,10 +1,23 @@
-import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@chessquery/shared';
 import { Shell, ShellNavItem } from '@chessquery/ui-lib';
-import { AdminLoginPage } from './pages/Login';
-import { AdminDashboardPage } from './pages/Dashboard';
-import { EtlPage } from './pages/Etl';
-import { UsersPage } from './pages/Users';
+
+import { LoginPage } from '../../chess-portal/src/pages/Login';
+import { AdminDashboardPage } from '../../chess-portal/src/pages/AdminDashboard';
+import { AdminEtlPage } from '../../chess-portal/src/pages/AdminEtl';
+import { RankingsPage } from '../../chess-portal/src/pages/Rankings';
+import { TournamentsPage } from '../../chess-portal/src/pages/Tournaments';
+import { TournamentDetailPage } from '../../chess-portal/src/pages/TournamentDetail';
+import { PlayerProfilePage } from '../../chess-portal/src/pages/PlayerProfile';
+import { SearchPage } from '../../chess-portal/src/pages/Search';
+
+const buildNav = (pathname: string, navigate: ReturnType<typeof useNavigate>): ShellNavItem[] => [
+  { id: 'home', label: 'Dashboard', icon: '♔', desc: 'Vista global', active: pathname === '/', onClick: () => navigate('/') },
+  { id: 'etl', label: 'ETL / Fuentes', icon: '⟳', desc: 'Circuit breakers y sync', active: pathname.startsWith('/etl'), onClick: () => navigate('/etl') },
+  { id: 'rankings', label: 'Ranking', icon: '♕', desc: 'Referencia pública', active: pathname.startsWith('/rankings'), onClick: () => navigate('/rankings') },
+  { id: 'tournaments', label: 'Torneos', icon: '♜', desc: 'Competencias activas', active: pathname.startsWith('/tournaments'), onClick: () => navigate('/tournaments') },
+  { id: 'search', label: 'Buscar', icon: '⌕', desc: 'Consulta de jugadores', active: pathname.startsWith('/search'), onClick: () => navigate('/search') },
+];
 
 export const App = () => {
   const location = useLocation();
@@ -14,7 +27,7 @@ export const App = () => {
   if (location.pathname === '/login') {
     return (
       <Routes>
-        <Route path="/login" element={<AdminLoginPage />} />
+        <Route path="/login" element={<LoginPage />} />
       </Routes>
     );
   }
@@ -30,31 +43,28 @@ export const App = () => {
   if (!user) return <Navigate to="/login" replace />;
   if (user.role !== 'ADMIN') {
     return (
-      <div style={{ padding: 40, textAlign: 'center' }}>
-        <h2>Acceso denegado</h2>
-        <p>Esta área está reservada para administradores.</p>
-        <button className="btn btn-ghost" onClick={() => logout()}>Cerrar sesión</button>
+      <div style={{ padding: 28 }}>
+        <h1>Acceso restringido</h1>
+        <p>Este panel es solo para administradores. Tu rol: {user.role}.</p>
       </div>
     );
   }
 
-  const items: ShellNavItem[] = [
-    { id: 'dash', label: 'Dashboard', icon: '♕', desc: 'Resumen general', active: location.pathname === '/', onClick: () => navigate('/') },
-    { id: 'etl', label: 'ETL', icon: '⟳', desc: 'Sincronización', active: location.pathname.startsWith('/etl'), onClick: () => navigate('/etl') },
-    { id: 'users', label: 'Usuarios', icon: '♟', desc: 'Gestión de cuentas', active: location.pathname.startsWith('/users'), onClick: () => navigate('/users') },
-  ];
-
   return (
     <Shell
-      subtitle="Administración"
-      items={items}
+      subtitle="admin workspace"
+      items={buildNav(location.pathname, navigate)}
       user={{ name: user.email.split('@')[0], role: user.role, email: user.email }}
       onLogout={() => logout().then(() => navigate('/login'))}
     >
       <Routes>
         <Route path="/" element={<AdminDashboardPage />} />
-        <Route path="/etl" element={<EtlPage />} />
-        <Route path="/users" element={<UsersPage />} />
+        <Route path="/etl" element={<AdminEtlPage />} />
+        <Route path="/rankings" element={<RankingsPage />} />
+        <Route path="/tournaments" element={<TournamentsPage />} />
+        <Route path="/tournaments/:id" element={<TournamentDetailPage />} />
+        <Route path="/player/:id" element={<PlayerProfilePage />} />
+        <Route path="/search" element={<SearchPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Shell>

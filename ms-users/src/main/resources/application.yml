@@ -15,7 +15,7 @@ spring:
   # ── JPA ─────────────────────────────────────────────────────────────────────
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: none
     show-sql: false
     properties:
       hibernate:
@@ -60,6 +60,19 @@ logging:
   level:
     cl.chessquery.users: DEBUG
     org.springframework.amqp: WARN
+
+# ── Actuator / Monitoring ───────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
 ---
 # ── Perfil Docker ────────────────────────────────────────────────────────────

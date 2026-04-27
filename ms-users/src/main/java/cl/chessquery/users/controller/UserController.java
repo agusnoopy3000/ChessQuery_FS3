@@ -2,16 +2,20 @@ package cl.chessquery.users.controller;
 
 import cl.chessquery.users.dto.*;
 import cl.chessquery.users.entity.RatingType;
+import cl.chessquery.users.repository.PlayerRepository;
 import cl.chessquery.users.service.PlayerService;
 import cl.chessquery.users.service.RankingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/users")
@@ -21,6 +25,24 @@ public class UserController {
 
     private final PlayerService  playerService;
     private final RankingService rankingService;
+    private final PlayerRepository playerRepository;
+
+    // ── Listado paginado ──────────────────────────────────────────────────────
+
+    @Operation(summary = "Conteo y listado liviano de jugadores (uso del dashboard admin)")
+    @GetMapping
+    public Map<String, Object> list(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        long total = playerRepository.count();
+        return Map.of(
+                "content", List.of(),
+                "page", page,
+                "size", size,
+                "totalElements", total,
+                "totalPages", size == 0 ? 0 : (int) Math.ceil((double) total / size)
+        );
+    }
 
     // ── Perfil completo ───────────────────────────────────────────────────────
 

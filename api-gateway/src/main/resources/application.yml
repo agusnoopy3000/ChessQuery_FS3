@@ -1,0 +1,137 @@
+spring:
+  application:
+    name: api-gateway
+
+  main:
+    web-application-type: reactive
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:chessquery_dev}
+
+  cloud:
+    gateway:
+      httpclient:
+        connect-timeout: 5000
+        response-timeout: 10s
+
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
+
+      routes:
+        # -------------------------------------------------------------------
+        # Rutas públicas (sin filtro JWT) — MS-Auth
+        # El JwtAuthFilter excluye todas las rutas /auth/** via PUBLIC_PATHS.
+        # -------------------------------------------------------------------
+        - id: ms-auth-login
+          uri: ${MS_AUTH_URL}
+          predicates:
+            - Path=/auth/login,/auth/register
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 20
+                redis-rate-limiter.burstCapacity: 40
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@ipKeyResolver}"
+                rate-limiter: "#{@authRateLimiter}"
+
+        - id: ms-auth
+          uri: ${MS_AUTH_URL}
+          predicates:
+            - Path=/auth/**
+
+        # -------------------------------------------------------------------
+        # BFFs — rutas autenticadas (JWT validado por JwtAuthFilter)
+        # -------------------------------------------------------------------
+        - id: bff-player
+          uri: ${BFF_PLAYER_URL}
+          predicates:
+            - Path=/api/player/**
+          filters:
+            - StripPrefix=1
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 100
+                redis-rate-limiter.burstCapacity: 120
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@ipKeyResolver}"
+                rate-limiter: "#{@defaultRateLimiter}"
+
+        - id: bff-organizer
+          uri: ${BFF_ORGANIZER_URL}
+          predicates:
+            - Path=/api/organizer/**
+          filters:
+            - StripPrefix=1
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 100
+                redis-rate-limiter.burstCapacity: 120
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@ipKeyResolver}"
+                rate-limiter: "#{@defaultRateLimiter}"
+
+        - id: bff-admin
+          uri: ${BFF_ADMIN_URL}
+          predicates:
+            - Path=/api/admin/**
+          filters:
+            - StripPrefix=1
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 100
+                redis-rate-limiter.burstCapacity: 120
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@ipKeyResolver}"
+                rate-limiter: "#{@defaultRateLimiter}"
+
+# ── Resilience4j Circuit Breaker ──────────────────────────────────────────
+resilience4j:
+  circuitbreaker:
+    instances:
+      ms-auth-validate:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+  timelimiter:
+    instances:
+      ms-auth-validate:
+        timeout-duration: 3s
+
+# ── Servidor ──────────────────────────────────────────────────────────────
+server:
+  port: ${SERVER_PORT:8080}
+
+# ── Configuración de Gateway ──────────────────────────────────────────────
+gateway:
+  ms-auth:
+    url: ${MS_AUTH_URL}
+  bff-player:
+    url: ${BFF_PLAYER_URL}
+  bff-organizer:
+    url: ${BFF_ORGANIZER_URL}
+  bff-admin:
+    url: ${BFF_ADMIN_URL}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost}
+
+# ── Actuator ──────────────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+  endpoint:
+    health:
+      show-details: when-authorized
+
+logging:
+  level:
+    org.springframework.cloud.gateway: INFO
+    reactor.netty.http.client: WARN
+    cl.chessquery.gateway: INFO

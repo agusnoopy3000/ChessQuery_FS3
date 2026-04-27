@@ -1,7 +1,7 @@
 import logging
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 import redis
@@ -46,7 +46,7 @@ async def run_sync(source: str, db: Session) -> EtlSyncLog:
     cb = circuit_breakers[source]
     log = EtlSyncLog(
         source=source.upper(),
-        started_at=datetime.utcnow(),
+        started_at=datetime.now(timezone.utc),
         status="RUNNING",
         cb_state=cb.get_state(),
     )
@@ -59,7 +59,7 @@ async def run_sync(source: str, db: Session) -> EtlSyncLog:
         log.records_processed = len(records)
         log.records_failed = 0
         log.status = "SUCCESS"
-        log.finished_at = datetime.utcnow()
+        log.finished_at = datetime.now(timezone.utc)
         log.cb_state = cb.get_state()
 
         # Cachear en Redis
@@ -69,7 +69,7 @@ async def run_sync(source: str, db: Session) -> EtlSyncLog:
                 f"etl:last_sync:{source}",
                 30 * 24 * 3600,
                 json.dumps({
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                     "records": len(records),
                     "status": "SUCCESS",
                 }),
@@ -95,7 +95,7 @@ async def run_sync(source: str, db: Session) -> EtlSyncLog:
                 "recordsProcessed": len(records),
                 "recordsFailed": 0,
                 "durationMs": int(
-                    (datetime.utcnow() - log.started_at).total_seconds() * 1000
+                    (datetime.now(timezone.utc) - log.started_at).total_seconds() * 1000
                 ),
                 "circuitBreakerState": cb.get_state(),
             },
@@ -104,7 +104,7 @@ async def run_sync(source: str, db: Session) -> EtlSyncLog:
     except Exception as e:
         log.status = "FAILED"
         log.error_message = str(e)
-        log.finished_at = datetime.utcnow()
+        log.finished_at = datetime.now(timezone.utc)
         log.cb_state = cb.get_state()
 
         # Intentar leer de Redis como fallback
@@ -124,7 +124,7 @@ async def run_sync(source: str, db: Session) -> EtlSyncLog:
                 "recordsProcessed": 0,
                 "recordsFailed": 0,
                 "durationMs": int(
-                    (datetime.utcnow() - log.started_at).total_seconds() * 1000
+                    (datetime.now(timezone.utc) - log.started_at).total_seconds() * 1000
                 ),
                 "circuitBreakerState": cb.get_state(),
             },
