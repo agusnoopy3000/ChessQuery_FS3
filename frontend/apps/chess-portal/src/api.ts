@@ -94,6 +94,8 @@ const normalizePlayer = (value: unknown): Player => {
     countryFlag: null,
     clubId: asNumber(club.id) ?? null,
     clubName: asString(club.name ?? raw.clubName) ?? null,
+    federationId: asString(raw.federationId) ?? null,
+    enrichmentSource: asString(raw.enrichmentSource) ?? null,
   };
 };
 

@@ -47,8 +47,16 @@ export const PlayerMatchmakingPage = () => {
     queryKey: ['player', 'matchmaking', 'profiles', candidates.map((candidate) => candidate.id).join('-')],
     enabled: candidates.length > 0,
     queryFn: async () => {
-      const profiles = await Promise.all(candidates.slice(0, 8).map((candidate) => playerApi.publicProfile(candidate.id)));
-      return new Map(profiles.map((profile) => [profile.profile.id, profile.profile]));
+      const settled = await Promise.allSettled(
+        candidates.slice(0, 8).map((candidate) => playerApi.publicProfile(candidate.id)),
+      );
+      const map = new Map<number, Player>();
+      for (const result of settled) {
+        if (result.status === 'fulfilled') {
+          map.set(result.value.profile.id, result.value.profile);
+        }
+      }
+      return map;
     },
   });
 

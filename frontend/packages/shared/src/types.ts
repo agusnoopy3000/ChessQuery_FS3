@@ -54,6 +54,8 @@ export interface Player {
   countryFlag?: string | null;
   clubId?: number | null;
   clubName?: string | null;
+  federationId?: string | null;
+  enrichmentSource?: string | null;
 }
 
 export interface RatingHistoryPoint {

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@chessquery/shared';
 import { Button, Card, ErrorAlert, Input } from '@chessquery/ui-lib';
-import { resolveRequestedRoute } from '../portal-utils';
 
 export const LoginPage = () => {
   const navigate = useNavigate();
@@ -19,8 +18,9 @@ export const LoginPage = () => {
     setSubmitting(true);
 
     try {
-      const user = await login(email.trim(), password);
-      navigate(resolveRequestedRoute(user.role, params.get('next')));
+      await login(email.trim(), password);
+      const next = params.get('next');
+      navigate(next && next.startsWith('/') ? next : '/');
     } catch (err) {
       const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       setError(message ?? 'Credenciales inválidas');

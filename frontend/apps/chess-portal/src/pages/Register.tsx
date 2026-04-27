@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Role, useAuth } from '@chessquery/shared';
 import { Badge, Button, Card, ErrorAlert, Input } from '@chessquery/ui-lib';
-import { getDefaultRoute } from '../portal-utils';
 
 const roleOptions: Array<{
   value: Role;
@@ -65,14 +64,14 @@ export const RegisterPage = () => {
 
     setSubmitting(true);
     try {
-      const user = await register({
+      await register({
         email: form.email.trim(),
         password: form.password,
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         role: form.role,
       });
-      navigate(getDefaultRoute(user.role));
+      navigate('/');
     } catch (err) {
       const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       setError(message ?? 'No se pudo crear la cuenta');

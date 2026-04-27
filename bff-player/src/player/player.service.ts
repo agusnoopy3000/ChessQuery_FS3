@@ -10,15 +10,32 @@ import {
 export class PlayerService {
   constructor(private readonly http: UpstreamHttpService) {}
 
+  private emptyStats(playerId: string | number) {
+    return {
+      playerId: Number(playerId) || 0,
+      totalGames: 0,
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      winRate: 0,
+      avgMoves: 0,
+      currentStreak: 0,
+      bestElo: null,
+      lastRefreshed: null,
+    };
+  }
+
   async getDashboard(userId: string): Promise<DashboardResponse> {
     const { msUsers, msGame, msAnalytics } = this.http.urls;
 
     const [profile, recentGamesPage, stats] = await Promise.all([
       this.http.get<unknown>(`${msUsers}/users/${userId}/profile`),
-      this.http.get<{ content: unknown[] }>(
-        `${msGame}/games?playerId=${userId}&size=5`,
-      ),
-      this.http.get<unknown>(`${msAnalytics}/analytics/players/${userId}/stats`),
+      this.http
+        .get<{ content: unknown[] }>(`${msGame}/games?playerId=${userId}&size=5`)
+        .catch(() => ({ content: [] as unknown[] })),
+      this.http
+        .get<unknown>(`${msAnalytics}/analytics/players/${userId}/stats`)
+        .catch(() => this.emptyStats(userId)),
     ]);
 
     return {
@@ -33,10 +50,12 @@ export class PlayerService {
 
     const [profile, recentGamesPage, stats] = await Promise.all([
       this.http.get<unknown>(`${msUsers}/users/${playerId}/profile`),
-      this.http.get<{ content: unknown[] }>(
-        `${msGame}/games?playerId=${playerId}&size=10`,
-      ),
-      this.http.get<unknown>(`${msAnalytics}/analytics/players/${playerId}/stats`),
+      this.http
+        .get<{ content: unknown[] }>(`${msGame}/games?playerId=${playerId}&size=10`)
+        .catch(() => ({ content: [] as unknown[] })),
+      this.http
+        .get<unknown>(`${msAnalytics}/analytics/players/${playerId}/stats`)
+        .catch(() => this.emptyStats(playerId)),
     ]);
 
     return {
