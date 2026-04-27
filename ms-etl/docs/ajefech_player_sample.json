@@ -1,0 +1,29 @@
+{
+  "_comment": "Salida real del scraper para /player/738 (capturada el 2026-04-26). Generado por: PYTHONPATH=. python3 -m scripts.scrape_player_sample --id 738",
+  "_source": "https://www.federacionchilenadeajedrez.cl/graphql query=person(id:\"738\")",
+  "ficha": {
+    "federation_id": "738",
+    "profile_url": "https://www.federacionchilenadeajedrez.cl/player/738",
+    "nombre": "Jorge Moises",
+    "apellidos": "Sepulveda Rojas",
+    "fecha_nacimiento": "1981-03-24",
+    "club": "Club Deportivo Chess Viña del Mar",
+    "fide_id": "3404803",
+    "elo_internacional": 2159,
+    "elo_nacional": 2053,
+    "rut": "9914860-8"
+  },
+  "chessquery": {
+    "firstName": "Jorge Moises",
+    "lastName": "Sepulveda Rojas",
+    "birthDate": "1981-03-24",
+    "clubName": "Club Deportivo Chess Viña del Mar",
+    "fideId": "3404803",
+    "federationId": "738",
+    "rut": "9914860-8",
+    "eloFideStandard": 2159,
+    "eloNational": 2053,
+    "source": "AJEFECH",
+    "sourceUrl": "https://www.federacionchilenadeajedrez.cl/player/738"
+  }
+}
