@@ -201,11 +201,13 @@ public class PlayerService {
                 p.getFirstName(),
                 p.getLastName(),
                 p.getFideId(),
+                p.getFederationId(),
                 p.getRut(),
                 p.getCountry() != null ? p.getCountry().getIsoCode() : null,
                 p.getEloNational(),
                 p.getEloFideStandard(),
-                title
+                title,
+                p.getEnrichmentSource()
         );
     }
 }

@@ -5,9 +5,11 @@ public record PlayerSearchResponse(
         String  firstName,
         String  lastName,
         String  fideId,
+        String  federationId,
         String  rut,
         String  countryIso,
         Integer eloNational,
         Integer eloFideStandard,
-        String  currentTitle
+        String  currentTitle,
+        String  enrichmentSource
 ) {}

@@ -7,8 +7,26 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface PlayerRepository extends JpaRepository<Player, Long> {
+
+    Optional<Player> findByFederationId(String federationId);
+
+    Optional<Player> findByFideId(String fideId);
+
+    Optional<Player> findByRut(String rut);
+
+    @Query(value = """
+            SELECT p.* FROM player p
+            WHERE  LOWER(p.first_name || ' ' || p.last_name) =
+                   LOWER(:firstName || ' ' || :lastName)
+            LIMIT  1
+            """, nativeQuery = true)
+    Optional<Player> findByFullNameIgnoreCase(
+            @Param("firstName") String firstName,
+            @Param("lastName") String lastName
+    );
 
     /**
      * Búsqueda fuzzy usando pg_trgm similarity() sobre nombre completo,

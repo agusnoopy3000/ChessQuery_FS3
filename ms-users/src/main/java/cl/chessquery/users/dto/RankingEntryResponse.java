@@ -10,5 +10,6 @@ public record RankingEntryResponse(
         Integer eloNational,
         Integer eloFideStandard,
         String  currentTitle,
-        String  ageCategory
+        String  ageCategory,
+        String  enrichmentSource
 ) {}

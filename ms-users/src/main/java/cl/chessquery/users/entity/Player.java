@@ -76,6 +76,13 @@ public class Player {
     @Column(name = "elo_platform")
     private Integer eloPlatform;
 
+    /** Fuente de la última enriquecimiento federado: AJEFECH, LICHESS, FIDE, null. */
+    @Column(name = "enrichment_source", length = 20)
+    private String enrichmentSource;
+
+    @Column(name = "enriched_at")
+    private Instant enrichedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

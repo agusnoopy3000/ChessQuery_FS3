@@ -66,7 +66,7 @@ class UserControllerIntegrationTest {
     void search_validQuery_returns200WithList() throws Exception {
         when(playerService.search("Rodrigo", 20)).thenReturn(List.of(
                 new PlayerSearchResponse(4L, "Rodrigo", "Sepúlveda",
-                        "3600001", "15234567-8", "CHL", 2100, 2050, "FM")
+                        "3600001", null, "15234567-8", "CHL", 2100, 2050, "FM", null)
         ));
 
         mockMvc.perform(get("/users/search").param("q", "Rodrigo"))
@@ -105,9 +105,9 @@ class UserControllerIntegrationTest {
     void ranking_returnsOrderedList() throws Exception {
         when(rankingService.getRanking(null, null, 50)).thenReturn(List.of(
                 new RankingEntryResponse(1, 4L, "Rodrigo", "Sepúlveda",
-                        "Metropolitana", "Lasker", 2100, 2050, "FM", "ADULTO"),
+                        "Metropolitana", "Lasker", 2100, 2050, "FM", "ADULTO", null),
                 new RankingEntryResponse(2, 8L, "Ignacio", "Pérez",
-                        "Metropolitana", "UCH", 2050, 2010, "FM", "ADULTO")
+                        "Metropolitana", "UCH", 2050, 2010, "FM", "ADULTO", null)
         ));
 
         mockMvc.perform(get("/users/ranking"))

@@ -26,8 +26,9 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMQConfig {
 
-    public static final String EXCHANGE        = "ChessEvents";
-    public static final String USERS_ELO_QUEUE = "users.elo.queue";
+    public static final String EXCHANGE           = "ChessEvents";
+    public static final String USERS_ELO_QUEUE    = "users.elo.queue";
+    public static final String USERS_RATING_QUEUE = "users.rating.queue";
 
     @Bean
     public TopicExchange chessEventsExchange() {
@@ -43,6 +44,20 @@ public class RabbitMQConfig {
     @Bean
     public Binding usersEloBinding(Queue usersEloQueue, TopicExchange chessEventsExchange) {
         return BindingBuilder.bind(usersEloQueue).to(chessEventsExchange).with("elo.*");
+    }
+
+    /**
+     * Cola dedicada para eventos rating.* publicados por MS-ETL.
+     * Aplica enriquecimiento federado (AJEFECH, FIDE, Lichess) sobre player.
+     */
+    @Bean
+    public Queue usersRatingQueue() {
+        return QueueBuilder.durable(USERS_RATING_QUEUE).build();
+    }
+
+    @Bean
+    public Binding usersRatingBinding(Queue usersRatingQueue, TopicExchange chessEventsExchange) {
+        return BindingBuilder.bind(usersRatingQueue).to(chessEventsExchange).with("rating.*");
     }
 
     /** Serialización/deserialización JSON para mensajes RabbitMQ. */

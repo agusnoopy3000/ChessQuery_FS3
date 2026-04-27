@@ -57,7 +57,8 @@ public class RankingService {
                             p.getEloNational(),
                             p.getEloFideStandard(),
                             title,
-                            playerCat.name()
+                            playerCat.name(),
+                            p.getEnrichmentSource()
                     );
                 })
                 .toList();
