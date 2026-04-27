@@ -129,6 +129,11 @@ export const RankingsPage = () => {
               { key: 'club', header: 'Club', render: (r) => r.clubName ?? '—' },
               { key: 'category', header: 'Cat.', render: (r) => r.ageCategory ?? '—' },
               {
+                key: 'source',
+                header: 'Fuente',
+                render: (r) => (r.enrichmentSource ? <Badge>{r.enrichmentSource}</Badge> : '—'),
+              },
+              {
                 key: 'fide',
                 header: 'FIDE',
                 align: 'right',

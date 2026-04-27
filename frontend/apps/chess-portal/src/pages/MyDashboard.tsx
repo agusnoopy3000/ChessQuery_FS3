@@ -70,6 +70,16 @@ export const MyDashboardPage = () => {
         <Card header="ELO Nacional">
           {p.eloNational != null ? <RatingBadge rating={p.eloNational} /> : <div style={{ fontSize: 18, color: 'var(--text-muted)' }}>—</div>}
         </Card>
+        {p.enrichmentSource && (
+          <Card header="Datos federados">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <Badge variant="gold">{p.enrichmentSource}</Badge>
+              {p.federationId && (
+                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>#{p.federationId}</span>
+              )}
+            </div>
+          </Card>
+        )}
       </div>
 
       {/* Partidas recientes */}

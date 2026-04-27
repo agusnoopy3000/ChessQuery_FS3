@@ -175,7 +175,10 @@ public class PlayerService {
                 p.getGender(),
                 p.getRegion(),
                 p.getFideId(),
+                p.getFederationId(),
                 p.getLichessUsername(),
+                p.getEnrichmentSource(),
+                p.getEnrichedAt(),
                 p.getCountry() != null
                         ? new CountryDto(p.getCountry().getId(), p.getCountry().getIsoCode(),
                                          p.getCountry().getName(), p.getCountry().getFideFederation())

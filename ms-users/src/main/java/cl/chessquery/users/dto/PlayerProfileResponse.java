@@ -13,7 +13,10 @@ public record PlayerProfileResponse(
         String gender,
         String region,
         String fideId,
+        String federationId,
         String lichessUsername,
+        String enrichmentSource,
+        Instant enrichedAt,
         CountryDto country,
         ClubDto    club,
         // ELO snapshots

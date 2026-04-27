@@ -13,6 +13,7 @@ export interface PlayerCardPlayer {
   fideTitle?: string | null;
   eloFideStandard?: number | null;
   eloNational?: number | null;
+  enrichmentSource?: string | null;
 }
 
 export interface PlayerCardProps {
@@ -67,6 +68,7 @@ export const PlayerCard = ({ player, onClick, ratingLabel = 'ELO' }: PlayerCardP
               {fullName}
             </div>
             {player.fideTitle && <Badge variant="gold">{player.fideTitle}</Badge>}
+            {player.enrichmentSource && <Badge>{player.enrichmentSource}</Badge>}
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
             {player.countryFlag && <span style={{ marginRight: 4 }}>{player.countryFlag}</span>}

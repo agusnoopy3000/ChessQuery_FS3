@@ -136,7 +136,7 @@ class UserControllerIntegrationTest {
         return new PlayerProfileResponse(
                 id, first, last, first.toLowerCase() + "@demo.cl",
                 "15234567-8", LocalDate.of(1992, 3, 15), "M",
-                "Metropolitana", "3600001", "rodrigo_chess",
+                "Metropolitana", "3600001", null, "rodrigo_chess", null, null,
                 new CountryDto(1, "CHL", "Chile", "CHI"),
                 new ClubDto(1, "Club de Ajedrez Lasker", "Santiago", "CL-LAS"),
                 2100, 2050, null, null, null, "FM",
