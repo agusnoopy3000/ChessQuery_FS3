@@ -32,40 +32,52 @@ public class PlayerService {
     // ─── POST /users/sync (upsert post-registro) ─────────────────────────────
 
     /**
-     * Crea o actualiza el Player con id=auth.userId. Llamado por el portal
-     * tras /auth/register exitoso para persistir firstName/lastName y
-     * lichessUsername opcional. Idempotente: ejecutar varias veces no falla.
+     * Crea, reclama o actualiza el Player con id=auth.userId. Flujo:
+     * <ol>
+     *   <li>Si ya existe Player con id=auth.userId → UPDATE de los campos
+     *       no nulos del request (idempotente).</li>
+     *   <li>Si no, busca un Player <em>federado-solamente</em> (email NULL)
+     *       cuyo nombre coincida con el del request. Si encuentra match,
+     *       lo "reclama": re-asigna su id a auth.userId (cascada vía FK
+     *       ON UPDATE) y rellena email/lichessUsername aportados por el
+     *       registro. Esto evita duplicar perfiles cuando AJEFECH ya
+     *       había scrapeado al jugador.</li>
+     *   <li>Si tampoco hay match federado → INSERT nuevo con el id explícito.</li>
+     * </ol>
      */
     @Transactional
     public PlayerProfileResponse syncFromAuth(AuthSyncRequest req) {
-        // Si ya existe, actualizamos vía JPA (entity managed)
+        // 1. Player ya existe con ese authId → UPDATE
         Player existing = playerRepo.findById(req.id()).orElse(null);
         if (existing != null) {
-            if (StringUtils.hasText(req.firstName())) existing.setFirstName(req.firstName());
-            if (StringUtils.hasText(req.lastName()))  existing.setLastName(req.lastName());
-            if (StringUtils.hasText(req.email()) && existing.getEmail() == null) existing.setEmail(req.email());
-            if (StringUtils.hasText(req.lichessUsername())) {
-                existing.setLichessUsername(req.lichessUsername().trim());
-            }
+            applyAuthFields(existing, req);
             playerRepo.save(existing);
         } else {
-            // INSERT nativo: respeta el id explícito que viene de auth_user.id
-            // (sortear IDENTITY usando OVERRIDING SYSTEM VALUE en PostgreSQL).
-            Instant now = Instant.now();
-            em.createNativeQuery("""
-                    INSERT INTO player (id, first_name, last_name, email, lichess_username, created_at, updated_at)
-                    OVERRIDING SYSTEM VALUE
-                    VALUES (:id, :fn, :ln, :em, :lu, :ts, :ts)
-                    ON CONFLICT (id) DO NOTHING
-                    """)
-                    .setParameter("id", req.id())
-                    .setParameter("fn", StringUtils.hasText(req.firstName()) ? req.firstName() : "Jugador")
-                    .setParameter("ln", StringUtils.hasText(req.lastName())  ? req.lastName()  : String.valueOf(req.id()))
-                    .setParameter("em", req.email())
-                    .setParameter("lu", StringUtils.hasText(req.lichessUsername()) ? req.lichessUsername().trim() : null)
-                    .setParameter("ts", now)
-                    .executeUpdate();
-            em.clear();
+            // 2. Intentar reclamar Player federado-solo por nombre
+            Player claimed = tryClaimFederated(req);
+            if (claimed != null) {
+                applyAuthFields(claimed, req);
+                playerRepo.save(claimed);
+                log.info("Player federado reclamado: id {} → {} (auth_user)",
+                        req.id(), claimed.getId());
+            } else {
+                // 3. INSERT nativo con id explícito desde auth_user
+                Instant now = Instant.now();
+                em.createNativeQuery("""
+                        INSERT INTO player (id, first_name, last_name, email, lichess_username, created_at, updated_at)
+                        OVERRIDING SYSTEM VALUE
+                        VALUES (:id, :fn, :ln, :em, :lu, :ts, :ts)
+                        ON CONFLICT (id) DO NOTHING
+                        """)
+                        .setParameter("id", req.id())
+                        .setParameter("fn", StringUtils.hasText(req.firstName()) ? req.firstName() : "Jugador")
+                        .setParameter("ln", StringUtils.hasText(req.lastName())  ? req.lastName()  : String.valueOf(req.id()))
+                        .setParameter("em", req.email())
+                        .setParameter("lu", StringUtils.hasText(req.lichessUsername()) ? req.lichessUsername().trim() : null)
+                        .setParameter("ts", now)
+                        .executeUpdate();
+                em.clear();
+            }
         }
 
         Player p = playerRepo.findById(req.id())
@@ -73,6 +85,55 @@ public class PlayerService {
         String title = titleRepo.findByPlayerIdAndIsCurrentTrue(p.getId())
                 .map(t -> t.getTitle().name()).orElse(null);
         return toProfileResponse(p, title);
+    }
+
+    /**
+     * Busca un Player federado-solamente (sin email) cuyo nombre coincida
+     * con el del request y re-asigna su id a auth.userId. Devuelve el
+     * Player ya con el nuevo id, listo para que el caller aplique los
+     * campos de auth (email, lichess) sin pisar los datos federados.
+     * <p>
+     * Si {@code req.id()} ya está ocupado por otro Player (carrera) o si
+     * no hay nombre en el request, retorna {@code null}.
+     */
+    private Player tryClaimFederated(AuthSyncRequest req) {
+        if (!StringUtils.hasText(req.firstName()) || !StringUtils.hasText(req.lastName())) {
+            return null;
+        }
+        Player federated = playerRepo
+                .findFederatedByFullName(req.firstName().trim(), req.lastName().trim())
+                .orElse(null);
+        if (federated == null) return null;
+
+        Long oldId = federated.getId();
+        if (oldId.equals(req.id())) return federated;
+
+        // Re-asignar el id. Las FKs en rating_history y player_title_history
+        // tienen ON UPDATE CASCADE (V8) — la actualización se propaga.
+        int rows = em.createNativeQuery("UPDATE player SET id = :newId WHERE id = :oldId")
+                .setParameter("newId", req.id())
+                .setParameter("oldId", oldId)
+                .executeUpdate();
+        if (rows == 0) {
+            log.warn("Reclamo abortado: no se actualizó player id {} → {}", oldId, req.id());
+            return null;
+        }
+        em.clear();
+        return playerRepo.findById(req.id()).orElse(null);
+    }
+
+    /**
+     * Aplica los campos provenientes de auth (firstName, lastName, email,
+     * lichessUsername) sin pisar datos federados ya curados (no
+     * sobreescribe email si ya existe).
+     */
+    private void applyAuthFields(Player p, AuthSyncRequest req) {
+        if (StringUtils.hasText(req.firstName())) p.setFirstName(req.firstName());
+        if (StringUtils.hasText(req.lastName()))  p.setLastName(req.lastName());
+        if (StringUtils.hasText(req.email()) && p.getEmail() == null) p.setEmail(req.email());
+        if (StringUtils.hasText(req.lichessUsername()) && p.getLichessUsername() == null) {
+            p.setLichessUsername(req.lichessUsername().trim());
+        }
     }
 
     // ─── GET /users/{id}/profile ──────────────────────────────────────────────

@@ -29,6 +29,25 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
     );
 
     /**
+     * Busca un Player federado-solamente (sin email asociado) por nombre
+     * exacto. Usado por syncFromAuth para "reclamar" registros scrapeados
+     * desde AJEFECH/Lichess cuando un usuario real se registra con el
+     * mismo nombre, evitando duplicados.
+     */
+    @Query(value = """
+            SELECT p.* FROM player p
+            WHERE  p.email IS NULL
+              AND  LOWER(p.first_name || ' ' || p.last_name) =
+                   LOWER(:firstName || ' ' || :lastName)
+            ORDER BY p.enriched_at DESC NULLS LAST
+            LIMIT  1
+            """, nativeQuery = true)
+    Optional<Player> findFederatedByFullName(
+            @Param("firstName") String firstName,
+            @Param("lastName") String lastName
+    );
+
+    /**
      * Búsqueda fuzzy usando pg_trgm similarity() sobre nombre completo,
      * con fallback exacto para RUT y FIDE ID.
      * Requiere la extensión pg_trgm activa (habilitada en V3__create_player.sql).

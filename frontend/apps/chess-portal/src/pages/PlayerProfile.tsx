@@ -2,7 +2,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   Card,
-  Badge,
   RatingBadge,
   Skeleton,
   ErrorAlert,
@@ -125,16 +124,6 @@ export const PlayerProfilePage = () => {
             >
               {fullName}
             </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-              {p.fideTitle && <Badge variant="gold">{p.fideTitle}</Badge>}
-              {p.ageCategory && <Badge>{p.ageCategory}</Badge>}
-              {p.enrichmentSource && <Badge>{p.enrichmentSource}</Badge>}
-              {p.fideId && (
-                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                  FIDE ID · {p.fideId}
-                </span>
-              )}
-            </div>
           </div>
         </div>
       </Card>
@@ -154,7 +143,7 @@ export const PlayerProfilePage = () => {
             <div style={{ fontSize: 18, color: 'var(--text-muted)' }}>—</div>
           )}
         </Card>
-        <Card header="ELO FIDE">
+        <Card header="ELO Internacional">
           {p.eloFideStandard != null ? (
             <RatingBadge rating={p.eloFideStandard} label="FIDE" />
           ) : (
@@ -188,11 +177,6 @@ export const PlayerProfilePage = () => {
           >
             {p.clubName ?? '—'}
           </div>
-          {p.countryName && (
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-              {p.countryFlag ? `${p.countryFlag} ` : ''}{p.countryName}
-            </div>
-          )}
         </Card>
       </div>
 
