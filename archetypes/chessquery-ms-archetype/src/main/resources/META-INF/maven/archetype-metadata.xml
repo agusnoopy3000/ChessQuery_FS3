@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<archetype-descriptor xmlns="http://maven.apache.org/plugins/maven-archetype-plugin/archetype-descriptor/1.1.0"
+                      name="chessquery-ms-archetype"
+                      partial="false">
+
+    <requiredProperties>
+        <requiredProperty key="serviceName">
+            <defaultValue>example</defaultValue>
+        </requiredProperty>
+        <requiredProperty key="servicePort">
+            <defaultValue>8090</defaultValue>
+        </requiredProperty>
+        <requiredProperty key="dbName">
+            <defaultValue>example_db</defaultValue>
+        </requiredProperty>
+        <requiredProperty key="dbPort">
+            <defaultValue>5440</defaultValue>
+        </requiredProperty>
+    </requiredProperties>
+
+    <fileSets>
+        <fileSet filtered="true" packaged="true" encoding="UTF-8">
+            <directory>src/main/java</directory>
+            <includes>
+                <include>**/*.java</include>
+            </includes>
+        </fileSet>
+        <fileSet filtered="true" packaged="true" encoding="UTF-8">
+            <directory>src/test/java</directory>
+            <includes>
+                <include>**/*.java</include>
+            </includes>
+        </fileSet>
+        <fileSet filtered="true" encoding="UTF-8">
+            <directory>src/main/resources</directory>
+            <includes>
+                <include>**/*.yml</include>
+                <include>**/*.sql</include>
+            </includes>
+        </fileSet>
+        <fileSet filtered="true" encoding="UTF-8">
+            <directory></directory>
+            <includes>
+                <include>Dockerfile</include>
+                <include>README.md</include>
+            </includes>
+        </fileSet>
+    </fileSets>
+</archetype-descriptor>
