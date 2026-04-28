@@ -1,8 +1,10 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Get,
   Param,
+  Post,
   Query,
   Req,
   UseGuards,
@@ -60,5 +62,26 @@ export class PlayerController {
     @Query('region') region?: string,
   ) {
     return this.playerService.getRankings(category, region);
+  }
+
+  /**
+   * Encuentra un rival random (preferentemente con rating similar) para
+   * que el jugador autenticado pueda iniciar una partida.
+   */
+  @Post('play/find-match')
+  async findMatch(@Req() req: Request) {
+    const userId = getUserId(req);
+    return this.playerService.findRandomOpponent(userId);
+  }
+
+  /**
+   * Persiste el resultado de una partida casual jugada en ChessQuery.
+   * Reenvía la creación a ms-game (que recalcula ELO y persiste PGN
+   * mínimo si se proveyó).
+   */
+  @Post('play/games')
+  async submitGame(@Req() req: Request, @Body() body: Record<string, unknown>) {
+    const userId = getUserId(req);
+    return this.playerService.submitCasualGame(userId, body);
   }
 }

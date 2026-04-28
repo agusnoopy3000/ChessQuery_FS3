@@ -106,12 +106,26 @@ export class OrganizerService {
 
   async generateRound(tournamentId: string, roundNumber: string, userId: string) {
     const { msTournament } = this.http.urls;
+    const headers = { 'X-User-Role': 'ORGANIZER', 'X-User-Id': userId };
+
+    // ms-tournament exige IN_PROGRESS para generar rondas. Si el torneo
+    // está en OPEN (cupos confirmados), lo transicionamos en línea para
+    // dar al organizador una experiencia de un solo click.
+    const tournament = await this.http.get<{ status?: string }>(
+      `${msTournament}/tournaments/${tournamentId}`,
+    );
+    if (tournament?.status === 'OPEN') {
+      await this.http.patch<unknown>(
+        `${msTournament}/tournaments/${tournamentId}/status`,
+        { newStatus: 'IN_PROGRESS' },
+        { headers },
+      );
+    }
+
     return this.http.post<unknown>(
       `${msTournament}/tournaments/${tournamentId}/rounds/${roundNumber}`,
       {},
-      {
-        headers: { 'X-User-Role': 'ORGANIZER', 'X-User-Id': userId },
-      },
+      { headers },
     );
   }
 

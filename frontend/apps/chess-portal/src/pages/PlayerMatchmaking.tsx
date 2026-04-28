@@ -1,208 +1,208 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { Badge, Button, Card, EmptyState, ErrorAlert, Input, RatingBadge, Skeleton, Table, TableColumn } from '@chessquery/ui-lib';
+import { Button, Card, ErrorAlert, RatingBadge } from '@chessquery/ui-lib';
 import { Player } from '@chessquery/shared';
-import { playerApi } from '../api';
-import { buildLichessProfileUrl, buildPlayerName, getPrimaryRating } from '../portal-utils';
+import { playerApi, gameApi } from '../api';
+import { buildPlayerName, getPrimaryRating } from '../portal-utils';
 
-interface MatchCandidate extends Player {
-  ratingGap: number;
+type Color = 'white' | 'black';
+
+interface MatchPayload {
+  you: Player;
+  opponent: Player;
+  yourColor: Color;
+  opponentColor: Color;
 }
+
+type Result = '1-0' | '0-1' | '1/2-1/2';
 
 export const PlayerMatchmakingPage = () => {
   const navigate = useNavigate();
-  const [query, setQuery] = useState('');
+  const queryClient = useQueryClient();
+  const [match, setMatch] = useState<MatchPayload | null>(null);
+  const [submitted, setSubmitted] = useState<{ result: Result; eloDelta: number } | null>(null);
 
-  const dashboard = useQuery({
-    queryKey: ['player', 'matchmaking', 'dashboard'],
-    queryFn: () => playerApi.dashboard(),
-  });
-
-  const rankings = useQuery({
-    queryKey: ['player', 'matchmaking', 'rankings'],
-    queryFn: () => playerApi.rankings(),
-  });
-
-  const candidates = useMemo<MatchCandidate[]>(() => {
-    if (!dashboard.data) return [];
-
-    const myRating = getPrimaryRating(dashboard.data.profile) ?? 1800;
-
-    return (rankings.data ?? [])
-      .filter((player) => player.id !== dashboard.data?.profile.id)
-      .filter((player) => {
-        const fullName = buildPlayerName(player).toLowerCase();
-        return !query.trim() || fullName.includes(query.trim().toLowerCase());
-      })
-      .map((player) => ({
-        ...player,
-        ratingGap: Math.abs((getPrimaryRating(player) ?? myRating) - myRating),
-      }))
-      .sort((a, b) => a.ratingGap - b.ratingGap)
-      .slice(0, 12);
-  }, [dashboard.data, query, rankings.data]);
-
-  const candidateProfiles = useQuery({
-    queryKey: ['player', 'matchmaking', 'profiles', candidates.map((candidate) => candidate.id).join('-')],
-    enabled: candidates.length > 0,
-    queryFn: async () => {
-      const settled = await Promise.allSettled(
-        candidates.slice(0, 8).map((candidate) => playerApi.publicProfile(candidate.id)),
-      );
-      const map = new Map<number, Player>();
-      for (const result of settled) {
-        if (result.status === 'fulfilled') {
-          map.set(result.value.profile.id, result.value.profile);
-        }
-      }
-      return map;
+  const findMatch = useMutation({
+    mutationFn: () => playerApi.findMatch(),
+    onSuccess: (data: MatchPayload) => {
+      setMatch(data);
+      setSubmitted(null);
     },
   });
 
-  if (dashboard.isLoading || rankings.isLoading) {
-    return (
-      <div style={{ padding: 28, display: 'grid', gap: 16 }}>
-        <Skeleton height={160} />
-        <Skeleton height={420} />
-      </div>
-    );
-  }
-
-  if (dashboard.isError || !dashboard.data) {
-    return (
-      <div style={{ padding: 28 }}>
-        <ErrorAlert title="No se pudo abrir el lobby" onRetry={() => dashboard.refetch()} />
-      </div>
-    );
-  }
+  const submitGame = useMutation({
+    mutationFn: (result: Result) => {
+      if (!match) throw new Error('No hay partida activa');
+      return gameApi.create({
+        whitePlayerId: match.you.id,
+        blackPlayerId: match.opponent.id,
+        result,
+        gameType: 'CASUAL',
+        whiteEloBefore: getPrimaryRating(match.you) ?? 1500,
+        blackEloBefore: getPrimaryRating(match.opponent) ?? 1500,
+        totalMoves: 30,
+        durationSeconds: 600,
+        pgnContent: `[Event "ChessQuery Casual"]\n[White "${buildPlayerName(match.you)}"]\n[Black "${buildPlayerName(match.opponent)}"]\n[Result "${result}"]\n\n${result}`,
+      });
+    },
+    onSuccess: (game: { whiteEloBefore: number; whiteEloAfter: number }, result: Result) => {
+      setSubmitted({ result, eloDelta: game.whiteEloAfter - game.whiteEloBefore });
+      queryClient.invalidateQueries({ queryKey: ['me'] });
+      queryClient.invalidateQueries({ queryKey: ['player'] });
+    },
+  });
 
   return (
-    <div style={{ padding: 28, display: 'grid', gap: 20 }}>
+    <div style={{ padding: 28, display: 'grid', gap: 20, maxWidth: 920, margin: '0 auto' }}>
       <section className="page-header">
         <div>
           <div className="eyebrow">Portal de Juego</div>
-          <h1 className="page-title">Emparejamientos sugeridos para lanzar un reto.</h1>
+          <h1 className="page-title">Buscar partida</h1>
           <p className="page-copy">
-            Esta vista ordena posibles rivales por cercanía de rating. Si el rival tiene cuenta de Lichess, el
-            botón abre el desafío externo; si no, la partida se registra directamente en ChessQuery.
+            ChessQuery te empareja con otro jugador de la plataforma de rating cercano.
+            La partida queda registrada en ChessQuery y tu ELO se recalcula al reportar
+            el resultado, independiente de si tienes cuenta de Lichess.
           </p>
-        </div>
-        <div style={{ minWidth: 280 }}>
-          <Input
-            placeholder="Filtra por nombre..."
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            leftIcon={<span>♞</span>}
-          />
         </div>
       </section>
 
-      <Card
-        header={
-          <div className="card-header-row">
-            <span>Lobby competitivo</span>
-            <Badge variant="success">Rating match</Badge>
+      {!match ? (
+        <Card>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: '32px 16px' }}>
+            <div style={{ fontSize: 56 }}>♞</div>
+            <div style={{ textAlign: 'center', color: 'var(--text-muted)', maxWidth: 420 }}>
+              Pulsa el botón y te asignaremos un rival al azar entre los jugadores
+              registrados, priorizando una diferencia de ELO de hasta 400 puntos.
+            </div>
+            <Button
+              size="lg"
+              onClick={() => findMatch.mutate()}
+              loading={findMatch.isPending}
+            >
+              Buscar partida
+            </Button>
+            {findMatch.isError ? (
+              <ErrorAlert
+                title="No se pudo buscar partida"
+                message={
+                  (findMatch.error as { response?: { data?: { message?: string } }; message?: string })
+                    ?.response?.data?.message ??
+                  (findMatch.error as { message?: string })?.message ??
+                  'Error desconocido'
+                }
+              />
+            ) : null}
           </div>
-        }
-      >
-        {candidates.length === 0 ? (
-          <EmptyState title="Sin rivales sugeridos" description="Ajusta el filtro o vuelve cuando haya más jugadores rankeados." icon="♟" />
-        ) : candidateProfiles.isError ? (
-          <ErrorAlert
-            title="No se pudieron enriquecer los perfiles"
-            message="Aun así puedes revisar los jugadores sugeridos."
-            onRetry={() => candidateProfiles.refetch()}
-          />
-        ) : (
-          <Table<MatchCandidate>
-            rows={candidates}
-            rowKey={(row) => row.id}
-            columns={[
-              {
-                key: 'player',
-                header: 'Jugador',
-                render: (row) => (
-                  <button className="table-link" onClick={() => navigate(`/player/${row.id}`)}>
-                    {buildPlayerName(row)}
-                  </button>
-                ),
-              },
-              {
-                key: 'source',
-                header: 'Perfil',
-                render: (row) => {
-                  const lichessUsername = candidateProfiles.data?.get(row.id)?.lichessUsername;
-                  return lichessUsername ? (
-                    <Badge variant="info">{lichessUsername}</Badge>
-                  ) : (
-                    <Badge variant="neutral">ChessQuery</Badge>
-                  );
-                },
-              },
-              {
-                key: 'rating',
-                header: 'Rating',
-                align: 'right',
-                render: (row) =>
-                  getPrimaryRating(row) != null ? <RatingBadge rating={getPrimaryRating(row)!} label="ELO" /> : '—',
-              },
-              {
-                key: 'gap',
-                header: 'Diferencia',
-                align: 'right',
-                render: (row) => `${row.ratingGap} pts`,
-              },
-              {
-                key: 'availability',
-                header: 'Estado',
-                render: (row) => {
-                  const lichessUsername = candidateProfiles.data?.get(row.id)?.lichessUsername;
-                  return lichessUsername ? (
-                    <Badge variant="success" dot>
-                      Lichess listo
-                    </Badge>
-                  ) : (
-                    <Badge variant="info" dot>
-                      ChessQuery
-                    </Badge>
-                  );
-                },
-              },
-              {
-                key: 'action',
-                header: 'Jugar',
-                align: 'right',
-                render: (row) => {
-                  const lichessUsername = candidateProfiles.data?.get(row.id)?.lichessUsername;
-                  const link = buildLichessProfileUrl(lichessUsername);
+        </Card>
+      ) : (
+        <>
+          <Card header="Partida encontrada">
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr auto 1fr',
+                gap: 18,
+                alignItems: 'center',
+                padding: 12,
+              }}
+            >
+              <PlayerCell label="Blancas (tú)" player={match.you} />
+              <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-muted)' }}>vs</div>
+              <PlayerCell label="Negras" player={match.opponent} align="end" />
+            </div>
+          </Card>
 
-                  if (link) {
-                    return (
-                      <a className="btn btn-primary" href={link} target="_blank" rel="noreferrer">
-                        Jugar
-                      </a>
-                    );
-                  }
-                  return (
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      onClick={() =>
-                        window.alert(
-                          `Reto enviado a ${buildPlayerName(row)}. La partida se registrará en ChessQuery cuando el rival acepte.`,
-                        )
-                      }
-                    >
-                      Jugar
-                    </Button>
-                  );
-                },
-              },
-            ] as TableColumn<MatchCandidate>[]}
-          />
-        )}
-      </Card>
+          {submitted ? (
+            <Card>
+              <div style={{ padding: 22, textAlign: 'center' }}>
+                <div style={{ fontSize: 38, fontWeight: 700 }}>{submitted.result}</div>
+                <div style={{ marginTop: 8, color: 'var(--text-muted)' }}>
+                  Tu ELO cambió en{' '}
+                  <strong style={{ color: submitted.eloDelta >= 0 ? 'var(--accent)' : 'var(--red)' }}>
+                    {submitted.eloDelta >= 0 ? '+' : ''}{submitted.eloDelta}
+                  </strong>{' '}
+                  puntos.
+                </div>
+                <div style={{ marginTop: 18, display: 'flex', gap: 10, justifyContent: 'center' }}>
+                  <Button variant="secondary" onClick={() => { setMatch(null); setSubmitted(null); }}>
+                    Buscar otra partida
+                  </Button>
+                  <Button onClick={() => navigate('/me')}>Ir a mi dashboard</Button>
+                </div>
+              </div>
+            </Card>
+          ) : (
+            <Card header="Reportar resultado">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 12 }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+                  Una vez terminada la partida, marca el resultado. ChessQuery recalculará
+                  el ELO usando la fórmula FIDE.
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                  <Button
+                    onClick={() => submitGame.mutate('1-0')}
+                    loading={submitGame.isPending && submitGame.variables === '1-0'}
+                    disabled={submitGame.isPending}
+                  >
+                    Gané (1-0)
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => submitGame.mutate('1/2-1/2')}
+                    loading={submitGame.isPending && submitGame.variables === '1/2-1/2'}
+                    disabled={submitGame.isPending}
+                  >
+                    Tablas (½-½)
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => submitGame.mutate('0-1')}
+                    loading={submitGame.isPending && submitGame.variables === '0-1'}
+                    disabled={submitGame.isPending}
+                  >
+                    Perdí (0-1)
+                  </Button>
+                </div>
+                {submitGame.isError ? (
+                  <ErrorAlert
+                    title="No se pudo registrar la partida"
+                    message={
+                      (submitGame.error as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+                      (submitGame.error as { message?: string })?.message ??
+                      'Error desconocido'
+                    }
+                  />
+                ) : null}
+                <Button variant="ghost" onClick={() => setMatch(null)}>
+                  Cancelar
+                </Button>
+              </div>
+            </Card>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
+const PlayerCell = ({
+  label,
+  player,
+  align = 'start',
+}: {
+  label: string;
+  player: Player;
+  align?: 'start' | 'end';
+}) => {
+  const rating = getPrimaryRating(player);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: align === 'end' ? 'flex-end' : 'flex-start', gap: 6 }}>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 700 }}>{buildPlayerName(player)}</div>
+      {rating != null ? <RatingBadge rating={rating} label="ELO" /> : <span style={{ color: 'var(--text-muted)' }}>Sin rating</span>}
     </div>
   );
 };

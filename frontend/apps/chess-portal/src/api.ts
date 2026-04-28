@@ -284,6 +284,22 @@ export const playerApi = {
 
   lichess: (id: string | number): Promise<LichessProfilePayload> =>
     api.get(`/api/player/${id}/lichess`).then((r) => normalizeLichess(r.data)),
+
+  findMatch: (): Promise<{
+    you: Player;
+    opponent: Player;
+    yourColor: 'white' | 'black';
+    opponentColor: 'white' | 'black';
+  }> =>
+    api.post('/api/player/play/find-match', {}).then((r) => {
+      const raw = asRecord(r.data);
+      return {
+        you: normalizePlayer(raw.you),
+        opponent: normalizePlayer(raw.opponent),
+        yourColor: (asString(raw.yourColor) === 'black' ? 'black' : 'white') as 'white' | 'black',
+        opponentColor: (asString(raw.opponentColor) === 'white' ? 'white' : 'black') as 'white' | 'black',
+      };
+    }),
 };
 
 export interface LichessRatingInfo {

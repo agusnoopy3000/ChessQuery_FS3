@@ -227,7 +227,12 @@ export const OrganizerTournamentsPage = () => {
                 {generateRound.isError ? (
                   <ErrorAlert
                     title="No se pudo generar la ronda"
-                    message="Revisa que el BFF-organizer reenvíe los headers requeridos al microservicio de torneos."
+                    message={
+                      (generateRound.error as { response?: { data?: { message?: string } }; message?: string })
+                        ?.response?.data?.message ??
+                      (generateRound.error as { message?: string })?.message ??
+                      'Error desconocido al generar emparejamientos.'
+                    }
                   />
                 ) : null}
               </div>
