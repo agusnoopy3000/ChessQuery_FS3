@@ -1,4 +1,3 @@
-import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   Card,
@@ -6,16 +5,10 @@ import {
   RatingBadge,
   Skeleton,
   ErrorAlert,
-  EmptyState,
-  Table,
-  TableColumn,
 } from '@chessquery/ui-lib';
-import { Game } from '@chessquery/shared';
 import { playerApi } from '../api';
 
 export const MyDashboardPage = () => {
-  const navigate = useNavigate();
-
   const dashboard = useQuery({
     queryKey: ['me', 'dashboard'],
     queryFn: () => playerApi.dashboard(),
@@ -41,7 +34,7 @@ export const MyDashboardPage = () => {
     );
   }
 
-  const { profile: p, recentGames } = dashboard.data;
+  const { profile: p } = dashboard.data;
   const fullName = [p.firstName, p.lastName].filter(Boolean).join(' ') || 'Jugador';
   const clubLabel = p.clubName ?? p.countryName ?? '—';
   const birthDate = p.birthDate ?? '—';
@@ -82,41 +75,6 @@ export const MyDashboardPage = () => {
         )}
       </div>
 
-      {/* Partidas recientes */}
-      <Card header="Partidas recientes">
-        {!recentGames || recentGames.length === 0 ? (
-          <EmptyState title="Aún no has jugado" description="Inscríbete en un torneo para comenzar" />
-        ) : (
-          <Table<Game>
-            rows={recentGames}
-            rowKey={(r) => r.id}
-            columns={[
-              { key: 'date', header: 'Fecha', render: (r) => r.playedAt?.slice(0, 10) ?? '—' },
-              {
-                key: 'opp',
-                header: 'Oponente',
-                render: (r) => {
-                  const isWhite = r.whitePlayerId === p.id;
-                  const oppName = isWhite ? r.blackName : r.whiteName;
-                  const oppId = isWhite ? r.blackPlayerId : r.whitePlayerId;
-                  return (
-                    <button
-                      className="btn btn-ghost"
-                      onClick={() => navigate(`/player/${oppId}`)}
-                      style={{ padding: '2px 6px', fontSize: 13 }}
-                    >
-                      {oppName ?? `#${oppId}`}
-                    </button>
-                  );
-                },
-              },
-              { key: 'color', header: 'Color', align: 'center', render: (r) => (r.whitePlayerId === p.id ? '♔' : '♚') },
-              { key: 'result', header: 'Resultado', align: 'center', render: (r) => <Badge>{r.result}</Badge> },
-              { key: 'opening', header: 'Apertura', render: (r) => r.openingName ?? '—' },
-            ] as TableColumn<Game>[]}
-          />
-        )}
-      </Card>
     </div>
   );
 };

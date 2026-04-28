@@ -1,10 +1,8 @@
-import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Badge, Button, Card, EmptyState, ErrorAlert, Skeleton } from '@chessquery/ui-lib';
-import { Tournament } from '@chessquery/shared';
-import { playerApi, tournamentApi } from '../api';
-import { buildPlayerName, formatDate, formatNumber, getPrimaryRating, tournamentStatusVariant, unwrapContent } from '../portal-utils';
+import { Button, Card, ErrorAlert, Skeleton } from '@chessquery/ui-lib';
+import { playerApi } from '../api';
+import { buildPlayerName, formatNumber, getPrimaryRating } from '../portal-utils';
 
 export const PlayerPortalPage = () => {
   const navigate = useNavigate();
@@ -14,23 +12,9 @@ export const PlayerPortalPage = () => {
     queryFn: () => playerApi.dashboard(),
   });
 
-  const tournaments = useQuery({
-    queryKey: ['player', 'portal', 'tournaments'],
-    queryFn: () => tournamentApi.list({ size: 8 }),
-  });
-
-  const activeTournaments = useMemo(
-    () =>
-      unwrapContent<Tournament>(tournaments.data)
-        .filter((t) => t.status === 'OPEN' || t.status === 'IN_PROGRESS')
-        .slice(0, 4),
-    [tournaments.data],
-  );
-
-  if (dashboard.isLoading || tournaments.isLoading) {
+  if (dashboard.isLoading) {
     return (
       <div style={{ padding: 28, display: 'grid', gap: 16 }}>
-        <Skeleton height={220} />
         <Skeleton height={220} />
       </div>
     );
@@ -100,42 +84,6 @@ export const PlayerPortalPage = () => {
           </Card>
         </div>
       </section>
-
-      <Card
-        header={
-          <div className="card-header-row">
-            <span>Torneos activos</span>
-            <Button size="sm" variant="ghost" onClick={() => navigate('/tournaments')}>
-              Ver todos
-            </Button>
-          </div>
-        }
-      >
-        {activeTournaments.length === 0 ? (
-          <EmptyState title="No hay competencias abiertas" description="Las próximas rondas aparecerán aquí." icon="♜" />
-        ) : (
-          <div style={{ display: 'grid', gap: 10 }}>
-            {activeTournaments.map((tournament) => (
-              <button
-                key={tournament.id}
-                type="button"
-                className="surface-button"
-                onClick={() => navigate(`/tournaments/${tournament.id}`)}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
-                  <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontWeight: 700 }}>{tournament.name}</div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-                      {formatDate(tournament.startDate)} · {tournament.location ?? 'Ubicación por confirmar'}
-                    </div>
-                  </div>
-                  <Badge variant={tournamentStatusVariant(tournament.status)}>{tournament.status}</Badge>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </Card>
     </div>
   );
 };
