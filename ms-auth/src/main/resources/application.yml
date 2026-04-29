@@ -28,6 +28,12 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
 
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:chessquery}
+    password: ${RABBITMQ_PASSWORD:chessquery_dev}
+
 # ── Servidor ────────────────────────────────────────────────────────────────
 server:
   port: ${SERVER_PORT:9090}
@@ -78,6 +84,8 @@ spring:
       on-profile: docker
   datasource:
     url: jdbc:postgresql://auth_db:5432/auth_db
+  rabbitmq:
+    host: rabbitmq
 
 ---
 # ── Perfil test (H2 en memoria, Flyway deshabilitado) ───────────────────────
@@ -95,3 +103,6 @@ spring:
       ddl-auto: create-drop
   flyway:
     enabled: false
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration

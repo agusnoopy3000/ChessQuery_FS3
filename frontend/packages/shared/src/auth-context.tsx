@@ -75,7 +75,10 @@ export const AuthProvider = ({ client, storage, children }: AuthProviderProps) =
     async (email, password) => {
       const res = await client.post<LoginResponse>('/auth/login', { email, password });
       storage.setTokens(res.data.accessToken, res.data.refreshToken);
-      const u: AuthUser = { id: res.data.userId, email: res.data.email, role: res.data.role };
+      const u = userFromAccessToken(res.data.accessToken);
+      if (!u) {
+        throw new Error('No se pudo reconstruir la sesión desde el access token');
+      }
       setUser(u);
       return u;
     },

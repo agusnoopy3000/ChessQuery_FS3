@@ -80,6 +80,7 @@ const normalizePlayer = (value: unknown): Player => {
     firstName: asString(raw.firstName) ?? '',
     lastName: asString(raw.lastName) ?? '',
     rut: asString(raw.rut) ?? null,
+    birthDate: asString(raw.birthDate) ?? null,
     fideId: asString(raw.fideId) ?? null,
     lichessUsername: asString(raw.lichessUsername) ?? null,
     eloNational: asNumber(raw.eloNational) ?? null,
