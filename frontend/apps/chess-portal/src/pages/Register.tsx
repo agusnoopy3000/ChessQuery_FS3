@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Role, useAuth } from '@chessquery/shared';
 import { Badge, Button, Card, ErrorAlert, Input } from '@chessquery/ui-lib';
@@ -29,7 +29,7 @@ const roleOptions: Array<{
 
 export const RegisterPage = () => {
   const navigate = useNavigate();
-  const { register } = useAuth();
+  const { register, user } = useAuth();
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -40,11 +40,17 @@ export const RegisterPage = () => {
   });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [pendingRole, setPendingRole] = useState<Role | null>(null);
 
   const activeRole = useMemo(
     () => roleOptions.find((option) => option.value === form.role) ?? roleOptions[0],
     [form.role],
   );
+
+  useEffect(() => {
+    if (!user) return;
+    navigate(getDefaultRoute(user.role ?? pendingRole), { replace: true });
+  }, [navigate, pendingRole, user]);
 
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -65,14 +71,14 @@ export const RegisterPage = () => {
 
     setSubmitting(true);
     try {
-      const user = await register({
+      setPendingRole(form.role);
+      await register({
         email: form.email.trim(),
         password: form.password,
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         role: form.role,
       });
-      navigate(getDefaultRoute(user.role));
     } catch (err) {
       const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       setError(message ?? 'No se pudo crear la cuenta');

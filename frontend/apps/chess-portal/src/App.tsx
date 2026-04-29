@@ -86,6 +86,10 @@ export const App = () => {
   const { user, logout, loading } = useAuth();
 
   if (location.pathname === '/login' || location.pathname === '/register') {
+    if (!loading && user) {
+      return <Navigate to={getDefaultRoute(user.role)} replace />;
+    }
+
     return (
       <Routes>
         <Route path="/login" element={<LoginPage />} />
