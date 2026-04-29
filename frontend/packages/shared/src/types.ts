@@ -40,6 +40,7 @@ export interface Player {
   firstName: string;
   lastName: string;
   rut?: string | null;
+  birthDate?: string | null;
   fideId?: string | null;
   lichessUsername?: string | null;
   eloNational?: number | null;

@@ -2,13 +2,17 @@ package cl.chessquery.users.repository;
 
 import cl.chessquery.users.entity.Player;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface PlayerRepository extends JpaRepository<Player, Long> {
+
+    Optional<Player> findByEmail(String email);
 
     /**
      * Búsqueda fuzzy usando pg_trgm similarity() sobre nombre completo,
@@ -44,4 +48,19 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
             @Param("maxBirth") LocalDate maxBirth,
             org.springframework.data.domain.Pageable pageable
     );
+
+    @Modifying
+    @Query(value = """
+            INSERT INTO player (id, first_name, last_name, email, created_at, updated_at)
+            VALUES (:id, :firstName, :lastName, :email, NOW(), NOW())
+            """, nativeQuery = true)
+    void insertProvisionedPlayer(
+            @Param("id") Long id,
+            @Param("firstName") String firstName,
+            @Param("lastName") String lastName,
+            @Param("email") String email
+    );
+
+    @Query(value = "SELECT setval('player_id_seq', (SELECT COALESCE(MAX(id), 1) FROM player), true)", nativeQuery = true)
+    Long syncIdSequence();
 }

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, Injectable } from '@nestjs/common';
 import { UpstreamHttpService } from '../common/http.service';
 import {
   DashboardResponse,
@@ -14,11 +14,11 @@ export class PlayerService {
     const { msUsers, msGame, msAnalytics } = this.http.urls;
 
     const [profile, recentGamesPage, stats] = await Promise.all([
-      this.http.get<unknown>(`${msUsers}/users/${userId}/profile`),
+      this.fetchOwnProfileOrPlaceholder(userId, `${msUsers}/users/${userId}/profile`),
       this.http.get<{ content: unknown[] }>(
         `${msGame}/games?playerId=${userId}&size=5`,
       ),
-      this.http.get<unknown>(`${msAnalytics}/analytics/players/${userId}/stats`),
+      this.fetchStatsOrDefault(`${msAnalytics}/analytics/players/${userId}/stats`, userId),
     ]);
 
     return {
@@ -36,7 +36,7 @@ export class PlayerService {
       this.http.get<{ content: unknown[] }>(
         `${msGame}/games?playerId=${playerId}&size=10`,
       ),
-      this.http.get<unknown>(`${msAnalytics}/analytics/players/${playerId}/stats`),
+      this.fetchStatsOrDefault(`${msAnalytics}/analytics/players/${playerId}/stats`, playerId),
     ]);
 
     return {
@@ -109,5 +109,87 @@ export class PlayerService {
       const msg = err instanceof Error ? err.message : 'No se pudo consultar Lichess';
       return { username, user: null, games: [], error: msg };
     }
+  }
+
+  private async fetchProfileWithRetry(url: string): Promise<unknown> {
+    let attempts = 0;
+    let lastError: unknown;
+
+    while (attempts < 3) {
+      try {
+        return await this.http.get<unknown>(url);
+      } catch (error) {
+        lastError = error;
+        if (!this.isNotFound(error) || attempts === 2) {
+          throw error;
+        }
+        await this.sleep(250);
+      }
+      attempts += 1;
+    }
+
+    throw lastError;
+  }
+
+  private async fetchOwnProfileOrPlaceholder(userId: string, url: string): Promise<unknown> {
+    try {
+      return await this.fetchProfileWithRetry(url);
+    } catch (error) {
+      if (this.isNotFound(error)) {
+        return {
+          id: Number(userId),
+          firstName: 'Jugador',
+          lastName: `#${userId}`,
+          email: null,
+          rut: null,
+          birthDate: null,
+          gender: null,
+          region: null,
+          fideId: null,
+          lichessUsername: null,
+          country: null,
+          club: null,
+          eloNational: null,
+          eloFideStandard: null,
+          eloFideRapid: null,
+          eloFideBlitz: null,
+          eloPlatform: null,
+          currentTitle: null,
+          createdAt: null,
+          updatedAt: null,
+        };
+      }
+      throw error;
+    }
+  }
+
+  private async fetchStatsOrDefault(url: string, userId: string): Promise<unknown> {
+    try {
+      return await this.http.get<unknown>(url);
+    } catch (error) {
+      if (this.isNotFound(error)) {
+        return {
+          playerId: Number(userId),
+          totalGames: 0,
+          wins: 0,
+          losses: 0,
+          draws: 0,
+          winRate: 0,
+          avgMoves: 0,
+          currentStreak: 0,
+          bestElo: null,
+          lastRefreshed: null,
+        };
+      }
+      throw error;
+    }
+  }
+
+  private isNotFound(error: unknown): boolean {
+    return error instanceof HttpException && error.getStatus() === 404;
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
