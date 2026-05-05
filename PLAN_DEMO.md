@@ -57,19 +57,6 @@ Los endpoints se agrupan por rol/escena. Si una escena no funciona end-to-end, e
 
 **Riesgos:** MinIO bucket sin crear → 500 al subir PGN. Verificar script de init.
 
-### Escena E — Analytics y admin (ADMIN)
-**Flujo UI:** `/admin`, `/admin/etl`
-
-| Endpoint | Servicio | Estado |
-|---|---|---|
-| `GET /admin/dashboard` | bff-admin → ms-analytics | ⚠️ ms-analytics sin `src/` |
-| `GET /admin/etl/status` | bff-admin → ms-etl | ✅ |
-| `POST /admin/etl/sync/:source` | bff-admin → ms-etl | ✅ |
-| `GET /analytics/players/{id}/stats` | ms-analytics | ⚠️ solo `.class` |
-| `GET /analytics/platform/summary` | ms-analytics | ⚠️ solo `.class` |
-
-**Bloqueante:** recuperar fuentes de MS-Analytics (ver `SPEC_BRECHAS.md` brecha 1).
-
 ### Escena F — Notificaciones (background)
 Demostrable vía RabbitMQ Management UI + consulta a `notification_log`.
 
