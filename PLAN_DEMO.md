@@ -3,6 +3,23 @@
 Fecha: 2026-04-23
 Objetivo: dejar el sistema estable con endpoints demo-críticos cubiertos y monitoreo básico, para que la última semana sea solo correcciones y ensayo.
 
+## Alcance operativo de la demo
+
+### Servicios Operativos Backend (9)
+api-gateway, ms-auth, ms-users, ms-tournament, ms-game, ms-etl, ms-notifications, bff-player, bff-organizer
+
+### Servicios Operativos Frontend (2)
+- **chess-portal** (con alcance reducido): Portal (centro del jugador), Jugar (emparejamiento), Torneos (inscripción), Mi Perfil (dashboard)
+- **organizer-panel** (con alcance reducido): Inicio del organizador, Torneos (gestión completa y validación de inscripciones)
+
+### Infraestructura
+PostgreSQL, RabbitMQ, MinIO/S3, Redis, Prometheus, Grafana
+
+### Servicios NO Operativos (fuera de alcance de la demo)
+ms-analytics, bff-admin, admin-panel
+
+> **Nota:** MS-ETL está operativo para poblar datos en la plataforma y evitar que se vea vacía. No se utiliza para funcionalidades de administración.
+
 ---
 
 ## 1. Endpoints críticos para la demo (guion narrativo)
