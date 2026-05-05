@@ -38,8 +38,8 @@ Los endpoints se agrupan por rol/escena. Si una escena no funciona end-to-end, e
 
 **Riesgos:** que `user.registered` no llegue a ms-users → perfil vacío. Verificar binding `user.*` en ms-users.
 
-### Escena B — Búsqueda y ranking
-**Flujo UI:** `/search`, `/rankings`
+### Escena B — Búsqueda y ranking (endpoints backend)
+**Endpoints operativos** (sin vistas frontend en alcance reducido):
 
 | Endpoint | Servicio | Estado |
 |---|---|---|
@@ -47,6 +47,8 @@ Los endpoints se agrupan por rol/escena. Si una escena no funciona end-to-end, e
 | `GET /users/ranking` | ms-users | ✅ |
 | `GET /player/search` | bff-player | ✅ |
 | `GET /player/rankings` | bff-player | ✅ |
+
+> **Nota:** Los endpoints de búsqueda y ranking están operativos en el backend para uso interno y desarrollo futuro, pero las vistas de usuario final (`/search`, `/rankings`) no están incluidas en el alcance de la demo.
 
 **Riesgos:** `pg_trgm` no activado → 500. Validar seed de 10 jugadores chilenos cargada.
 
@@ -187,7 +189,7 @@ Asumiendo presentación en ~2 semanas:
 | Semana | Foco |
 |---|---|
 | **Semana 1 días 1-2** | Brecha 4 (compose version), actuator en todos los servicios (Paso 1) |
-| **Semana 1 días 3-4** | Brecha 1 (recuperar MS-Analytics), Prometheus+Grafana (Paso 2-3) |
+| **Semana 1 días 3-4** | Consolidar servicios operativos, Prometheus+Grafana (Paso 2-3) |
 | **Semana 1 días 5-7** | Brecha 2 (auditar notifications), Brecha 3 start (organizer-panel o consolidar chess-portal) |
 | **Semana 2 días 1-2** | Smoke test E2E, ajuste de healthchecks (Paso 4) |
 | **Semana 2 días 3-4** | Congelar código. Solo bug-fixes |
