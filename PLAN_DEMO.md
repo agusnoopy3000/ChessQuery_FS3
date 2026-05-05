@@ -71,10 +71,10 @@ Demostrable vía RabbitMQ Management UI + consulta a `notification_log`.
 
 Ordenados por prioridad demo:
 
-1. **MS-Analytics** — todos sus endpoints (ver brecha 1). Bloquea escena E.
-2. **MS-Notifications** — `GET /notifications?userId=` para mostrar log en UI admin (opcional, pero vistoso).
-3. **MS-Users** — `GET /users/{id}/elo` existe interno; validar que BFF lo exponga si Escena B lo requiere.
-4. **Gateway** — agregar ruta `/api/analytics/**` si se expone directamente al admin-panel.
+1. **MS-Notifications** — `GET /notifications?userId=` para mostrar log en UI (opcional, pero vistoso).
+2. **MS-Users** — `GET /users/{id}/elo` existe interno; validar que BFF lo exponga si Escena B lo requiere.
+
+> **Nota sobre MS-ETL:** MS-ETL está operativo para servir datos a la plataforma y evitar que se vea vacía, no para funcionalidades de administración. Sus endpoints son consumidos internamente.
 
 **No crear** endpoints nuevos fuera de esta lista antes de la demo.
 
