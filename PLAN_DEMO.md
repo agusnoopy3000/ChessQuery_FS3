@@ -135,7 +135,7 @@ grafana:
 
 **Nota:** ms-auth ya usa puerto 9090 → exponer Prometheus en **9091** para evitar colisión.
 
-Crear `infrastructure/prometheus/prometheus.yml` con scrape jobs para los 6 microservicios Java + api-gateway (path `/actuator/prometheus`).
+Crear `infrastructure/prometheus/prometheus.yml` con scrape jobs para los 6 microservicios Java operativos (ms-auth, ms-users, ms-tournament, ms-game, ms-etl, ms-notifications) + api-gateway (path `/actuator/prometheus`).
 
 ### Paso 3 — Dashboard Grafana (1 PR, ~1h)
 Importar dashboard oficial **Spring Boot 2.1 System Monitor** (ID 11378) o **JVM Micrometer** (ID 4701). Cubre:
