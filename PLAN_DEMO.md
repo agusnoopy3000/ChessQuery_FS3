@@ -87,7 +87,7 @@ Ordenados por prioridad demo:
 - Sin Prometheus, Grafana, tracing, logs estructurados.
 
 ### Paso 1 — Actuator en todos los servicios Java (1 PR, ~1h)
-Agregar a cada `pom.xml` de `ms-auth`, `ms-users`, `ms-tournament`, `ms-game`, `ms-analytics`, `ms-notifications`:
+Agregar a cada `pom.xml` de `ms-auth`, `ms-users`, `ms-tournament`, `ms-game`, `ms-etl`, `ms-notifications`:
 
 ```xml
 <dependency>
