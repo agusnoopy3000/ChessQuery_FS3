@@ -188,7 +188,8 @@ Asumiendo presentación en ~2 semanas:
 - [ ] Seed de 90+ aperturas en game_db
 - [ ] Grafana en `localhost:3000` con dashboard cargado
 - [ ] Prometheus en `localhost:9091` scrapeando los 7 servicios
-- [ ] chess-portal en 5173 sirve login PLAYER/ORGANIZER/ADMIN
+- [ ] chess-portal en 5173 sirve login PLAYER/ORGANIZER (vistas reducidas: Portal, Jugar, Torneos, Mi Perfil)
+- [ ] organizer-panel sirve vistas de gestión de torneos (Inicio, Torneos)
 - [ ] Smoke test `infrastructure/scripts/smoke-test.sh` pasa
 - [ ] Usuario demo creado con cada rol (credenciales anotadas)
 - [ ] Torneo demo pre-cargado (opcional, agiliza la presentación)
