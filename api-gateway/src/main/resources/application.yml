@@ -71,9 +71,6 @@ spring:
                 key-resolver: "#{@ipKeyResolver}"
                 rate-limiter: "#{@defaultRateLimiter}"
 
-# ── Resilience4j Circuit Breaker ──────────────────────────────────────────
-# (instancia ms-auth-validate eliminada con la migración a Supabase Auth)
-
 # ── Servidor ──────────────────────────────────────────────────────────────
 server:
   port: ${SERVER_PORT:8080}
