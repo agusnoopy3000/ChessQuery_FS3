@@ -111,12 +111,6 @@ export const RegisterPage = () => {
                     {form.role === option.value ? 'Seleccionado' : 'Disponible'}
                   </Badge>
                 </div>
-                <div className="board-mini">
-                  <div />
-                  <div />
-                  <div />
-                  <div />
-                </div>
                 <div style={{ color: 'var(--text-dim)', fontSize: 12 }}>{option.detail}</div>
               </button>
             ))}
