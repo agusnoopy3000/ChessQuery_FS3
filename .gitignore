@@ -1,6 +1,6 @@
-# Environment files
+# Environment files (NUNCA commitear secrets)
+.env
 infrastructure/.env
-infrastructure/.env.example
 
 # Build artifacts
 **/target/
