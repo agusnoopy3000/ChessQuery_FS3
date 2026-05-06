@@ -22,11 +22,14 @@ spring:
 
       routes:
         # -------------------------------------------------------------------
-        # Rutas públicas (sin filtro JWT) — MS-Auth
-        # El JwtAuthFilter excluye todas las rutas /auth/** via PUBLIC_PATHS.
+        # Rutas públicas de autenticación
+        # Con Supabase Auth, el frontend llama directamente a Supabase.
+        # Estas rutas se mantienen por compatibilidad durante la migración.
         # -------------------------------------------------------------------
+        # NOTA: Las rutas /auth/** se pueden remover completamente una vez
+        # que la migración a Supabase esté completa (Fase 4: Descomisionamiento).
         - id: ms-auth-login
-          uri: ${MS_AUTH_URL}
+          uri: ${MS_AUTH_URL:http://localhost:9090}
           predicates:
             - Path=/auth/login,/auth/register
           filters:
@@ -39,7 +42,7 @@ spring:
                 rate-limiter: "#{@authRateLimiter}"
 
         - id: ms-auth
-          uri: ${MS_AUTH_URL}
+          uri: ${MS_AUTH_URL:http://localhost:9090}
           predicates:
             - Path=/auth/**
 
@@ -135,3 +138,16 @@ logging:
     org.springframework.cloud.gateway: INFO
     reactor.netty.http.client: WARN
     cl.chessquery.gateway: INFO
+
+# ── Supabase Auth ────────────────────────────────────────────────────────────────
+supabase:
+  jwt-secret: ${SUPABASE_JWT_SECRET:super-secret-jwt-token-with-at-least-32-characters-long}
+  webhook-secret: ${SUPABASE_WEBHOOK_SECRET:dev-webhook-secret}
+  url: ${SUPABASE_URL:http://localhost:54321}
+
+# ── RabbitMQ (para webhook user.registered) ──────────────────────────────────
+spring.rabbitmq:
+  host: ${RABBITMQ_HOST:localhost}
+  port: ${RABBITMQ_PORT:5672}
+  username: ${RABBITMQ_USER:chessquery}
+  password: ${RABBITMQ_PASSWORD:chessquery_dev}
