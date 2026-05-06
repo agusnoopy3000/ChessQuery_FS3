@@ -3,6 +3,7 @@ package cl.chessquery.auth.service;
 import cl.chessquery.auth.dto.*;
 import cl.chessquery.auth.entity.AuthUser;
 import cl.chessquery.auth.entity.RefreshToken;
+import cl.chessquery.auth.event.UserRegisteredPublisher;
 import cl.chessquery.auth.exception.ApiException;
 import cl.chessquery.auth.repository.AuthUserRepository;
 import cl.chessquery.auth.repository.RefreshTokenRepository;
@@ -29,6 +30,7 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepo;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
+    private final UserRegisteredPublisher userRegisteredPublisher;
 
     @Value("${app.jwt.refresh-expiration-days:7}")
     private long refreshExpirationDays;
@@ -47,6 +49,7 @@ public class AuthService {
                 .isActive(true)
                 .build();
         user = authUserRepo.save(user);
+        userRegisteredPublisher.publish(user.getId(), req.email(), req.firstName(), req.lastName(), req.role().name());
         return new RegisterResponse(user.getId(), user.getEmail(), user.getRole().name());
     }
 

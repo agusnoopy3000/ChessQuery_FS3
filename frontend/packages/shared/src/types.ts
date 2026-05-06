@@ -11,11 +11,7 @@ export interface AuthUser {
 export interface LoginResponse {
   accessToken: string;
   refreshToken: string;
-  tokenType: string;
   expiresIn: number;
-  userId: number;
-  email: string;
-  role: Role;
 }
 
 // ── Shared contracts ─────────────────────────────────────────────
@@ -40,6 +36,7 @@ export interface Player {
   firstName: string;
   lastName: string;
   rut?: string | null;
+  birthDate?: string | null;
   fideId?: string | null;
   lichessUsername?: string | null;
   eloNational?: number | null;

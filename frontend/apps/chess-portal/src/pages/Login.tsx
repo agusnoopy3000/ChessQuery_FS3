@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@chessquery/shared';
 import { Button, Card, ErrorAlert, Input } from '@chessquery/ui-lib';
@@ -7,11 +7,17 @@ import { resolveRequestedRoute } from '../portal-utils';
 export const LoginPage = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const { login } = useAuth();
+  const { login, user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [pendingRoute, setPendingRoute] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    navigate(resolveRequestedRoute(user.role, pendingRoute ?? params.get('next')), { replace: true });
+  }, [navigate, params, pendingRoute, user]);
 
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -19,8 +25,8 @@ export const LoginPage = () => {
     setSubmitting(true);
 
     try {
-      const user = await login(email.trim(), password);
-      navigate(resolveRequestedRoute(user.role, params.get('next')));
+      setPendingRoute(params.get('next'));
+      await login(email.trim(), password);
     } catch (err) {
       const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       setError(message ?? 'Credenciales inválidas');

@@ -27,6 +27,7 @@ import org.springframework.context.annotation.Configuration;
 public class RabbitMQConfig {
 
     public static final String EXCHANGE        = "ChessEvents";
+    public static final String USERS_REGISTERED_QUEUE = "users.registered.queue";
     public static final String USERS_ELO_QUEUE = "users.elo.queue";
 
     @Bean
@@ -35,6 +36,16 @@ public class RabbitMQConfig {
     }
 
     /** Cola durable dedicada a MS-Users para eventos elo.* */
+    @Bean
+    public Queue usersRegisteredQueue() {
+        return QueueBuilder.durable(USERS_REGISTERED_QUEUE).build();
+    }
+
+    @Bean
+    public Binding usersRegisteredBinding(Queue usersRegisteredQueue, TopicExchange chessEventsExchange) {
+        return BindingBuilder.bind(usersRegisteredQueue).to(chessEventsExchange).with("user.registered");
+    }
+
     @Bean
     public Queue usersEloQueue() {
         return QueueBuilder.durable(USERS_ELO_QUEUE).build();
