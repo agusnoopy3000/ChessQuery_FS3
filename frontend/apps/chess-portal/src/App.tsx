@@ -11,6 +11,7 @@ import { OrganizerPlayersPage } from './pages/OrganizerPlayers';
 import { OrganizerPortalPage } from './pages/OrganizerPortal';
 import { OrganizerTournamentsPage } from './pages/OrganizerTournaments';
 import { PlayerMatchmakingPage } from './pages/PlayerMatchmaking';
+import { LiveGamePage } from './pages/LiveGame';
 import { PlayerPortalPage } from './pages/PlayerPortal';
 import { PlayerProfilePage } from './pages/PlayerProfile';
 import { RankingsPage } from './pages/Rankings';
@@ -143,6 +144,14 @@ export const App = () => {
           element={
             <RequireRole userRole={user?.role} roles={['PLAYER']}>
               <PlayerMatchmakingPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/play/:id"
+          element={
+            <RequireRole userRole={user?.role} roles={['PLAYER']}>
+              <LiveGamePage />
             </RequireRole>
           }
         />

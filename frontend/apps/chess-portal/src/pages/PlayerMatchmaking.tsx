@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card, ErrorAlert, RatingBadge } from '@chessquery/ui-lib';
 import { Player } from '@chessquery/shared';
-import { playerApi, gameApi } from '../api';
+import { playerApi, gameApi, liveGameApi } from '../api';
 import { buildPlayerName, getPrimaryRating } from '../portal-utils';
 
 type Color = 'white' | 'black';
@@ -29,6 +29,11 @@ export const PlayerMatchmakingPage = () => {
       setMatch(data);
       setSubmitted(null);
     },
+  });
+
+  const startLive = useMutation({
+    mutationFn: (eloBefore?: number) => liveGameApi.create(eloBefore),
+    onSuccess: (game) => navigate(`/play/${game.id}`),
   });
 
   const submitGame = useMutation({
@@ -71,17 +76,43 @@ export const PlayerMatchmakingPage = () => {
         <Card>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: '32px 16px' }}>
             <div style={{ fontSize: 56 }}>♞</div>
-            <div style={{ textAlign: 'center', color: 'var(--text-muted)', maxWidth: 420 }}>
-              Pulsa el botón y te asignaremos un rival al azar entre los jugadores
-              registrados, priorizando una diferencia de ELO de hasta 400 puntos.
+            <div style={{ textAlign: 'center', color: 'var(--text-muted)', maxWidth: 480 }}>
+              Crea una partida en vivo y comparte el enlace con tu rival.
+              Cuando entre, jugarán en tablero real con tus jugadas validadas
+              y la partida quedará guardada con su PGN al terminar.
             </div>
             <Button
               size="lg"
-              onClick={() => findMatch.mutate()}
-              loading={findMatch.isPending}
+              onClick={() => startLive.mutate(undefined)}
+              loading={startLive.isPending}
             >
-              Buscar partida
+              ♞ Empezar partida en vivo
             </Button>
+            {startLive.isError ? (
+              <ErrorAlert
+                title="No se pudo crear la partida"
+                message={
+                  (startLive.error as { response?: { data?: { message?: string } }; message?: string })
+                    ?.response?.data?.message ??
+                  (startLive.error as { message?: string })?.message ??
+                  'Error desconocido'
+                }
+              />
+            ) : null}
+
+            <div style={{ marginTop: 18, padding: 12, borderTop: '1px solid var(--border)', width: '100%', textAlign: 'center' }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+                ¿Sólo quieres ver con quién te emparejaríamos?
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => findMatch.mutate()}
+                loading={findMatch.isPending}
+              >
+                Buscar rival sugerido (legacy)
+              </Button>
+            </div>
             {findMatch.isError ? (
               <ErrorAlert
                 title="No se pudo buscar partida"

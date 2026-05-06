@@ -456,6 +456,24 @@ export const adminApi = {
     api.get('/api/admin/users', { params: { q } }).then((r) => asArray<unknown>(r.data).map(normalizePlayer)),
 };
 
+export interface LiveGameSummary {
+  id: number;
+  whitePlayerId: number;
+  blackPlayerId: number | null;
+  status: 'WAITING' | 'ACTIVE' | 'FINISHED' | 'ABANDONED';
+  currentFen: string;
+  turn: 'w' | 'b';
+}
+
+export const liveGameApi = {
+  create: (whiteEloBefore?: number) =>
+    api.post<LiveGameSummary>('/api/player/play/live', { whiteEloBefore }).then((r) => r.data),
+  get: (id: number | string) =>
+    api.get<LiveGameSummary>(`/api/player/play/live/${id}`).then((r) => r.data),
+  join: (id: number | string, eloBefore?: number) =>
+    api.post<LiveGameSummary>(`/api/player/play/live/${id}/join`, { eloBefore }).then((r) => r.data),
+};
+
 export const gameApi = {
   recent: (playerId: number | string, size = 10): Promise<Pagination<Game>> =>
     api
