@@ -1,0 +1,334 @@
+package cl.chessquery.game.service;
+
+import cl.chessquery.game.dto.LiveGameDtos.*;
+import cl.chessquery.game.dto.RegisterGameRequest;
+import cl.chessquery.game.entity.GameType;
+import cl.chessquery.game.entity.LiveGameMove;
+import cl.chessquery.game.entity.LiveGameSession;
+import cl.chessquery.game.entity.LiveGameSession.SessionStatus;
+import cl.chessquery.game.exception.ApiException;
+import cl.chessquery.game.repository.LiveGameMoveRepository;
+import cl.chessquery.game.repository.LiveGameSessionRepository;
+import cl.chessquery.game.realtime.LiveGameBroadcaster;
+import com.github.bhlangonijr.chesslib.Board;
+import com.github.bhlangonijr.chesslib.Side;
+import com.github.bhlangonijr.chesslib.move.Move;
+import com.github.bhlangonijr.chesslib.move.MoveList;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class LiveGameService {
+
+    private static final String INITIAL_FEN =
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+    private final LiveGameSessionRepository sessionRepo;
+    private final LiveGameMoveRepository    moveRepo;
+    private final GameService                gameService;
+    private final LiveGameBroadcaster        broadcaster;
+
+    // ── Crear sesión (creator = white) ─────────────────────────────────────
+
+    @Transactional
+    public LiveGameResponse create(CreateLiveGameRequest req) {
+        LiveGameSession s = LiveGameSession.builder()
+                .whitePlayerId(req.whitePlayerId())
+                .status(SessionStatus.WAITING)
+                .initialFen(INITIAL_FEN)
+                .currentFen(INITIAL_FEN)
+                .turn("w")
+                .timeControlInitialMs(req.timeControlInitialMs())
+                .timeControlIncrementMs(req.timeControlIncrementMs())
+                .clockWhiteMs(req.timeControlInitialMs())
+                .clockBlackMs(req.timeControlInitialMs())
+                .whiteEloBefore(req.whiteEloBefore())
+                .build();
+        sessionRepo.save(s);
+        log.info("LiveGame creada id={} white={}", s.getId(), s.getWhitePlayerId());
+        return toResponse(s, List.of());
+    }
+
+    // ── Obtener (con jugadas) ──────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public LiveGameResponse get(Long id) {
+        LiveGameSession s = findOrThrow(id);
+        List<LiveGameMove> moves = moveRepo.findBySessionIdOrderByMoveNumberAscColorAsc(id);
+        return toResponse(s, moves);
+    }
+
+    // ── Join (rival = black) ───────────────────────────────────────────────
+
+    @Transactional
+    public LiveGameResponse join(Long id, JoinLiveGameRequest req) {
+        LiveGameSession s = findOrThrow(id);
+        if (s.getStatus() != SessionStatus.WAITING) {
+            throw new ApiException(409, "SESSION_NOT_WAITING",
+                    "La sesión no está en estado WAITING");
+        }
+        if (req.playerId().equals(s.getWhitePlayerId())) {
+            throw new ApiException(400, "SAME_PLAYER",
+                    "El creador y el rival no pueden ser el mismo jugador");
+        }
+        Instant now = Instant.now();
+        s.setBlackPlayerId(req.playerId());
+        s.setBlackEloBefore(req.eloBefore());
+        s.setStatus(SessionStatus.ACTIVE);
+        s.setStartedAt(now);
+        sessionRepo.save(s);
+        log.info("LiveGame {} joined: black={}", id, req.playerId());
+        broadcaster.publish(id, "game.started", Map.of(
+                "blackPlayerId", req.playerId(),
+                "startedAt", now.toString()
+        ));
+        return toResponse(s, moveRepo.findBySessionIdOrderByMoveNumberAscColorAsc(id));
+    }
+
+    // ── Move ───────────────────────────────────────────────────────────────
+
+    @Transactional
+    public LiveGameResponse move(Long id, MoveRequest req) {
+        LiveGameSession s = findOrThrow(id);
+        if (s.getStatus() != SessionStatus.ACTIVE) {
+            throw new ApiException(409, "SESSION_NOT_ACTIVE",
+                    "La sesión no está activa (estado=" + s.getStatus() + ")");
+        }
+        // Verificar turno
+        Side expected = "w".equals(s.getTurn()) ? Side.WHITE : Side.BLACK;
+        Long expectedPlayerId = expected == Side.WHITE ? s.getWhitePlayerId() : s.getBlackPlayerId();
+        if (!req.playerId().equals(expectedPlayerId)) {
+            throw new ApiException(403, "NOT_YOUR_TURN",
+                    "No es el turno del jugador " + req.playerId());
+        }
+
+        // Validar y aplicar jugada con chesslib
+        Board board = new Board();
+        board.loadFromFen(s.getCurrentFen());
+        Move move;
+        try {
+            move = new Move(req.uci(), board.getSideToMove());
+        } catch (Exception e) {
+            throw new ApiException(400, "INVALID_UCI",
+                    "UCI inválido: " + req.uci());
+        }
+        if (!board.legalMoves().contains(move)) {
+            throw new ApiException(400, "ILLEGAL_MOVE",
+                    "Jugada ilegal en la posición actual");
+        }
+        String san = sanForMove(board, move);
+        board.doMove(move);
+
+        // Persistir jugada
+        int totalPrev = (int) moveRepo.countBySessionId(id);
+        int moveNumber = (totalPrev / 2) + 1;
+        String color = expected == Side.WHITE ? "w" : "b";
+        LiveGameMove lm = LiveGameMove.builder()
+                .sessionId(id)
+                .moveNumber(moveNumber)
+                .playerId(req.playerId())
+                .color(color)
+                .uci(req.uci())
+                .san(san)
+                .fenAfter(board.getFen())
+                .clockWhiteMs(req.clockWhiteMs())
+                .clockBlackMs(req.clockBlackMs())
+                .build();
+        moveRepo.save(lm);
+
+        // Actualizar sesión
+        Instant now = Instant.now();
+        s.setCurrentFen(board.getFen());
+        s.setTurn(board.getSideToMove() == Side.WHITE ? "w" : "b");
+        s.setLastMoveAt(now);
+        if (req.clockWhiteMs() != null) s.setClockWhiteMs(req.clockWhiteMs());
+        if (req.clockBlackMs() != null) s.setClockBlackMs(req.clockBlackMs());
+
+        // Detectar fin
+        String terminal = detectTerminal(board);
+        if (terminal != null) {
+            String result = switch (terminal) {
+                case "CHECKMATE" -> color.equals("w") ? "1-0" : "0-1";
+                default -> "1/2-1/2";
+            };
+            finishSession(s, result, terminal, now);
+        }
+        sessionRepo.save(s);
+
+        // Broadcast
+        broadcaster.publish(id, "move.played", Map.of(
+                "moveNumber", moveNumber,
+                "color", color,
+                "uci", req.uci(),
+                "san", san,
+                "fenAfter", board.getFen(),
+                "clockWhiteMs", req.clockWhiteMs() == null ? -1L : req.clockWhiteMs(),
+                "clockBlackMs", req.clockBlackMs() == null ? -1L : req.clockBlackMs()
+        ));
+        if (terminal != null) {
+            broadcastFinished(s);
+        }
+
+        return toResponse(s, moveRepo.findBySessionIdOrderByMoveNumberAscColorAsc(id));
+    }
+
+    // ── Resign ─────────────────────────────────────────────────────────────
+
+    @Transactional
+    public LiveGameResponse resign(Long id, ResignRequest req) {
+        LiveGameSession s = findOrThrow(id);
+        if (s.getStatus() != SessionStatus.ACTIVE) {
+            throw new ApiException(409, "SESSION_NOT_ACTIVE",
+                    "La sesión no está activa");
+        }
+        boolean whiteResigns = req.playerId().equals(s.getWhitePlayerId());
+        boolean blackResigns = req.playerId().equals(s.getBlackPlayerId());
+        if (!whiteResigns && !blackResigns) {
+            throw new ApiException(403, "NOT_A_PLAYER",
+                    "El jugador " + req.playerId() + " no participa en esta partida");
+        }
+        String result = whiteResigns ? "0-1" : "1-0";
+        Instant now = Instant.now();
+        finishSession(s, result, "RESIGN", now);
+        sessionRepo.save(s);
+        broadcastFinished(s);
+        return toResponse(s, moveRepo.findBySessionIdOrderByMoveNumberAscColorAsc(id));
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+
+    private LiveGameSession findOrThrow(Long id) {
+        return sessionRepo.findById(id)
+                .orElseThrow(() -> new ApiException(404, "SESSION_NOT_FOUND",
+                        "Sesión live " + id + " no encontrada"));
+    }
+
+    /** Dispara el flujo final: marca FINISHED, construye PGN, persiste en `game`. */
+    private void finishSession(LiveGameSession s, String result, String reason, Instant now) {
+        s.setStatus(SessionStatus.FINISHED);
+        s.setResult(result);
+        s.setEndReason(reason);
+        s.setFinishedAt(now);
+
+        if (s.getBlackPlayerId() == null) {
+            log.warn("LiveGame {} finalizada sin oponente; no se materializa game", s.getId());
+            return;
+        }
+
+        // Construir PGN desde la lista de jugadas
+        List<LiveGameMove> moves = moveRepo.findBySessionIdOrderByMoveNumberAscColorAsc(s.getId());
+        String pgn = buildPgn(s, moves, result);
+
+        try {
+            int duration = s.getStartedAt() != null
+                    ? (int) Math.max(0, java.time.Duration.between(s.getStartedAt(), now).toSeconds())
+                    : 0;
+            var registered = gameService.registerGame(new RegisterGameRequest(
+                    s.getWhitePlayerId(),
+                    s.getBlackPlayerId(),
+                    result,
+                    GameType.CASUAL,
+                    s.getWhiteEloBefore(),
+                    s.getBlackEloBefore(),
+                    moves.size(),
+                    null,
+                    duration,
+                    s.getStartedAt() != null ? s.getStartedAt() : now,
+                    pgn
+            ));
+            s.setFinalizedGameId(registered.id());
+            log.info("LiveGame {} materializada como game {} (result={} reason={})",
+                    s.getId(), registered.id(), result, reason);
+        } catch (Exception e) {
+            log.error("LiveGame {} no se pudo materializar en `game`: {}", s.getId(), e.getMessage());
+            // La sesión queda finalizada igualmente; reintentar con un job manual.
+        }
+    }
+
+    private void broadcastFinished(LiveGameSession s) {
+        broadcaster.publish(s.getId(), "game.finished", Map.of(
+                "result", s.getResult() == null ? "" : s.getResult(),
+                "endReason", s.getEndReason() == null ? "" : s.getEndReason(),
+                "finalizedGameId", s.getFinalizedGameId() == null ? -1L : s.getFinalizedGameId()
+        ));
+    }
+
+    /** Detecta CHECKMATE / STALEMATE / DRAW (50-move, repetition, insuficiente). */
+    private String detectTerminal(Board board) {
+        if (board.isMated()) return "CHECKMATE";
+        if (board.isStaleMate()) return "STALEMATE";
+        if (board.isInsufficientMaterial()) return "DRAW_INSUFFICIENT";
+        if (board.isRepetition()) return "DRAW_REPETITION";
+        if (board.getHalfMoveCounter() >= 100) return "DRAW_50MOVE";
+        return null;
+    }
+
+    /** SAN de una jugada legal sobre la posición actual del board (sin aplicarla). */
+    private String sanForMove(Board board, Move move) {
+        Board copy = board.clone();
+        MoveList ml = new MoveList(copy.getFen());
+        ml.add(move);
+        try {
+            return ml.toSanArray()[0];
+        } catch (Exception e) {
+            return move.toString();
+        }
+    }
+
+    /** PGN mínimo válido a partir de los movimientos persistidos. */
+    private String buildPgn(LiveGameSession s, List<LiveGameMove> moves, String result) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("[Event \"ChessQuery Live\"]\n");
+        sb.append("[Site \"chessquery.local\"]\n");
+        sb.append("[Date \"").append(Instant.now().toString().substring(0, 10).replace('-', '.')).append("\"]\n");
+        sb.append("[White \"").append(s.getWhitePlayerId()).append("\"]\n");
+        sb.append("[Black \"").append(s.getBlackPlayerId()).append("\"]\n");
+        sb.append("[Result \"").append(result).append("\"]\n\n");
+
+        for (int i = 0; i < moves.size(); i++) {
+            LiveGameMove m = moves.get(i);
+            if ("w".equals(m.getColor())) {
+                sb.append(m.getMoveNumber()).append(". ");
+            }
+            sb.append(m.getSan()).append(' ');
+        }
+        sb.append(result).append('\n');
+        return sb.toString();
+    }
+
+    private LiveGameResponse toResponse(LiveGameSession s, List<LiveGameMove> moves) {
+        List<LiveMoveResponse> mr = moves.stream()
+                .map(m -> new LiveMoveResponse(
+                        m.getMoveNumber(), m.getColor(), m.getUci(), m.getSan(),
+                        m.getFenAfter(), m.getClockWhiteMs(), m.getClockBlackMs(),
+                        m.getCreatedAt()))
+                .toList();
+        return new LiveGameResponse(
+                s.getId(),
+                s.getWhitePlayerId(),
+                s.getBlackPlayerId(),
+                s.getStatus().name(),
+                s.getCurrentFen(),
+                s.getTurn(),
+                s.getResult(),
+                s.getEndReason(),
+                s.getTimeControlInitialMs(),
+                s.getTimeControlIncrementMs(),
+                s.getClockWhiteMs(),
+                s.getClockBlackMs(),
+                s.getFinalizedGameId(),
+                mr,
+                s.getStartedAt(),
+                s.getFinishedAt(),
+                s.getLastMoveAt()
+        );
+    }
+}

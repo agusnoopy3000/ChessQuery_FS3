@@ -84,4 +84,35 @@ export class PlayerController {
     const userId = getUserId(req);
     return this.playerService.submitCasualGame(userId, body);
   }
+
+  // ── Live games (tablero en tiempo real) ──────────────────────────────
+
+  @Post('play/live')
+  async createLive(@Req() req: Request, @Body() body: Record<string, unknown>) {
+    const userId = getUserId(req);
+    return this.playerService.createLiveGame(userId, body);
+  }
+
+  @Get('play/live/:id')
+  async getLive(@Param('id') id: string) {
+    return this.playerService.getLiveGame(id);
+  }
+
+  @Post('play/live/:id/join')
+  async joinLive(@Req() req: Request, @Param('id') id: string, @Body() body: Record<string, unknown>) {
+    const userId = getUserId(req);
+    return this.playerService.joinLiveGame(userId, id, body);
+  }
+
+  @Post('play/live/:id/move')
+  async moveLive(@Req() req: Request, @Param('id') id: string, @Body() body: Record<string, unknown>) {
+    const userId = getUserId(req);
+    return this.playerService.moveLiveGame(userId, id, body);
+  }
+
+  @Post('play/live/:id/resign')
+  async resignLive(@Req() req: Request, @Param('id') id: string) {
+    const userId = getUserId(req);
+    return this.playerService.resignLiveGame(userId, id);
+  }
 }

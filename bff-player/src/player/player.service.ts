@@ -188,6 +188,48 @@ export class PlayerService {
     return this.http.post<unknown>(`${msGame}/games`, payload);
   }
 
+  // ── Live games (proxy a ms-game) ─────────────────────────────────────
+
+  async createLiveGame(userId: string, body: Record<string, unknown>): Promise<unknown> {
+    const { msGame } = this.http.urls;
+    return this.http.post<unknown>(`${msGame}/games/live`, {
+      whitePlayerId: Number(userId),
+      whiteEloBefore: body.whiteEloBefore,
+      timeControlInitialMs: body.timeControlInitialMs,
+      timeControlIncrementMs: body.timeControlIncrementMs,
+    });
+  }
+
+  async getLiveGame(id: string): Promise<unknown> {
+    const { msGame } = this.http.urls;
+    return this.http.get<unknown>(`${msGame}/games/live/${id}`);
+  }
+
+  async joinLiveGame(userId: string, id: string, body: Record<string, unknown>): Promise<unknown> {
+    const { msGame } = this.http.urls;
+    return this.http.post<unknown>(`${msGame}/games/live/${id}/join`, {
+      playerId: Number(userId),
+      eloBefore: body.eloBefore,
+    });
+  }
+
+  async moveLiveGame(userId: string, id: string, body: Record<string, unknown>): Promise<unknown> {
+    const { msGame } = this.http.urls;
+    return this.http.post<unknown>(`${msGame}/games/live/${id}/move`, {
+      playerId: Number(userId),
+      uci: body.uci,
+      clockWhiteMs: body.clockWhiteMs,
+      clockBlackMs: body.clockBlackMs,
+    });
+  }
+
+  async resignLiveGame(userId: string, id: string): Promise<unknown> {
+    const { msGame } = this.http.urls;
+    return this.http.post<unknown>(`${msGame}/games/live/${id}/resign`, {
+      playerId: Number(userId),
+    });
+  }
+
   async getLichessProfile(playerId: string): Promise<{
     username: string | null;
     user: unknown | null;
