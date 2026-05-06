@@ -92,7 +92,6 @@ class PlayerSearchServiceTest {
     @Test
     void search_limitCappedAt50() {
         when(playerRepo.searchFuzzy(anyString(), eq(50))).thenReturn(List.of());
-        when(playerRepo.searchFuzzy(anyString(), eq(100))).thenReturn(List.of());
 
         playerService.search("test", 200);  // pide 200, debe ejecutarse con 50
         verify(playerRepo).searchFuzzy("test", 50);
