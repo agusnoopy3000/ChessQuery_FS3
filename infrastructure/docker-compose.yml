@@ -26,7 +26,7 @@ volumes:
   etl_db_data:
   rabbitmq_data:
   redis_data:
-  minio_data:
+  # minio_data eliminado en migración a Supabase Storage (ver docker-compose.backup.yml)
 
 # ---------------------------------------------------------------------------
 # Services
@@ -229,15 +229,9 @@ services:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USER: ${RABBITMQ_USER:-chessquery}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-chessquery_dev}
-      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-minioadmin}
-      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-minioadmin}
-      S3_ENDPOINT_URL: http://minio:9000
-      S3_PUBLIC_ENDPOINT_URL: ${S3_PUBLIC_ENDPOINT_URL:-http://localhost:9000}
-      S3_REGION: ${S3_REGION:-us-east-1}
       S3_BUCKET: ${S3_BUCKET:-chessquery-pgn}
-      S3_PATH_STYLE_ACCESS: "true"
       SERVER_PORT: "8083"
-      # Supabase Storage — almacenamiento PGN
+      # Supabase Storage — almacenamiento PGN (default)
       SUPABASE_URL: ${SUPABASE_URL:-http://host.docker.internal:54321}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:-}
       STORAGE_PROVIDER: ${STORAGE_PROVIDER:-supabase}
@@ -247,8 +241,6 @@ services:
       game_db:
         condition: service_healthy
       rabbitmq:
-        condition: service_healthy
-      minio:
         condition: service_healthy
     networks:
       - chessquery-net
@@ -518,62 +510,8 @@ services:
       timeout: 5s
       retries: 5
 
-  # -------------------------------------------------------------------------
-  # OBJECT STORAGE – MinIO (S3-compatible)
-  #
-  # Compatibilidad con AWS S3 SDK:
-  #   Los microservicios configuran:
-  #     AWS_ACCESS_KEY_ID     = ${S3_ACCESS_KEY}
-  #     AWS_SECRET_ACCESS_KEY = ${S3_SECRET_KEY}
-  #     S3_ENDPOINT_URL       = http://minio:9000   (solo en local; vacío en prod)
-  #     S3_REGION             = us-east-1           (MinIO lo acepta; en prod usar la región real)
-  #     S3_BUCKET             = chessquery-pgn
-  #   Con path-style habilitado en el SDK (forcePathStyle: true / path_style: true).
-  #   En producción: quitar S3_ENDPOINT_URL y usar credenciales IAM de AWS.
-  # -------------------------------------------------------------------------
-
-  minio:
-    image: minio/minio:latest
-    container_name: chessquery_minio
-    restart: unless-stopped
-    command: server /data --console-address ":9001"
-    environment:
-      # Estas vars replican los nombres estándar del AWS SDK para que el
-      # cambio a S3 real solo requiera actualizar el .env de producción.
-      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin}
-    ports:
-      - "9000:9000"   # S3 API  →  http://localhost:9000
-      - "9001:9001"   # Console →  http://localhost:9001
-    volumes:
-      - minio_data:/data
-    networks:
-      - chessquery-net
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 20s
-
-  # Contenedor one-shot: crea el bucket al primer arranque.
-  minio_setup:
-    image: minio/mc:latest
-    container_name: chessquery_minio_setup
-    restart: "no"
-    depends_on:
-      minio:
-        condition: service_healthy
-    environment:
-      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
-      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
-      S3_ENDPOINT: http://minio:9000
-      S3_BUCKET: ${S3_BUCKET:-chessquery-pgn}
-    volumes:
-      - ./scripts/init-minio.sh:/init-minio.sh:ro
-    entrypoint: ["sh", "/init-minio.sh"]
-    networks:
-      - chessquery-net
+  # MinIO removido — Supabase Storage gestiona PGN.
+  # Para rollback: docker compose -f docker-compose.yml -f docker-compose.backup.yml up
 
   # -------------------------------------------------------------------------
   # PROXY – Nginx (reverse proxy + frontend estático)
@@ -594,5 +532,4 @@ services:
     depends_on:
       - rabbitmq
       - redis
-      - minio
       - api-gateway
