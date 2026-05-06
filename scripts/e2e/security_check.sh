@@ -7,8 +7,15 @@ ok()   { echo "✅ $1"; PASS=$((PASS+1)); }
 fail() { echo "❌ $1"; FAIL=$((FAIL+1)); }
 
 echo "── 1. JWT secret tiene >=32 caracteres ─────────────────────────────"
-LEN=${#SUPABASE_JWT_SECRET}
-(( LEN >= 32 )) && ok "SUPABASE_JWT_SECRET length=$LEN" || fail "SUPABASE_JWT_SECRET muy corto ($LEN)"
+SECRET_VAL="${SUPABASE_JWT_SECRET-}"
+LEN=${#SECRET_VAL}
+if [[ -z "$SECRET_VAL" ]]; then
+  fail "SUPABASE_JWT_SECRET no está seteado en el shell"
+elif (( LEN >= 32 )); then
+  ok "SUPABASE_JWT_SECRET length=$LEN"
+else
+  fail "SUPABASE_JWT_SECRET muy corto ($LEN, esperado >=32)"
+fi
 
 echo "── 2. Service Key NO está en frontends ─────────────────────────────"
 if grep -rq "service_role\|SUPABASE_SERVICE_KEY" frontend/apps/*/src 2>/dev/null; then
