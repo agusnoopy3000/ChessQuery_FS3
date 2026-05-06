@@ -26,9 +26,10 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMQConfig {
 
-    public static final String EXCHANGE           = "ChessEvents";
-    public static final String USERS_ELO_QUEUE    = "users.elo.queue";
-    public static final String USERS_RATING_QUEUE = "users.rating.queue";
+    public static final String EXCHANGE                  = "ChessEvents";
+    public static final String USERS_ELO_QUEUE           = "users.elo.queue";
+    public static final String USERS_RATING_QUEUE        = "users.rating.queue";
+    public static final String USERS_REGISTRATION_QUEUE  = "users.registration.queue";
 
     @Bean
     public TopicExchange chessEventsExchange() {
@@ -58,6 +59,21 @@ public class RabbitMQConfig {
     @Bean
     public Binding usersRatingBinding(Queue usersRatingQueue, TopicExchange chessEventsExchange) {
         return BindingBuilder.bind(usersRatingQueue).to(chessEventsExchange).with("rating.*");
+    }
+
+    /**
+     * Cola dedicada a MS-Users para eventos user.registered publicados por
+     * el API Gateway (webhook de Supabase Auth). Crea/actualiza el Player
+     * con su supabase_user_id.
+     */
+    @Bean
+    public Queue usersRegistrationQueue() {
+        return QueueBuilder.durable(USERS_REGISTRATION_QUEUE).build();
+    }
+
+    @Bean
+    public Binding usersRegistrationBinding(Queue usersRegistrationQueue, TopicExchange chessEventsExchange) {
+        return BindingBuilder.bind(usersRegistrationQueue).to(chessEventsExchange).with("user.registered");
     }
 
     /** Serialización/deserialización JSON para mensajes RabbitMQ. */

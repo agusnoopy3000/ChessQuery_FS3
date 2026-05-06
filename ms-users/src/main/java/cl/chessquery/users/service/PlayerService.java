@@ -14,6 +14,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -142,6 +143,19 @@ public class PlayerService {
     public PlayerProfileResponse getProfile(Long id) {
         Player p = findOrThrow(id);
         String title = titleRepo.findByPlayerIdAndIsCurrentTrue(id)
+                .map(t -> t.getTitle().name())
+                .orElse(null);
+        return toProfileResponse(p, title);
+    }
+
+    // ─── GET /users/by-supabase-id/{supabaseUserId} ──────────────────────────
+
+    @Transactional(readOnly = true)
+    public PlayerProfileResponse getProfileBySupabaseId(UUID supabaseUserId) {
+        Player p = playerRepo.findBySupabaseUserId(supabaseUserId)
+                .orElseThrow(() -> new ApiException(404, "PLAYER_NOT_FOUND",
+                        "Jugador con supabaseUserId " + supabaseUserId + " no encontrado"));
+        String title = titleRepo.findByPlayerIdAndIsCurrentTrue(p.getId())
                 .map(t -> t.getTitle().name())
                 .orElse(null);
         return toProfileResponse(p, title);

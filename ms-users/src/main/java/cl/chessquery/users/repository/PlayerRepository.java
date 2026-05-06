@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 public interface PlayerRepository extends JpaRepository<Player, Long> {
 
@@ -16,6 +17,10 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
     Optional<Player> findByFideId(String fideId);
 
     Optional<Player> findByRut(String rut);
+
+    Optional<Player> findBySupabaseUserId(UUID supabaseUserId);
+
+    Optional<Player> findByEmail(String email);
 
     @Query(value = """
             SELECT p.* FROM player p

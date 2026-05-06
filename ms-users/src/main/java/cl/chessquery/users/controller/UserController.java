@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/users")
@@ -59,6 +60,12 @@ public class UserController {
     @GetMapping("/{id}/profile")
     public PlayerProfileResponse getProfile(@PathVariable Long id) {
         return playerService.getProfile(id);
+    }
+
+    @Operation(summary = "Resolver Player por UUID de Supabase Auth (usado por API Gateway / BFFs)")
+    @GetMapping("/by-supabase-id/{supabaseUserId}")
+    public PlayerProfileResponse getBySupabaseId(@PathVariable UUID supabaseUserId) {
+        return playerService.getProfileBySupabaseId(supabaseUserId);
     }
 
     @Operation(summary = "Actualizar datos de perfil (firstName, lastName, clubId, region)")

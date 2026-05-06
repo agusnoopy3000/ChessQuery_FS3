@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
@@ -33,6 +34,7 @@ class UserControllerIntegrationTest {
 
     @MockBean PlayerService  playerService;
     @MockBean RankingService rankingService;
+    @MockBean cl.chessquery.users.repository.PlayerRepository playerRepository;
 
     // ── GET /users/{id}/profile ───────────────────────────────────────────────
 
@@ -58,6 +60,31 @@ class UserControllerIntegrationTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("PLAYER_NOT_FOUND"))
                 .andExpect(jsonPath("$.status").value(404));
+    }
+
+    // ── GET /users/by-supabase-id/{supabaseUserId} ────────────────────────────
+
+    @Test
+    void getBySupabaseId_existingPlayer_returns200() throws Exception {
+        UUID supabaseId = UUID.fromString("11111111-2222-3333-4444-555555555555");
+        PlayerProfileResponse profile = sampleProfile(4L, "Rodrigo", "Sepúlveda");
+        when(playerService.getProfileBySupabaseId(supabaseId)).thenReturn(profile);
+
+        mockMvc.perform(get("/users/by-supabase-id/" + supabaseId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(4))
+                .andExpect(jsonPath("$.firstName").value("Rodrigo"));
+    }
+
+    @Test
+    void getBySupabaseId_unknownUuid_returns404() throws Exception {
+        UUID supabaseId = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+        when(playerService.getProfileBySupabaseId(supabaseId))
+                .thenThrow(new ApiException(404, "PLAYER_NOT_FOUND", "no encontrado"));
+
+        mockMvc.perform(get("/users/by-supabase-id/" + supabaseId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("PLAYER_NOT_FOUND"));
     }
 
     // ── GET /users/search ─────────────────────────────────────────────────────

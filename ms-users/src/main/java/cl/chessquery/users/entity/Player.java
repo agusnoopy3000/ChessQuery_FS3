@@ -5,6 +5,7 @@ import lombok.*;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Entity
 @Table(name = "player")
@@ -29,6 +30,10 @@ public class Player {
 
     @Column(length = 255, unique = true)
     private String email;
+
+    /** UUID del usuario en Supabase Auth (auth.users.id). */
+    @Column(name = "supabase_user_id", unique = true)
+    private UUID supabaseUserId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "country_id")
