@@ -1,5 +1,26 @@
 # ChessQuery — Contexto compartido para agentes de código
 
+> **⚠ Migración a Supabase (2026-05) — leer antes de tocar auth/storage**
+>
+> El stack actual usa **Supabase Auth** (en lugar de MS-Auth) y **Supabase
+> Storage** (en lugar de MinIO). Componentes activos: 8 (no 11).
+>
+> - MS-Auth, `auth_db`, MinIO → **REMOVIDOS** del `docker-compose.yml`.
+>   Preservados en `docker-compose.backup.yml` para rollback.
+> - JWT validation: API Gateway lo hace local con `SUPABASE_JWT_SECRET`
+>   (clase `SupabaseJwtAuthFilter`).
+> - Webhook: Supabase `auth.users` → `POST /webhook/user-registered` →
+>   evento `user.registered` a RabbitMQ → `UserRegisteredConsumer` en
+>   MS-Users crea Player con `supabase_user_id`.
+> - PGN storage: MS-Game inyecta `StorageService` (Supabase impl por
+>   defecto, `storage.provider=minio` para fallback).
+> - Setup: ver [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md).
+> - Rollback: ver [docs/ROLLBACK.md](docs/ROLLBACK.md).
+>
+> Las secciones de MS-Auth (`/auth/login`, `/auth/refresh`) y MinIO
+> descritas más abajo están **obsoletas** pero se mantienen como
+> referencia histórica.
+
 ## Proyecto
 Plataforma de microservicios para ajedrez competitivo en Chile.
 Curso DSY1106 Desarrollo Fullstack III, DuocUC.

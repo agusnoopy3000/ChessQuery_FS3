@@ -4,11 +4,14 @@ Plataforma de microservicios para ajedrez competitivo en Chile.
 **Asignatura:** DSY1106 Desarrollo Fullstack III — DuocUC.
 **Equipo:** Martín Mora, Agustín Garrido, Gabriel Espinoza.
 
+> **Nota (2026-05):** stack migrado a Supabase Auth + Supabase Storage.
+> MS-Auth, `auth_db` y MinIO removidos. Setup: [docs/SUPABASE_SETUP.md](./docs/SUPABASE_SETUP.md). Rollback: [docs/ROLLBACK.md](./docs/ROLLBACK.md).
+
 ## Componentes
 
 | Componente | Tipo | Puerto | Stack |
 |---|---|---|---|
-| [ms-auth](./ms-auth) | microservicio | 9090 | Spring Boot 3.2.4 |
+| Supabase Auth + Storage | externo | 54321 | Supabase Local |
 | [ms-users](./ms-users) | microservicio | 8081 | Spring Boot 3.2.4 |
 | [ms-tournament](./ms-tournament) | microservicio | 8082 | Spring Boot 3.2.4 |
 | [ms-game](./ms-game) | microservicio | 8083 | Spring Boot 3.2.4 |
