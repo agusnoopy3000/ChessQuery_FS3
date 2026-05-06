@@ -9,7 +9,7 @@ import cl.chessquery.game.entity.Opening;
 import cl.chessquery.game.exception.ApiException;
 import cl.chessquery.game.opening.OpeningDetector;
 import cl.chessquery.game.repository.GameRepository;
-import cl.chessquery.game.storage.PgnStorageService;
+import cl.chessquery.game.storage.StorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Optional;
 
 @Slf4j
@@ -30,7 +31,7 @@ public class GameService {
     private final GameRepository       gameRepo;
     private final EloCalculator        eloCalculator;
     private final OpeningDetector      openingDetector;
-    private final PgnStorageService    pgnStorage;
+    private final StorageService       storageService;
     private final EventPublisherService events;
 
     // ── Registrar partida ─────────────────────────────────────────────────────
@@ -73,16 +74,21 @@ public class GameService {
 
         gameRepo.save(game);
 
-        // 4. Subir PGN a S3 si hay contenido
+        // 4. Subir PGN a Storage si hay contenido. Si falla → 503 (la partida
+        // ya quedó persistida; el usuario puede reintentar pegándole de nuevo,
+        // pero NO publicamos eventos hasta confirmar el storage).
         if (req.pgnContent() != null && !req.pgnContent().isBlank()) {
             try {
                 byte[] pgnBytes = req.pgnContent().getBytes(StandardCharsets.UTF_8);
-                String storageKey = pgnStorage.uploadPgn(game.getId(), pgnBytes);
+                String storageKey = buildPgnKey(game.getId());
+                storageService.uploadPgn(storageKey, pgnBytes);
                 game.setPgnStorageKey(storageKey);
                 gameRepo.save(game);
             } catch (Exception e) {
-                log.warn("No se pudo subir el PGN a S3 para la partida {}: {}", game.getId(), e.getMessage());
-                // No propagar el error — la partida queda registrada sin PGN
+                log.error("Storage inaccesible al subir PGN gameId={}: {}",
+                        game.getId(), e.getMessage());
+                throw new ApiException(503, "STORAGE_UNAVAILABLE",
+                        "No se pudo subir el PGN al storage");
             }
         }
 
@@ -143,7 +149,7 @@ public class GameService {
                     "La partida " + id + " no tiene un PGN almacenado");
         }
         try {
-            String url = pgnStorage.generatePresignedUrl(game.getPgnStorageKey());
+            String url = storageService.generatePresignedUrl(game.getPgnStorageKey());
             return new PgnUrlResponse(url, Instant.now().plusSeconds(3600));
         } catch (Exception e) {
             log.error("Error generando URL presignada para partida {}: {}", id, e.getMessage());
@@ -153,6 +159,13 @@ public class GameService {
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
+
+    /** Construye la storage key del PGN: games/{year}/{month}/{gameId}.pgn */
+    private String buildPgnKey(Long gameId) {
+        LocalDate now = LocalDate.now();
+        return String.format("games/%d/%02d/%d.pgn",
+                now.getYear(), now.getMonthValue(), gameId);
+    }
 
     private Game findOrThrow(Long id) {
         return gameRepo.findById(id)
@@ -164,7 +177,7 @@ public class GameService {
         String pgnUrl = null;
         if (g.getPgnStorageKey() != null && !g.getPgnStorageKey().isBlank()) {
             try {
-                pgnUrl = pgnStorage.generatePresignedUrl(g.getPgnStorageKey());
+                pgnUrl = storageService.generatePresignedUrl(g.getPgnStorageKey());
             } catch (Exception e) {
                 log.warn("No se pudo generar URL presignada para partida {}: {}", g.getId(), e.getMessage());
             }
