@@ -17,7 +17,7 @@ networks:
 # Volumes persistentes
 # ---------------------------------------------------------------------------
 volumes:
-  auth_db_data:
+  # auth_db_data eliminado en migración a Supabase Auth (ver docker-compose.backup.yml)
   user_db_data:
   tournament_db_data:
   game_db_data:
@@ -37,25 +37,8 @@ services:
   # BASES DE DATOS – PostgreSQL 16
   # -------------------------------------------------------------------------
 
-  auth_db:
-    image: postgres:16-alpine
-    container_name: chessquery_auth_db
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${DB_USER:-chessquery}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-chessquery_dev}
-      POSTGRES_DB: auth_db
-    ports:
-      - "5432:5432"
-    volumes:
-      - auth_db_data:/var/lib/postgresql/data
-    networks:
-      - chessquery-net
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-chessquery} -d auth_db"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # auth_db removido — Supabase Auth gestiona usuarios.
+  # Para rollback: docker compose -f docker-compose.yml -f docker-compose.backup.yml up
 
   user_db:
     image: postgres:16-alpine
@@ -181,25 +164,8 @@ services:
   # MICROSERVICIOS JAVA
   # -------------------------------------------------------------------------
 
-  ms-auth:
-    build:
-      context: ../ms-auth
-      dockerfile: Dockerfile
-    container_name: chessquery_ms_auth
-    restart: unless-stopped
-    environment:
-      DB_URL: jdbc:postgresql://auth_db:5432/auth_db
-      DB_USER: ${DB_USER:-chessquery}
-      DB_PASSWORD: ${DB_PASSWORD:-chessquery_dev}
-      JWT_SECRET: ${JWT_SECRET:-Y2hlc3NxdWVyeS1zZWNyZXQta2V5LTI1Ni1iaXRzLWxvbmctZW5vdWdo}
-      SERVER_PORT: "9090"
-    ports:
-      - "9090:9090"
-    depends_on:
-      auth_db:
-        condition: service_healthy
-    networks:
-      - chessquery-net
+  # ms-auth removido — Supabase Auth + API Gateway validan JWT directamente.
+  # Para rollback: docker compose -f docker-compose.yml -f docker-compose.backup.yml up
 
   ms-users:
     build:
@@ -465,7 +431,7 @@ services:
     restart: unless-stopped
     environment:
       SERVER_PORT: "8080"
-      MS_AUTH_URL: http://ms-auth:9090
+      # MS_AUTH_URL eliminado — Supabase Auth gestiona login/refresh
       BFF_PLAYER_URL: http://bff-player:3001
       BFF_ORGANIZER_URL: http://bff-organizer:3002
       BFF_ADMIN_URL: http://bff-admin:3003
@@ -480,7 +446,6 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - ms-auth
       - bff-player
       - bff-organizer
       - bff-admin

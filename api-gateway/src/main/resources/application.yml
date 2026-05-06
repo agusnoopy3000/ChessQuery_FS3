@@ -22,32 +22,12 @@ spring:
 
       routes:
         # -------------------------------------------------------------------
-        # Rutas públicas de autenticación
-        # Con Supabase Auth, el frontend llama directamente a Supabase.
-        # Estas rutas se mantienen por compatibilidad durante la migración.
-        # -------------------------------------------------------------------
-        # NOTA: Las rutas /auth/** se pueden remover completamente una vez
-        # que la migración a Supabase esté completa (Fase 4: Descomisionamiento).
-        - id: ms-auth-login
-          uri: ${MS_AUTH_URL:http://localhost:9090}
-          predicates:
-            - Path=/auth/login,/auth/register
-          filters:
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 20
-                redis-rate-limiter.burstCapacity: 40
-                redis-rate-limiter.requestedTokens: 1
-                key-resolver: "#{@ipKeyResolver}"
-                rate-limiter: "#{@authRateLimiter}"
-
-        - id: ms-auth
-          uri: ${MS_AUTH_URL:http://localhost:9090}
-          predicates:
-            - Path=/auth/**
+        # Rutas /auth/** removidas — Supabase Auth las atiende directamente
+        # desde el frontend. El webhook user-registered y la validación JWT
+        # corren dentro de este mismo gateway (ver SupabaseJwtAuthFilter).
 
         # -------------------------------------------------------------------
-        # BFFs — rutas autenticadas (JWT validado por JwtAuthFilter)
+        # BFFs — rutas autenticadas (JWT validado por SupabaseJwtAuthFilter)
         # -------------------------------------------------------------------
         - id: bff-player
           uri: ${BFF_PLAYER_URL}
@@ -92,19 +72,7 @@ spring:
                 rate-limiter: "#{@defaultRateLimiter}"
 
 # ── Resilience4j Circuit Breaker ──────────────────────────────────────────
-resilience4j:
-  circuitbreaker:
-    instances:
-      ms-auth-validate:
-        sliding-window-size: 10
-        minimum-number-of-calls: 5
-        failure-rate-threshold: 50
-        wait-duration-in-open-state: 30s
-        permitted-number-of-calls-in-half-open-state: 3
-  timelimiter:
-    instances:
-      ms-auth-validate:
-        timeout-duration: 3s
+# (instancia ms-auth-validate eliminada con la migración a Supabase Auth)
 
 # ── Servidor ──────────────────────────────────────────────────────────────
 server:
@@ -112,8 +80,6 @@ server:
 
 # ── Configuración de Gateway ──────────────────────────────────────────────
 gateway:
-  ms-auth:
-    url: ${MS_AUTH_URL}
   bff-player:
     url: ${BFF_PLAYER_URL}
   bff-organizer:

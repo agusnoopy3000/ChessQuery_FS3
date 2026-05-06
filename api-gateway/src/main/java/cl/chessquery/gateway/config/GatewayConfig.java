@@ -28,12 +28,6 @@ public class GatewayConfig {
         return new RedisRateLimiter(100, 120, 1);
     }
 
-    /** Rate limiter para /auth/login y /auth/register: 20 req/min. */
-    @Bean
-    public RedisRateLimiter authRateLimiter() {
-        return new RedisRateLimiter(20, 40, 1);
-    }
-
     /** Key resolver por IP remota para el rate limiter. */
     @Bean
     public KeyResolver ipKeyResolver() {
