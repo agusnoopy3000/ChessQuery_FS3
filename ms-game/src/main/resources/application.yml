@@ -73,6 +73,15 @@ cloud:
 s3:
   bucket: ${S3_BUCKET:chessquery-pgn}
 
+# ── Storage provider (supabase | minio) ─────────────────────────────────────
+storage:
+  provider: ${STORAGE_PROVIDER:supabase}
+
+# ── Supabase ────────────────────────────────────────────────────────────────
+supabase:
+  url: ${SUPABASE_URL:http://localhost:54321}
+  service-key: ${SUPABASE_SERVICE_KEY:}
+
 # ── Actuator / Monitoring ───────────────────────────────────────────────────
 management:
   endpoints:

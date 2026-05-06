@@ -1,6 +1,7 @@
 package cl.chessquery.game.storage;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -13,7 +14,13 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 import java.net.URI;
 
+/**
+ * @deprecated Configuración legacy de S3/MinIO. Sólo se activa cuando
+ * {@code storage.provider=minio}. Preservada para rollback.
+ */
+@Deprecated
 @Configuration
+@ConditionalOnProperty(name = "storage.provider", havingValue = "minio")
 public class S3Config {
 
     @Value("${cloud.aws.s3.endpoint:}")
