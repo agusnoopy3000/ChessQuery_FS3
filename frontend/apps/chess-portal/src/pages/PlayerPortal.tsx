@@ -47,10 +47,10 @@ export const PlayerPortalPage = () => {
             </p>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 20 }}>
               <Button size="lg" onClick={() => navigate('/play')}>
-                Ver emparejamientos
+                Empezar partida
               </Button>
-              <Button size="lg" variant="secondary" onClick={() => navigate('/search')}>
-                Consultar jugadores
+              <Button size="lg" variant="secondary" onClick={() => navigate('/tournaments')}>
+                Ver torneos
               </Button>
             </div>
           </div>

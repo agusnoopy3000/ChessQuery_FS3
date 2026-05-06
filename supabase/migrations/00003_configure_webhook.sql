@@ -39,10 +39,10 @@ BEGIN
     'old_record', NULL
   );
 
-  -- Enviar webhook HTTP via pg_net
-  PERFORM extensions.http_post(
+  -- Enviar webhook HTTP via pg_net (función vive en schema `net`, body es JSONB)
+  PERFORM net.http_post(
     url := webhook_url,
-    body := payload::TEXT,
+    body := payload,
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'X-Supabase-Webhook-Secret', COALESCE(webhook_secret, 'dev-webhook-secret')

@@ -10,6 +10,29 @@ import {
 export class PlayerService {
   constructor(private readonly http: UpstreamHttpService) {}
 
+  /**
+   * Resuelve el supabaseUserId (UUID) al player.id numérico consultando
+   * ms-users. Cachea por proceso (no por request) ya que el mapping es estable.
+   */
+  private readonly playerIdCache = new Map<string, number>();
+  private async resolvePlayerId(supabaseUserId: string): Promise<number> {
+    // Si ya viene numérico (legacy / tests), úsalo tal cual
+    if (/^\d+$/.test(supabaseUserId)) return Number(supabaseUserId);
+    const cached = this.playerIdCache.get(supabaseUserId);
+    if (cached) return cached;
+    const { msUsers } = this.http.urls;
+    const player = await this.http.get<{ id: number }>(
+      `${msUsers}/users/by-supabase-id/${supabaseUserId}`,
+    );
+    if (!player?.id) {
+      throw new BadRequestException(
+        `Player no encontrado para supabaseUserId=${supabaseUserId}`,
+      );
+    }
+    this.playerIdCache.set(supabaseUserId, player.id);
+    return player.id;
+  }
+
   private emptyStats(playerId: string | number) {
     return {
       playerId: Number(playerId) || 0,
@@ -27,15 +50,16 @@ export class PlayerService {
 
   async getDashboard(userId: string): Promise<DashboardResponse> {
     const { msUsers, msGame, msAnalytics } = this.http.urls;
+    const playerId = await this.resolvePlayerId(userId);
 
     const [profile, recentGamesPage, stats] = await Promise.all([
-      this.http.get<unknown>(`${msUsers}/users/${userId}/profile`),
+      this.http.get<unknown>(`${msUsers}/users/${playerId}/profile`),
       this.http
-        .get<{ content: unknown[] }>(`${msGame}/games?playerId=${userId}&size=5`)
+        .get<{ content: unknown[] }>(`${msGame}/games?playerId=${playerId}&size=5`)
         .catch(() => ({ content: [] as unknown[] })),
       this.http
-        .get<unknown>(`${msAnalytics}/analytics/players/${userId}/stats`)
-        .catch(() => this.emptyStats(userId)),
+        .get<unknown>(`${msAnalytics}/analytics/players/${playerId}/stats`)
+        .catch(() => this.emptyStats(playerId)),
     ]);
 
     return {
@@ -71,8 +95,9 @@ export class PlayerService {
     months: number,
   ): Promise<RatingChartPoint[]> {
     const { msUsers } = this.http.urls;
+    const playerId = await this.resolvePlayerId(userId);
     const history = await this.http.get<RatingHistoryEntry[]>(
-      `${msUsers}/users/${userId}/rating-history?type=${encodeURIComponent(ratingType)}`,
+      `${msUsers}/users/${playerId}/rating-history?type=${encodeURIComponent(ratingType)}`,
     );
 
     const cutoff = new Date();
@@ -130,10 +155,11 @@ export class PlayerService {
     opponentColor: 'white' | 'black';
   }> {
     const { msUsers } = this.http.urls;
+    const playerId = await this.resolvePlayerId(userId);
 
     const meProfile = await this.http
       .get<{ id?: number; eloNational?: number | null; eloFideStandard?: number | null }>(
-        `${msUsers}/users/${userId}/profile`,
+        `${msUsers}/users/${playerId}/profile`,
       )
       .catch(() => ({} as { id?: number; eloNational?: number | null; eloFideStandard?: number | null }));
 
@@ -146,7 +172,7 @@ export class PlayerService {
     }>>(`${msUsers}/users/ranking?page=0&size=200`);
 
     const candidates = (Array.isArray(ranking) ? ranking : [])
-      .filter((p) => p.playerId !== Number(userId));
+      .filter((p) => p.playerId !== playerId);
 
     const closeEnough = myRating == null
       ? candidates
@@ -180,10 +206,11 @@ export class PlayerService {
    */
   async submitCasualGame(userId: string, body: Record<string, unknown>): Promise<unknown> {
     const { msGame } = this.http.urls;
+    const playerId = await this.resolvePlayerId(userId);
     const payload = {
       ...body,
       gameType: 'CASUAL',
-      whitePlayerId: body.whitePlayerId ?? Number(userId),
+      whitePlayerId: body.whitePlayerId ?? playerId,
     };
     return this.http.post<unknown>(`${msGame}/games`, payload);
   }
@@ -192,8 +219,9 @@ export class PlayerService {
 
   async createLiveGame(userId: string, body: Record<string, unknown>): Promise<unknown> {
     const { msGame } = this.http.urls;
+    const playerId = await this.resolvePlayerId(userId);
     return this.http.post<unknown>(`${msGame}/games/live`, {
-      whitePlayerId: Number(userId),
+      whitePlayerId: playerId,
       whiteEloBefore: body.whiteEloBefore,
       timeControlInitialMs: body.timeControlInitialMs,
       timeControlIncrementMs: body.timeControlIncrementMs,
@@ -207,16 +235,18 @@ export class PlayerService {
 
   async joinLiveGame(userId: string, id: string, body: Record<string, unknown>): Promise<unknown> {
     const { msGame } = this.http.urls;
+    const playerId = await this.resolvePlayerId(userId);
     return this.http.post<unknown>(`${msGame}/games/live/${id}/join`, {
-      playerId: Number(userId),
+      playerId,
       eloBefore: body.eloBefore,
     });
   }
 
   async moveLiveGame(userId: string, id: string, body: Record<string, unknown>): Promise<unknown> {
     const { msGame } = this.http.urls;
+    const playerId = await this.resolvePlayerId(userId);
     return this.http.post<unknown>(`${msGame}/games/live/${id}/move`, {
-      playerId: Number(userId),
+      playerId,
       uci: body.uci,
       clockWhiteMs: body.clockWhiteMs,
       clockBlackMs: body.clockBlackMs,
@@ -225,8 +255,9 @@ export class PlayerService {
 
   async resignLiveGame(userId: string, id: string): Promise<unknown> {
     const { msGame } = this.http.urls;
+    const playerId = await this.resolvePlayerId(userId);
     return this.http.post<unknown>(`${msGame}/games/live/${id}/resign`, {
-      playerId: Number(userId),
+      playerId,
     });
   }
 

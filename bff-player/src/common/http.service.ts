@@ -37,7 +37,7 @@ export class UpstreamHttpService {
 
   async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
     try {
-      const res = await firstValueFrom(this.http.get<T>(url, { timeout: 5000, ...config }));
+      const res = await firstValueFrom(this.http.get<T>(url, { timeout: 15000, ...config }));
       return res.data;
     } catch (err) {
       this.rethrow(err as AxiosError, 'GET', url);
@@ -46,7 +46,7 @@ export class UpstreamHttpService {
 
   async post<T>(url: string, body: unknown, config?: AxiosRequestConfig): Promise<T> {
     try {
-      const res = await firstValueFrom(this.http.post<T>(url, body, { timeout: 5000, ...config }));
+      const res = await firstValueFrom(this.http.post<T>(url, body, { timeout: 15000, ...config }));
       return res.data;
     } catch (err) {
       this.rethrow(err as AxiosError, 'POST', url);
@@ -55,7 +55,7 @@ export class UpstreamHttpService {
 
   async patch<T>(url: string, body: unknown, config?: AxiosRequestConfig): Promise<T> {
     try {
-      const res = await firstValueFrom(this.http.patch<T>(url, body, { timeout: 5000, ...config }));
+      const res = await firstValueFrom(this.http.patch<T>(url, body, { timeout: 15000, ...config }));
       return res.data;
     } catch (err) {
       this.rethrow(err as AxiosError, 'PATCH', url);
@@ -64,7 +64,7 @@ export class UpstreamHttpService {
 
   async put<T>(url: string, body: unknown, config?: AxiosRequestConfig): Promise<T> {
     try {
-      const res = await firstValueFrom(this.http.put<T>(url, body, { timeout: 5000, ...config }));
+      const res = await firstValueFrom(this.http.put<T>(url, body, { timeout: 15000, ...config }));
       return res.data;
     } catch (err) {
       this.rethrow(err as AxiosError, 'PUT', url);

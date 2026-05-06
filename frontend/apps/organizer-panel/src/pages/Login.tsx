@@ -1,15 +1,12 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@chessquery/shared';
 import { Button, Card, ErrorAlert, Input } from '@chessquery/ui-lib';
-import { playerApi } from '../api';
 
 export const LoginPage = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { login } = useAuth();
-  const queryClient = useQueryClient();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -21,21 +18,9 @@ export const LoginPage = () => {
     setSubmitting(true);
 
     try {
-      const u = await login(email.trim(), password);
-      // Precargamos el dashboard EN PARALELO con la navegación: cuando el
-      // usuario aterrice en /portal, los datos ya estarán en el cache de
-      // react-query y se renderizan al instante (sin Skeleton).
-      queryClient.prefetchQuery({
-        queryKey: ['me', 'playerId', u.supabaseUserId],
-        queryFn: () => playerApi.dashboard().then((d) => d.profile?.id ?? null),
-      });
-      queryClient.prefetchQuery({
-        queryKey: ['player', 'portal', 'dashboard'],
-        queryFn: () => playerApi.dashboard(),
-      });
+      await login(email.trim(), password);
       const next = params.get('next');
-      const decoded = next ? decodeURIComponent(next) : '';
-      navigate(decoded && decoded.startsWith('/') ? decoded : '/');
+      navigate(next && next.startsWith('/') ? next : '/');
     } catch (err) {
       const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       setError(message ?? 'Credenciales inválidas');

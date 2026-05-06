@@ -5,13 +5,14 @@ import type { Api as CgApi } from 'chessground/api';
 import type { Config as CgConfig } from 'chessground/config';
 import type { Key } from 'chessground/types';
 import { Chess } from 'chessops/chess';
-import { parseFen } from 'chessops/fen';
-import { parseSquare } from 'chessops/util';
+import { parseFen, makeFen } from 'chessops/fen';
+import { parseSquare, parseUci } from 'chessops/util';
 import { chessgroundDests } from 'chessops/compat';
 import { useAuth } from '@chessquery/shared';
 import { Button, Card } from '@chessquery/ui-lib';
-import { api } from '../api';
+import { api, playerApi } from '../api';
 import { supabase } from '../lib/supabase';
+import { useMyPlayerId } from '../hooks/useMyPlayerId';
 
 import 'chessground/assets/chessground.base.css';
 import 'chessground/assets/chessground.brown.css';
@@ -58,14 +59,38 @@ export const LiveGamePage = () => {
   const [state, setState] = useState<LiveGameState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const myPlayerId = useMyPlayerId();
+  const [whiteName, setWhiteName] = useState<string>('Blancas');
+  const [blackName, setBlackName] = useState<string>('Negras');
+  const [confirmingResign, setConfirmingResign] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  // Determinar el color del usuario actual
+  // Resuelve nombres de los jugadores cuando cambian los IDs.
+  useEffect(() => {
+    if (!state) return;
+    const fetchName = async (pid: number | null): Promise<string> => {
+      if (pid == null) return '— esperando rival —';
+      try {
+        const p = await playerApi.publicProfile(pid);
+        const n = `${p.profile?.firstName ?? ''} ${p.profile?.lastName ?? ''}`.trim();
+        return n || `Jugador ${pid}`;
+      } catch {
+        return `Jugador ${pid}`;
+      }
+    };
+    let cancelled = false;
+    Promise.all([fetchName(state.whitePlayerId), fetchName(state.blackPlayerId)])
+      .then(([w, b]) => { if (!cancelled) { setWhiteName(w); setBlackName(b); } });
+    return () => { cancelled = true; };
+  }, [state?.whitePlayerId, state?.blackPlayerId]);
+
+  // Determinar el color del usuario actual usando el player.id resuelto
   const myColor: 'white' | 'black' | null = useMemo(() => {
-    if (!state || !user) return null;
-    if (user.id === state.whitePlayerId) return 'white';
-    if (user.id === state.blackPlayerId) return 'black';
+    if (!state || myPlayerId == null) return null;
+    if (myPlayerId === state.whitePlayerId) return 'white';
+    if (myPlayerId === state.blackPlayerId) return 'black';
     return null;
-  }, [state, user]);
+  }, [state, myPlayerId]);
 
   // Carga inicial
   useEffect(() => {
@@ -78,24 +103,38 @@ export const LiveGamePage = () => {
     return () => { cancelled = true; };
   }, [id]);
 
-  // Subscripción a Supabase Realtime
+  // Subscripción a Supabase Realtime.
+  // Backend envía el estado completo en `payload.state`, así que aplicamos
+  // directo sin GET extra (~50-200ms menos de latencia entre jugadores).
   useEffect(() => {
     if (!id) return;
+    const applyOrFetch = (payload: { state?: LiveGameState } | undefined) => {
+      if (payload?.state) {
+        setState(payload.state);
+      } else {
+        dataApi.get(id).then(setState).catch(() => {});
+      }
+    };
     const channel = supabase.channel(`game:${id}`, { config: { broadcast: { self: false } } });
     channel
-      .on('broadcast', { event: 'move.played' }, () => { dataApi.get(id).then(setState).catch(() => {}); })
-      .on('broadcast', { event: 'game.started' }, () => { dataApi.get(id).then(setState).catch(() => {}); })
-      .on('broadcast', { event: 'game.finished' }, () => { dataApi.get(id).then(setState).catch(() => {}); })
+      .on('broadcast', { event: 'move.played' }, ({ payload }) => applyOrFetch(payload))
+      .on('broadcast', { event: 'game.started' }, ({ payload }) => applyOrFetch(payload))
+      .on('broadcast', { event: 'game.finished' }, ({ payload }) => applyOrFetch(payload))
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [id]);
 
-  // Auto-join si soy el rival y la sesión está WAITING
+  // Auto-join si soy el rival y la sesión está WAITING.
+  // Guard con ref: solo intentamos join una vez por id de sesión, sin
+  // depender del valor numérico de user.id (que la app no resuelve aún).
+  const joinAttempted = useRef<string | null>(null);
   useEffect(() => {
     if (!id || !state || !user) return;
-    if (state.status === 'WAITING' && user.id !== state.whitePlayerId && state.blackPlayerId == null) {
-      dataApi.join(id).then(setState).catch((e) => setError(message(e)));
-    }
+    if (state.status !== 'WAITING') return;
+    if (state.blackPlayerId != null) return; // ya hay rival
+    if (joinAttempted.current === id) return; // ya intentamos este id
+    joinAttempted.current = id;
+    dataApi.join(id).then(setState).catch((e) => setError(message(e)));
   }, [id, state, user]);
 
   // Render del tablero
@@ -140,11 +179,27 @@ export const LiveGamePage = () => {
   useEffect(() => () => { cgApi.current?.destroy?.(); cgApi.current = null; }, []);
 
   const handleMove = async (orig: Key, dest: Key, chess: Chess | null) => {
-    if (!id || !chess) return;
-    // chessops UCI puede incluir promoción "q" si el peón llega a la última fila
+    if (!id || !chess || !state) return;
     let uci = `${orig}${dest}`;
     const movePromotion = inferPromotion(orig, dest, chess);
     if (movePromotion) uci += movePromotion;
+
+    // Optimistic UI: aplicamos la jugada localmente con chessops antes de
+    // que el backend confirme. Si rechaza, revertimos al FEN previo.
+    const fenBeforeMove = state.currentFen;
+    try {
+      const moveObj = parseUci(uci);
+      if (moveObj) {
+        const optimisticChess = chess.clone();
+        optimisticChess.play(moveObj);
+        const optimisticFen = makeFen(optimisticChess.toSetup());
+        cgApi.current?.set({
+          fen: optimisticFen,
+          turnColor: state.turn === 'w' ? 'black' : 'white',
+          movable: { color: undefined, dests: new Map() },
+        });
+      }
+    } catch { /* errores client-side los maneja el server */ }
 
     setBusy(true);
     try {
@@ -152,15 +207,22 @@ export const LiveGamePage = () => {
       setState(next);
     } catch (e) {
       setError(message(e));
-      // revertir tablero al estado anterior
-      cgApi.current?.set({ fen: state?.currentFen });
+      cgApi.current?.set({ fen: fenBeforeMove });
     } finally {
       setBusy(false);
     }
   };
 
+  // Patrón two-click: el primer click pide confirmación inline; el segundo
+  // ejecuta. Reemplaza el `confirm()` nativo intrusivo por un toggle de UI.
   const handleResign = async () => {
-    if (!id || !confirm('¿Rendirse?')) return;
+    if (!id) return;
+    if (!confirmingResign) {
+      setConfirmingResign(true);
+      setTimeout(() => setConfirmingResign(false), 4000);
+      return;
+    }
+    setConfirmingResign(false);
     setBusy(true);
     try {
       const next = await dataApi.resign(id);
@@ -177,53 +239,141 @@ export const LiveGamePage = () => {
 
   const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/play/${state.id}` : '';
 
+  const opponentName = myColor === 'white' ? blackName : whiteName;
+  const topName = myColor === 'black' ? whiteName : blackName;
+  const bottomName = myColor === 'black' ? blackName : whiteName;
+  const turnLabel = state.turn === 'w' ? whiteName : blackName;
+
   return (
-    <div className="page-shell" style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 560px) 320px', gap: 24 }}>
-      <div>
-        <div ref={cgRef} style={{ width: 560, height: 560, maxWidth: '100%', aspectRatio: '1 / 1' }} />
+    <div
+      className="page-shell"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1fr) 340px',
+        gap: 24,
+        padding: 24,
+        maxWidth: 1100,
+        margin: '0 auto',
+        alignItems: 'start',
+      }}
+    >
+      {/* Columna del tablero — centrado vertical y horizontal */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+        <div style={{ alignSelf: 'flex-start', fontSize: 14, fontWeight: 600 }}>
+          {myColor === 'black' ? '⚪' : '⚫'} {topName}
+        </div>
+
+        <div
+          ref={cgRef}
+          style={{
+            width: 'min(560px, 90vw)',
+            aspectRatio: '1 / 1',
+          }}
+        />
+
+        <div style={{ alignSelf: 'flex-start', fontSize: 14, fontWeight: 600 }}>
+          {myColor === 'black' ? '⚫' : '⚪'} {bottomName} {myColor && '(tú)'}
+        </div>
+
         {state.status === 'ACTIVE' && myColor && (
-          <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-            <Button onClick={handleResign} disabled={busy} variant="danger">Rendirse</Button>
-          </div>
+          <Button
+            onClick={handleResign}
+            disabled={busy}
+            variant="danger"
+            style={{ marginTop: 8 }}
+          >
+            {confirmingResign ? '¿Seguro? Click para confirmar' : 'Rendirse'}
+          </Button>
         )}
       </div>
 
+      {/* Panel lateral */}
       <Card>
-        <h2 style={{ marginTop: 0 }}>Partida {state.id}</h2>
-        <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>
-          Estado: <strong>{state.status}</strong>
-          {state.result && <> · Resultado: <strong>{state.result}</strong></>}
-          {state.endReason && <> · {state.endReason}</>}
-        </p>
-        <p style={{ fontSize: 13 }}>
-          ⚪ <strong>{state.whitePlayerId}</strong>{user?.id === state.whitePlayerId && ' (tú)'}<br />
-          ⚫ <strong>{state.blackPlayerId ?? '— esperando rival —'}</strong>
-          {user?.id === state.blackPlayerId && ' (tú)'}
+        <h2 style={{ marginTop: 0 }}>Partida #{state.id}</h2>
+        <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 12 }}>
+          {state.status === 'ACTIVE' && <>Turno de <strong>{turnLabel}</strong></>}
+          {state.status === 'WAITING' && <>Esperando rival…</>}
+          {state.status === 'FINISHED' && (
+            <>
+              Resultado: <strong>{state.result}</strong>
+              {state.endReason && <> · {state.endReason}</>}
+            </>
+          )}
         </p>
 
-        {state.status === 'WAITING' && user?.id === state.whitePlayerId && (
-          <Card style={{ marginTop: 12, background: 'var(--surface-2)' }}>
-            <p style={{ margin: 0, fontSize: 13 }}>
-              Comparte esta URL con tu rival:
+        <div style={{ display: 'grid', gap: 6, fontSize: 14, marginBottom: 16 }}>
+          <div>⚪ <strong>{whiteName}</strong>{myColor === 'white' && ' (tú)'}</div>
+          <div>⚫ <strong>{blackName}</strong>{myColor === 'black' && ' (tú)'}</div>
+          {myColor && state.status === 'ACTIVE' && (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              Rival: {opponentName}
+            </div>
+          )}
+        </div>
+
+        {state.status === 'WAITING' && myColor === 'white' && (
+          <Card style={{ marginBottom: 16, background: 'var(--surface-2)' }}>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>
+              📨 URL de invitación
             </p>
-            <code style={{ display: 'block', wordBreak: 'break-all', marginTop: 6 }}>{shareUrl}</code>
+            <p style={{ margin: '4px 0 8px', fontSize: 12, color: 'var(--text-muted)' }}>
+              Compartila con el rival. Si no tiene cuenta, lo manda al registro;
+              si ya está logueado, entra directo a la partida.
+            </p>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
+              <input
+                readOnly
+                value={shareUrl}
+                onClick={(e) => (e.currentTarget as HTMLInputElement).select()}
+                style={{
+                  flex: 1,
+                  background: 'var(--input-bg, #0e100d)',
+                  border: '1px solid var(--border, #2a2d27)',
+                  borderRadius: 6,
+                  padding: '8px 10px',
+                  fontSize: 11,
+                  fontFamily: 'monospace',
+                  color: 'var(--text, #e8ead4)',
+                }}
+              />
+              <Button
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(shareUrl);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  } catch {
+                    /* portapapeles bloqueado: el input ya está seleccionado */
+                  }
+                }}
+              >
+                {copied ? '✓ Copiado' : 'Copiar'}
+              </Button>
+            </div>
           </Card>
         )}
 
-        <h3 style={{ marginTop: 16 }}>Jugadas</h3>
-        <ol style={{ fontFamily: 'monospace', fontSize: 13, maxHeight: 240, overflow: 'auto', paddingLeft: 22 }}>
-          {groupMoves(state.moves).map((pair, i) => (
-            <li key={i}>{pair.white} {pair.black ?? ''}</li>
-          ))}
-        </ol>
+        <h3 style={{ margin: '16px 0 8px' }}>Jugadas</h3>
+        {state.moves.length === 0 ? (
+          <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Aún no hay jugadas.</p>
+        ) : (
+          <ol style={{ fontFamily: 'monospace', fontSize: 13, maxHeight: 280, overflow: 'auto', paddingLeft: 22, margin: 0 }}>
+            {groupMoves(state.moves).map((pair, i) => (
+              <li key={i}>{pair.white} {pair.black ?? ''}</li>
+            ))}
+          </ol>
+        )}
 
         {state.finalizedGameId && (
-          <Link to={`/profile/${user?.id ?? ''}`} style={{ marginTop: 12, display: 'inline-block' }}>
+          <Link to={`/player/${myPlayerId ?? ''}`} style={{ marginTop: 12, display: 'inline-block' }}>
             Partida guardada como #{state.finalizedGameId} →
           </Link>
         )}
 
-        {error && <p style={{ color: 'crimson', marginTop: 12 }}>{error}</p>}
+        {error && state.status === 'ACTIVE' && (
+          <p style={{ color: 'crimson', marginTop: 12, fontSize: 13 }}>{error}</p>
+        )}
       </Card>
     </div>
   );

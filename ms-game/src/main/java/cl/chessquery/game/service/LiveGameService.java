@@ -86,11 +86,13 @@ public class LiveGameService {
         s.setStartedAt(now);
         sessionRepo.save(s);
         log.info("LiveGame {} joined: black={}", id, req.playerId());
-        broadcaster.publish(id, "game.started", Map.of(
-                "blackPlayerId", req.playerId(),
-                "startedAt", now.toString()
-        ));
-        return toResponse(s, moveRepo.findBySessionIdOrderByMoveNumberAscColorAsc(id));
+        LiveGameResponse response = toResponse(s, moveRepo.findBySessionIdOrderByMoveNumberAscColorAsc(id));
+        Map<String, Object> startedPayload = new java.util.HashMap<>();
+        startedPayload.put("blackPlayerId", req.playerId());
+        startedPayload.put("startedAt", now.toString());
+        startedPayload.put("state", response);
+        broadcaster.publish(id, "game.started", startedPayload);
+        return response;
     }
 
     // ── Move ───────────────────────────────────────────────────────────────
@@ -163,21 +165,26 @@ public class LiveGameService {
         }
         sessionRepo.save(s);
 
-        // Broadcast
-        broadcaster.publish(id, "move.played", Map.of(
-                "moveNumber", moveNumber,
-                "color", color,
-                "uci", req.uci(),
-                "san", san,
-                "fenAfter", board.getFen(),
-                "clockWhiteMs", req.clockWhiteMs() == null ? -1L : req.clockWhiteMs(),
-                "clockBlackMs", req.clockBlackMs() == null ? -1L : req.clockBlackMs()
-        ));
+        // Construir response una sola vez para devolver Y broadcastear.
+        // Enviar el estado completo en el broadcast permite al rival actualizar
+        // su tablero sin un GET adicional (elimina ~50-200ms de round-trip).
+        LiveGameResponse response = toResponse(s, moveRepo.findBySessionIdOrderByMoveNumberAscColorAsc(id));
+
+        Map<String, Object> movePayload = new java.util.HashMap<>();
+        movePayload.put("moveNumber", moveNumber);
+        movePayload.put("color", color);
+        movePayload.put("uci", req.uci());
+        movePayload.put("san", san);
+        movePayload.put("fenAfter", board.getFen());
+        movePayload.put("clockWhiteMs", req.clockWhiteMs() == null ? -1L : req.clockWhiteMs());
+        movePayload.put("clockBlackMs", req.clockBlackMs() == null ? -1L : req.clockBlackMs());
+        movePayload.put("state", response);
+        broadcaster.publish(id, "move.played", movePayload);
         if (terminal != null) {
             broadcastFinished(s);
         }
 
-        return toResponse(s, moveRepo.findBySessionIdOrderByMoveNumberAscColorAsc(id));
+        return response;
     }
 
     // ── Resign ─────────────────────────────────────────────────────────────
@@ -254,11 +261,13 @@ public class LiveGameService {
     }
 
     private void broadcastFinished(LiveGameSession s) {
-        broadcaster.publish(s.getId(), "game.finished", Map.of(
-                "result", s.getResult() == null ? "" : s.getResult(),
-                "endReason", s.getEndReason() == null ? "" : s.getEndReason(),
-                "finalizedGameId", s.getFinalizedGameId() == null ? -1L : s.getFinalizedGameId()
-        ));
+        LiveGameResponse response = toResponse(s, moveRepo.findBySessionIdOrderByMoveNumberAscColorAsc(s.getId()));
+        Map<String, Object> payload = new java.util.HashMap<>();
+        payload.put("result", s.getResult() == null ? "" : s.getResult());
+        payload.put("endReason", s.getEndReason() == null ? "" : s.getEndReason());
+        payload.put("finalizedGameId", s.getFinalizedGameId() == null ? -1L : s.getFinalizedGameId());
+        payload.put("state", response);
+        broadcaster.publish(s.getId(), "game.finished", payload);
     }
 
     /** Detecta CHECKMATE / STALEMATE / DRAW (50-move, repetition, insuficiente). */

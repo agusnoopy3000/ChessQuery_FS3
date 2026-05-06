@@ -1,9 +1,8 @@
 import { Player, Role, Tournament } from '@chessquery/shared';
 
 export const getDefaultRoute = (role?: Role | null) => {
-  // ORGANIZER va al Inicio donde mostramos el redirect al panel separado.
-  // ADMIN ya no existe como vista; tratamos como visitante.
-  if (role === 'ORGANIZER') return '/';
+  if (role === 'ORGANIZER') return '/organizer';
+  if (role === 'ADMIN') return '/admin';
   return '/portal';
 };
 

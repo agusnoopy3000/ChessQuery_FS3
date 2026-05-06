@@ -1,6 +1,7 @@
 package cl.chessquery.game.realtime;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
@@ -11,6 +12,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Broadcastea eventos de partida viva a Supabase Realtime usando el endpoint
@@ -33,6 +37,14 @@ public class LiveGameBroadcaster {
     private final String supabaseUrl;
     private final String serviceKey;
 
+    /**
+     * Pool de hilos para broadcasts fire-and-forget. El response del move
+     * NO debe esperar al POST a Supabase Realtime (50-200ms en local) — eso
+     * agrega latencia entre que A juega y B ve el movimiento.
+     */
+    private final ExecutorService broadcastPool = Executors.newFixedThreadPool(
+            4, r -> { Thread t = new Thread(r, "live-broadcast"); t.setDaemon(true); return t; });
+
     public LiveGameBroadcaster(RestTemplate rest,
                                 @Value("${supabase.url:}") String supabaseUrl,
                                 @Value("${supabase.service-key:}") String serviceKey) {
@@ -46,6 +58,10 @@ public class LiveGameBroadcaster {
             log.debug("Realtime no configurado; broadcast {} game:{} omitido", eventType, gameId);
             return;
         }
+        broadcastPool.submit(() -> doPublish(gameId, eventType, payload));
+    }
+
+    private void doPublish(Long gameId, String eventType, Map<String, Object> payload) {
         String url = supabaseUrl + "/realtime/v1/api/broadcast";
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(serviceKey);
@@ -66,5 +82,11 @@ public class LiveGameBroadcaster {
             // No interrumpir el flujo del juego por un fallo en realtime.
             log.warn("Broadcast {} → game:{} falló: {}", eventType, gameId, e.getMessage());
         }
+    }
+
+    @PreDestroy
+    void shutdown() {
+        broadcastPool.shutdown();
+        try { broadcastPool.awaitTermination(2, TimeUnit.SECONDS); } catch (InterruptedException ignored) {}
     }
 }

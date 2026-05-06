@@ -1,0 +1,2 @@
+ALTER TABLE live_game_move ALTER COLUMN color TYPE VARCHAR(1);
+ALTER TABLE live_game_session ALTER COLUMN turn TYPE VARCHAR(1);

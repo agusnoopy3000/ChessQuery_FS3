@@ -430,6 +430,10 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       REDIS_PASSWORD: ${REDIS_PASSWORD:-chessquery_dev}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: ${RABBITMQ_USER:-chessquery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-chessquery_dev}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost}
       # Supabase Auth — validación JWT local
       SUPABASE_URL: ${SUPABASE_URL:-http://host.docker.internal:54321}
