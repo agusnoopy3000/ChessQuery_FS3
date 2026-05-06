@@ -2,7 +2,7 @@ import axios, { AxiosInstance } from 'axios';
 import {
   AdminDashboard,
   CircuitBreakerState,
-  createApiClient,
+  createSupabaseApiClient,
   EtlStatus,
   Game,
   Pagination,
@@ -15,15 +15,16 @@ import {
   Round,
   Standing,
   Tournament,
-  localStorageTokenStorage,
 } from '@chessquery/shared';
+import { supabase } from './lib/supabase';
 
 const baseURL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8080';
-export const storage = localStorageTokenStorage('chessquery.portal');
 
-export const api: AxiosInstance = createApiClient({
+export { supabase };
+
+export const api: AxiosInstance = createSupabaseApiClient({
   baseURL,
-  storage,
+  supabase,
   onAuthFailure: () => {
     if (window.location.pathname !== '/login') {
       window.location.assign('/login');

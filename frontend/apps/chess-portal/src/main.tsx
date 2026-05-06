@@ -2,22 +2,20 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import {
-  AuthProvider,
-  createApiClient,
-  localStorageTokenStorage,
-} from '@chessquery/shared';
+import { AuthProvider, createSupabaseApiClient } from '@chessquery/shared';
 import '@chessquery/ui-lib';
 import { App } from './App';
+import { supabase } from './lib/supabase';
 
 const baseURL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
-const storage = localStorageTokenStorage('chessquery.portal');
 
-const api = createApiClient({
+const api = createSupabaseApiClient({
   baseURL,
-  storage,
+  supabase,
   onAuthFailure: () => {
-    window.location.assign('/login');
+    if (window.location.pathname !== '/login') {
+      window.location.assign('/login');
+    }
   },
 });
 
@@ -31,13 +29,12 @@ const queryClient = new QueryClient({
   },
 });
 
-// Expose the api client to child features without prop drilling
-export { api, storage };
+export { api, supabase };
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <AuthProvider client={api} storage={storage}>
+      <AuthProvider supabase={supabase} defaultRole="PLAYER">
         <BrowserRouter>
           <App />
         </BrowserRouter>

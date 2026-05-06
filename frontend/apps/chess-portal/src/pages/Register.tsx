@@ -73,17 +73,21 @@ export const RegisterPage = () => {
         lastName: form.lastName.trim(),
         role: form.role,
       });
-      // Sincronizar con ms-users (crea Player con id = user.id e incluye lichessUsername si lo dio)
-      try {
-        await authApi.syncProfile({
-          id: user.id,
-          email: form.email.trim(),
-          firstName: form.firstName.trim(),
-          lastName: form.lastName.trim(),
-          lichessUsername: form.lichessUsername.trim() || undefined,
-        });
-      } catch {
-        // No bloqueamos el registro si el sync falla; el usuario podrá editarlo después.
+      // Con Supabase Auth la creación del Player la hace el consumer
+      // user.registered en MS-Users (ver UserRegisteredConsumer). Sólo
+      // intentamos sync si la ruta legacy aún expone un id BIGINT > 0.
+      if (user.id && user.id > 0) {
+        try {
+          await authApi.syncProfile({
+            id: user.id,
+            email: form.email.trim(),
+            firstName: form.firstName.trim(),
+            lastName: form.lastName.trim(),
+            lichessUsername: form.lichessUsername.trim() || undefined,
+          });
+        } catch {
+          /* el usuario podrá editarlo después */
+        }
       }
       navigate('/');
     } catch (err) {

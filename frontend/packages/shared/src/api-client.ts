@@ -1,5 +1,13 @@
-import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosInstance } from 'axios';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
+/**
+ * Storage abstracto para tokens. Mantenido por compatibilidad con código
+ * legacy y como fallback cuando no hay un cliente Supabase configurado.
+ *
+ * @deprecated Con Supabase Auth la sesión la gestiona el SDK; usar
+ * `createSupabaseApiClient` en su lugar.
+ */
 export interface TokenStorage {
   getAccess: () => string | null;
   getRefresh: () => string | null;
@@ -20,14 +28,59 @@ export const localStorageTokenStorage = (prefix = 'chessquery'): TokenStorage =>
   },
 });
 
+export interface CreateSupabaseApiClientOptions {
+  baseURL: string;
+  supabase: SupabaseClient;
+  onAuthFailure?: () => void;
+}
+
+/**
+ * Cliente axios que adjunta el access token de Supabase en cada request.
+ * El refresh lo gestiona el propio Supabase Client (autoRefreshToken=true);
+ * en caso de 401 invocamos onAuthFailure para que la app redirija a /login.
+ */
+export const createSupabaseApiClient = ({
+  baseURL,
+  supabase,
+  onAuthFailure,
+}: CreateSupabaseApiClientOptions): AxiosInstance => {
+  const client = axios.create({ baseURL, timeout: 10000 });
+
+  client.interceptors.request.use(async (config) => {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (token) {
+      config.headers.set('Authorization', `Bearer ${token}`);
+    }
+    return config;
+  });
+
+  client.interceptors.response.use(
+    (r) => r,
+    async (error) => {
+      if (error.response?.status === 401) {
+        await supabase.auth.signOut();
+        onAuthFailure?.();
+      }
+      throw error;
+    },
+  );
+
+  return client;
+};
+
+// ── Legacy (MS-Auth) — preservado para rollback ─────────────────────────────
+
 export interface CreateApiClientOptions {
   baseURL: string;
   storage: TokenStorage;
   onAuthFailure?: () => void;
 }
 
-type RetryConfig = InternalAxiosRequestConfig & { __retry?: boolean };
-
+/**
+ * @deprecated Cliente legacy contra MS-Auth. Usar `createSupabaseApiClient`.
+ * Se mantiene para facilitar rollback (ver docs/ROLLBACK.md).
+ */
 export const createApiClient = ({ baseURL, storage, onAuthFailure }: CreateApiClientOptions): AxiosInstance => {
   const client = axios.create({ baseURL, timeout: 10000 });
 
@@ -42,39 +95,11 @@ export const createApiClient = ({ baseURL, storage, onAuthFailure }: CreateApiCl
   client.interceptors.response.use(
     (r) => r,
     async (error) => {
-      const original = error.config as RetryConfig | undefined;
-      if (!original || error.response?.status !== 401 || original.__retry) {
-        throw error;
-      }
-
-      // Don't try to refresh the refresh-call itself.
-      if (original.url?.endsWith('/auth/refresh')) {
+      if (error.response?.status === 401) {
         storage.clear();
         onAuthFailure?.();
-        throw error;
       }
-
-      const refresh = storage.getRefresh();
-      if (!refresh) {
-        storage.clear();
-        onAuthFailure?.();
-        throw error;
-      }
-
-      try {
-        original.__retry = true;
-        const r = await axios.post(`${baseURL}/auth/refresh`, { refreshToken: refresh });
-        const access = r.data?.accessToken;
-        const newRefresh = r.data?.refreshToken ?? refresh;
-        if (!access) throw new Error('no accessToken in refresh response');
-        storage.setTokens(access, newRefresh);
-        original.headers.set('Authorization', `Bearer ${access}`);
-        return client(original);
-      } catch (e) {
-        storage.clear();
-        onAuthFailure?.();
-        throw e;
-      }
+      throw error;
     },
   );
 

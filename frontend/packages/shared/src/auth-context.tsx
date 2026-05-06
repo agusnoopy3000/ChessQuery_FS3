@@ -7,9 +7,8 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { AxiosInstance } from 'axios';
-import { AuthUser, LoginResponse, Role } from './types';
-import { TokenStorage } from './api-client';
+import type { Session, SupabaseClient, User } from '@supabase/supabase-js';
+import { AuthUser, Role } from './types';
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -30,79 +29,102 @@ export interface RegisterInput {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export interface AuthProviderProps {
-  client: AxiosInstance;
-  storage: TokenStorage;
+  /** Cliente Supabase compartido (creado en main.tsx con anon key). */
+  supabase: SupabaseClient;
+  /** Role por defecto al registrar (PLAYER en chess-portal, ORGANIZER en organizer-panel). */
+  defaultRole?: Role;
   children: ReactNode;
 }
 
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
-  try {
-    const parts = token.split('.');
-    if (parts.length < 2) return null;
-    const payload = parts[1];
-    const pad = payload.length % 4 === 0 ? 0 : 4 - (payload.length % 4);
-    const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat(pad));
-    return JSON.parse(decoded);
-  } catch {
-    return null;
-  }
+/**
+ * Mapea un usuario y sesión de Supabase al modelo `AuthUser` de la app.
+ * - id: numérico (BIGINT de PLAYER) — se resuelve vía /users/by-supabase-id
+ *       en una capa superior; aquí dejamos 0 hasta que esté disponible.
+ * - role: leído de user_metadata.role (default PLAYER).
+ */
+function userFromSession(session: Session | null): AuthUser | null {
+  if (!session?.user) return null;
+  return userFromSupabaseUser(session.user);
 }
 
-function userFromAccessToken(token: string): AuthUser | null {
-  const claims = decodeJwtPayload(token);
-  if (!claims) return null;
-  const userId = Number(claims.sub ?? claims.userId);
-  const email = typeof claims.email === 'string' ? claims.email : '';
-  const role = (claims.role ?? 'PLAYER') as Role;
-  if (!userId || !email) return null;
-  return { id: userId, email, role };
+function userFromSupabaseUser(u: User): AuthUser {
+  const meta = (u.user_metadata ?? {}) as Record<string, unknown>;
+  const role = (typeof meta.role === 'string' ? meta.role : 'PLAYER') as Role;
+  return {
+    id: 0,
+    supabaseUserId: u.id,
+    email: u.email ?? '',
+    role,
+    name: typeof meta.firstName === 'string' && typeof meta.lastName === 'string'
+      ? `${meta.firstName} ${meta.lastName}`
+      : undefined,
+  };
 }
 
-export const AuthProvider = ({ client, storage, children }: AuthProviderProps) => {
+export const AuthProvider = ({ supabase, defaultRole = 'PLAYER', children }: AuthProviderProps) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const access = storage.getAccess();
-    if (access) {
-      const u = userFromAccessToken(access);
-      if (u) setUser(u);
-    }
-    setLoading(false);
-  }, [storage]);
+    let mounted = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      setUser(userFromSession(data.session));
+      setLoading(false);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(userFromSession(session));
+    });
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
+  }, [supabase]);
 
   const login = useCallback<AuthContextValue['login']>(
     async (email, password) => {
-      const res = await client.post<LoginResponse>('/auth/login', { email, password });
-      storage.setTokens(res.data.accessToken, res.data.refreshToken);
-      const u: AuthUser = { id: res.data.userId, email: res.data.email, role: res.data.role };
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      const u = userFromSession(data.session);
+      if (!u) throw new Error('Login no devolvió sesión');
       setUser(u);
       return u;
     },
-    [client, storage],
+    [supabase],
   );
 
   const register = useCallback<AuthContextValue['register']>(
     async (input) => {
-      await client.post('/auth/register', input);
-      return login(input.email, input.password);
+      const role = input.role ?? defaultRole;
+      const { data, error } = await supabase.auth.signUp({
+        email: input.email,
+        password: input.password,
+        options: {
+          data: {
+            role,
+            firstName: input.firstName,
+            lastName: input.lastName,
+          },
+        },
+      });
+      if (error) throw error;
+      // Si la confirmación de email está activada, no hay session aún.
+      // Iniciamos sesión explícitamente para mantener el flujo previo.
+      if (!data.session) {
+        return login(input.email, input.password);
+      }
+      const u = userFromSession(data.session);
+      if (!u) throw new Error('Registro no devolvió sesión');
+      setUser(u);
+      return u;
     },
-    [client, login],
+    [supabase, defaultRole, login],
   );
 
   const logout = useCallback<AuthContextValue['logout']>(async () => {
-    const refresh = storage.getRefresh();
-    try {
-      if (refresh) {
-        await client.post('/auth/logout', { refreshToken: refresh });
-      }
-    } catch {
-      /* ignore */
-    } finally {
-      storage.clear();
-      setUser(null);
-    }
-  }, [client, storage]);
+    await supabase.auth.signOut();
+    setUser(null);
+  }, [supabase]);
 
   const value = useMemo(
     () => ({ user, loading, login, logout, register }),

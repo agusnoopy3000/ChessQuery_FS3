@@ -2,7 +2,10 @@
 export type Role = 'PLAYER' | 'ORGANIZER' | 'ADMIN';
 
 export interface AuthUser {
+  /** BIGINT de PLAYER en MS-Users. 0 si aún no se ha resuelto desde Supabase. */
   id: number;
+  /** UUID de Supabase Auth (auth.users.id). Presente tras login con Supabase. */
+  supabaseUserId?: string;
   email: string;
   role: Role;
   name?: string;
