@@ -1,7 +1,9 @@
 package cl.chessquery.users.messaging;
 
 import cl.chessquery.users.config.RabbitMQConfig;
+import cl.chessquery.users.entity.Club;
 import cl.chessquery.users.entity.Player;
+import cl.chessquery.users.repository.ClubRepository;
 import cl.chessquery.users.repository.PlayerRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +44,7 @@ import java.util.UUID;
 public class UserRegisteredConsumer {
 
     private final PlayerRepository playerRepo;
+    private final ClubRepository clubRepo;
 
     @RabbitListener(queues = RabbitMQConfig.USERS_REGISTRATION_QUEUE)
     @Transactional
@@ -67,9 +70,18 @@ public class UserRegisteredConsumer {
             return;
         }
 
-        String email     = (String) payload.get("email");
-        String firstName = (String) payload.getOrDefault("firstName", null);
-        String lastName  = (String) payload.getOrDefault("lastName", null);
+        String email           = (String) payload.get("email");
+        String firstName       = (String) payload.getOrDefault("firstName", null);
+        String lastName        = (String) payload.getOrDefault("lastName", null);
+        String lichessUsername = (String) payload.getOrDefault("lichessUsername", null);
+        String clubName        = (String) payload.getOrDefault("clubName", null);
+
+        Club club = StringUtils.hasText(clubName)
+                ? clubRepo.findFirstByNameIgnoreCase(clubName.trim()).orElse(null)
+                : null;
+        if (StringUtils.hasText(clubName) && club == null) {
+            log.info("user.registered: club '{}' no existe, se ignora (player queda sin club)", clubName);
+        }
 
         // 1. Idempotencia: si ya existe Player con este supabaseUserId, no-op.
         if (playerRepo.findBySupabaseUserId(supabaseUserId).isPresent()) {
@@ -83,6 +95,12 @@ public class UserRegisteredConsumer {
             Player existing = playerRepo.findByEmail(email).orElse(null);
             if (existing != null) {
                 existing.setSupabaseUserId(supabaseUserId);
+                if (StringUtils.hasText(lichessUsername) && !StringUtils.hasText(existing.getLichessUsername())) {
+                    existing.setLichessUsername(lichessUsername.trim());
+                }
+                if (club != null && existing.getClub() == null) {
+                    existing.setClub(club);
+                }
                 playerRepo.save(existing);
                 log.info("user.registered: asociado supabaseUserId={} a Player existente id={}",
                         supabaseUserId, existing.getId());
@@ -97,11 +115,13 @@ public class UserRegisteredConsumer {
                 .lastName(StringUtils.hasText(lastName)  ? lastName  : userIdStr.substring(0, 8))
                 .email(email)
                 .supabaseUserId(supabaseUserId)
+                .lichessUsername(StringUtils.hasText(lichessUsername) ? lichessUsername.trim() : null)
+                .club(club)
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
         playerRepo.save(p);
-        log.info("user.registered: Player creado id={} supabaseUserId={} email={}",
-                p.getId(), supabaseUserId, email);
+        log.info("user.registered: Player creado id={} supabaseUserId={} email={} club={}",
+                p.getId(), supabaseUserId, email, club != null ? club.getName() : "—");
     }
 }

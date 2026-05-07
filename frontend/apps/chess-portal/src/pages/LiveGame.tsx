@@ -9,10 +9,12 @@ import { parseFen, makeFen } from 'chessops/fen';
 import { parseSquare, parseUci } from 'chessops/util';
 import { chessgroundDests } from 'chessops/compat';
 import { useAuth } from '@chessquery/shared';
+import type { Player } from '@chessquery/shared';
 import { Button, Card } from '@chessquery/ui-lib';
 import { api, playerApi } from '../api';
 import { supabase } from '../lib/supabase';
 import { useMyPlayerId } from '../hooks/useMyPlayerId';
+import { computeMaterialBalance, flagFromIsoCode } from '../lib/chessHelpers';
 
 import 'chessground/assets/chessground.base.css';
 import 'chessground/assets/chessground.brown.css';
@@ -81,6 +83,9 @@ export const LiveGamePage = () => {
   const myPlayerId = useMyPlayerId();
   const [whiteName, setWhiteName] = useState<string>('Blancas');
   const [blackName, setBlackName] = useState<string>('Negras');
+  const [whiteProfile, setWhiteProfile] = useState<Player | null>(null);
+  const [blackProfile, setBlackProfile] = useState<Player | null>(null);
+  const [toasts, setToasts] = useState<{ id: number; text: string }[]>([]);
   const [confirmingResign, setConfirmingResign] = useState(false);
   const [copied, setCopied] = useState(false);
   const lastMoveCountRef = useRef(0);
@@ -93,24 +98,41 @@ export const LiveGamePage = () => {
   const [rematchSessionId, setRematchSessionId] = useState<number | null>(null);
   const [rematchCreating, setRematchCreating] = useState(false);
 
-  // Resuelve nombres de los jugadores cuando cambian los IDs.
+  // Resuelve perfiles de los jugadores (nombre + ELO + país) cuando cambian los IDs.
   useEffect(() => {
     if (!state) return;
-    const fetchName = async (pid: number | null): Promise<string> => {
-      if (pid == null) return '— esperando rival —';
+    const fetchProfile = async (pid: number | null): Promise<{ name: string; profile: Player | null }> => {
+      if (pid == null) return { name: '— esperando rival —', profile: null };
       try {
         const p = await playerApi.publicProfile(pid);
-        const n = `${p.profile?.firstName ?? ''} ${p.profile?.lastName ?? ''}`.trim();
-        return n || `Jugador ${pid}`;
+        const profile = p.profile ?? null;
+        const n = `${profile?.firstName ?? ''} ${profile?.lastName ?? ''}`.trim();
+        return { name: n || `Jugador ${pid}`, profile };
       } catch {
-        return `Jugador ${pid}`;
+        return { name: `Jugador ${pid}`, profile: null };
       }
     };
     let cancelled = false;
-    Promise.all([fetchName(state.whitePlayerId), fetchName(state.blackPlayerId)])
-      .then(([w, b]) => { if (!cancelled) { setWhiteName(w); setBlackName(b); } });
+    Promise.all([fetchProfile(state.whitePlayerId), fetchProfile(state.blackPlayerId)])
+      .then(([w, b]) => {
+        if (cancelled) return;
+        setWhiteName(w.name);
+        setBlackName(b.name);
+        setWhiteProfile(w.profile);
+        setBlackProfile(b.profile);
+      });
     return () => { cancelled = true; };
   }, [state?.whitePlayerId, state?.blackPlayerId]);
+
+  // Toast queue — autodismiss en 3s, una sola visible a la vez.
+  const pushToast = (text: string) => {
+    setToasts((prev) => [...prev, { id: Date.now() + Math.random(), text }]);
+  };
+  useEffect(() => {
+    if (toasts.length === 0) return;
+    const t = setTimeout(() => setToasts((prev) => prev.slice(1)), 3000);
+    return () => clearTimeout(t);
+  }, [toasts]);
 
   // Determinar el color del usuario actual usando el player.id resuelto
   const myColor: 'white' | 'black' | null = useMemo(() => {
@@ -154,7 +176,11 @@ export const LiveGamePage = () => {
       const opponentId = myPlayerId === state.whitePlayerId ? state.blackPlayerId : state.whitePlayerId;
       if (opponentId == null) { setOpponentOnline(false); return; }
       const presenceState = channel.presenceState() as Record<string, unknown>;
-      setOpponentOnline(String(opponentId) in presenceState);
+      const wasOnline = opponentOnline;
+      const nowOnline = String(opponentId) in presenceState;
+      setOpponentOnline(nowOnline);
+      if (!wasOnline && nowOnline) pushToast('Rival conectado');
+      else if (wasOnline && !nowOnline) pushToast('Rival desconectado');
     };
     channel
       .on('broadcast', { event: 'move.played' }, ({ payload }) => applyOrFetch(payload))
@@ -328,12 +354,37 @@ export const LiveGamePage = () => {
   const opponentName = myColor === 'white' ? blackName : whiteName;
   const topName = myColor === 'black' ? whiteName : blackName;
   const bottomName = myColor === 'black' ? blackName : whiteName;
+  const topProfile = myColor === 'black' ? whiteProfile : blackProfile;
+  const bottomProfile = myColor === 'black' ? blackProfile : whiteProfile;
   const turnLabel = state.turn === 'w' ? whiteName : blackName;
   const turnColorView: 'white' | 'black' = state.turn === 'w' ? 'white' : 'black';
   const isMyTurn = myColor !== null && turnColorView === myColor && state.status === 'ACTIVE';
 
+  const material = computeMaterialBalance(state.currentFen);
+  // Si juego con negras, "top" del tablero es blancas → muestro sus capturas (piezas negras).
+  const topCaptured = myColor === 'black' ? material.capturedByWhite : material.capturedByBlack;
+  const bottomCaptured = myColor === 'black' ? material.capturedByBlack : material.capturedByWhite;
+  const topDelta = myColor === 'black' ? material.delta : -material.delta;
+  const bottomDelta = -topDelta;
+
   return (
     <div className="page-shell cq-live-grid">
+      {/* Toast queue (R8): notificaciones de eventos Realtime */}
+      {toasts.length > 0 && (
+        <div
+          style={{
+            position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
+            background: 'rgba(20,22,18,0.95)', color: '#e8ead4',
+            border: '1px solid var(--border, #2a2d27)', borderRadius: 8,
+            padding: '10px 16px', fontSize: 13, fontWeight: 500,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.4)', zIndex: 1100,
+            animation: 'cq-toast-in 200ms ease-out',
+          }}
+        >
+          <style>{`@keyframes cq-toast-in { from { opacity: 0; transform: translate(-50%, -8px) } to { opacity: 1; transform: translate(-50%, 0) } }`}</style>
+          {toasts[0].text}
+        </div>
+      )}
       <style>{`
         .cq-live-grid {
           display: grid;
@@ -369,17 +420,15 @@ export const LiveGamePage = () => {
           .cq-turn-theirs .cq-turn-dot { background: #777; }
         `}</style>
 
-        <div style={{ alignSelf: 'flex-start', fontSize: 14, fontWeight: 600 }}>
-          {myColor === 'black' ? '⚪' : '⚫'} {topName}
-          {myColor && state.status === 'ACTIVE' && (
-            <span
-              title={opponentOnline ? 'Conectado' : 'Desconectado'}
-              style={{ marginLeft: 8, fontSize: 10 }}
-            >
-              {opponentOnline ? '🟢' : '🔴'}
-            </span>
-          )}
-        </div>
+        <PlayerHeaderRow
+          name={topName}
+          profile={topProfile}
+          colorIcon={myColor === 'black' ? '⚪' : '⚫'}
+          showPresence={!!myColor && state.status === 'ACTIVE'}
+          online={opponentOnline}
+          captured={topCaptured}
+          delta={topDelta}
+        />
 
         {state.status === 'ACTIVE' && myColor && (
           <div className={`cq-turn-banner ${isMyTurn ? 'cq-turn-mine' : 'cq-turn-theirs'}`}>
@@ -390,9 +439,15 @@ export const LiveGamePage = () => {
 
         <div ref={cgRef} className="cq-live-board" />
 
-        <div style={{ alignSelf: 'flex-start', fontSize: 14, fontWeight: 600 }}>
-          {myColor === 'black' ? '⚫' : '⚪'} {bottomName} {myColor && '(tú)'}
-        </div>
+        <PlayerHeaderRow
+          name={`${bottomName}${myColor ? ' (tú)' : ''}`}
+          profile={bottomProfile}
+          colorIcon={myColor === 'black' ? '⚫' : '⚪'}
+          showPresence={false}
+          online={false}
+          captured={bottomCaptured}
+          delta={bottomDelta}
+        />
 
         {state.status === 'ACTIVE' && myColor && (
           <Button
@@ -596,6 +651,52 @@ export const LiveGamePage = () => {
           rematchPending={rematchSessionId != null}
           rematchCreating={rematchCreating}
         />
+      )}
+    </div>
+  );
+};
+
+interface PlayerHeaderRowProps {
+  name: string;
+  profile: Player | null;
+  colorIcon: string;
+  showPresence: boolean;
+  online: boolean;
+  captured: { piece: string; symbol: string }[];
+  delta: number;
+}
+
+const PlayerHeaderRow = ({
+  name, profile, colorIcon, showPresence, online, captured, delta,
+}: PlayerHeaderRowProps) => {
+  const elo = profile?.eloNational ?? null;
+  const flag = flagFromIsoCode(profile?.countryIsoCode);
+  const eloLabel = elo != null ? String(elo) : 'Sin rating';
+  return (
+    <div style={{ alignSelf: 'flex-start', display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <div style={{ fontSize: 14, fontWeight: 600, fontFamily: '"Noto Sans", "Helvetica Neue", sans-serif' }}>
+        {colorIcon} {name}
+        <span style={{ marginLeft: 6, color: 'var(--text-muted)', fontWeight: 500 }}>
+          · {eloLabel}
+          {flag && <> · <span style={{ fontSize: 14 }}>{flag}</span></>}
+        </span>
+        {showPresence && (
+          <span title={online ? 'Conectado' : 'Desconectado'} style={{ marginLeft: 8, fontSize: 10 }}>
+            {online ? '🟢' : '🔴'}
+          </span>
+        )}
+      </div>
+      {(captured.length > 0 || delta > 0) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 16, lineHeight: 1, minHeight: 16 }}>
+          {captured.map((c, i) => (
+            <span key={i} style={{ color: 'var(--text-muted)' }}>{c.symbol}</span>
+          ))}
+          {delta > 0 && (
+            <span style={{ marginLeft: 4, fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>
+              +{delta}
+            </span>
+          )}
+        </div>
       )}
     </div>
   );

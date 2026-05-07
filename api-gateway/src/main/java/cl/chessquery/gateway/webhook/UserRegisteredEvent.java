@@ -48,5 +48,11 @@ public class UserRegisteredEvent {
 
         @JsonProperty("lastName")
         private String lastName;
+
+        @JsonProperty("lichessUsername")
+        private String lichessUsername;
+
+        @JsonProperty("clubName")
+        private String clubName;
     }
 }

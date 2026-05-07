@@ -341,6 +341,8 @@ export const RegisterPage = () => {
         firstName: form.nombre.trim(),
         lastName: form.apellido.trim(),
         role,
+        lichessUsername: role === 'PLAYER' ? form.lichess.trim() || undefined : undefined,
+        clubName: role === 'ORGANIZER' ? form.club.trim() || undefined : undefined,
       });
       // Si venía de un link de invitación (?next=/play/123), respetamos esa URL.
       // Si no, mandamos al dashboard correspondiente al rol elegido.

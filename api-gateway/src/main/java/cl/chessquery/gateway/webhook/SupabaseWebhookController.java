@@ -82,6 +82,8 @@ public class SupabaseWebhookController {
                         .role(metadata != null ? metadata.getOrDefault("role", "PLAYER") : "PLAYER")
                         .firstName(metadata != null ? metadata.getOrDefault("firstName", "") : "")
                         .lastName(metadata != null ? metadata.getOrDefault("lastName", "") : "")
+                        .lichessUsername(metadata != null ? metadata.getOrDefault("lichessUsername", "") : "")
+                        .clubName(metadata != null ? metadata.getOrDefault("clubName", "") : "")
                         .build())
                 .build();
 

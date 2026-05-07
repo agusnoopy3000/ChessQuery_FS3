@@ -24,6 +24,10 @@ export interface RegisterInput {
   firstName: string;
   lastName: string;
   role?: Role;
+  /** Username de Lichess opcional (solo PLAYER). */
+  lichessUsername?: string;
+  /** Nombre del club si el usuario lo introduce en el form. */
+  clubName?: string;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -96,16 +100,21 @@ export const AuthProvider = ({ supabase, defaultRole = 'PLAYER', children }: Aut
   const register = useCallback<AuthContextValue['register']>(
     async (input) => {
       const role = input.role ?? defaultRole;
+      const metadata: Record<string, string> = {
+        role,
+        firstName: input.firstName,
+        lastName: input.lastName,
+      };
+      if (input.lichessUsername?.trim()) {
+        metadata.lichessUsername = input.lichessUsername.trim();
+      }
+      if (input.clubName?.trim()) {
+        metadata.clubName = input.clubName.trim();
+      }
       const { data, error } = await supabase.auth.signUp({
         email: input.email,
         password: input.password,
-        options: {
-          data: {
-            role,
-            firstName: input.firstName,
-            lastName: input.lastName,
-          },
-        },
+        options: { data: metadata },
       });
       if (error) throw error;
       // Si la confirmación de email está activada, no hay session aún.

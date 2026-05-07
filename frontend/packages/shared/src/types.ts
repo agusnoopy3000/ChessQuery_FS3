@@ -54,6 +54,7 @@ export interface Player {
   ageCategory?: string | null;
   countryId?: number | null;
   countryName?: string | null;
+  countryIsoCode?: string | null;
   countryFlag?: string | null;
   clubId?: number | null;
   clubName?: string | null;

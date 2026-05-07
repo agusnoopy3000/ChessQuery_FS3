@@ -92,6 +92,7 @@ const normalizePlayer = (value: unknown): Player => {
     ageCategory: asString(raw.ageCategory) ?? null,
     countryId: asNumber(country.id) ?? null,
     countryName: asString(country.name ?? raw.countryName ?? raw.countryIso ?? raw.region) ?? null,
+    countryIsoCode: asString(country.isoCode ?? raw.countryIsoCode ?? raw.countryIso) ?? null,
     countryFlag: null,
     clubId: asNumber(club.id) ?? null,
     clubName: asString(club.name ?? raw.clubName) ?? null,
