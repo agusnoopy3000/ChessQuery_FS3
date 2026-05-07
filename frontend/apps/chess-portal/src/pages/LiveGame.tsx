@@ -26,6 +26,20 @@ interface LiveMove {
   fenAfter: string;
 }
 
+// Sonidos de jugada (assets en /sounds/, set estándar de lichess)
+const sounds = {
+  move: typeof Audio !== 'undefined' ? new Audio('/sounds/move.mp3') : null,
+  capture: typeof Audio !== 'undefined' ? new Audio('/sounds/capture.mp3') : null,
+  check: typeof Audio !== 'undefined' ? new Audio('/sounds/check.mp3') : null,
+  notify: typeof Audio !== 'undefined' ? new Audio('/sounds/genericnotify.mp3') : null,
+};
+const playSound = (kind: keyof typeof sounds) => {
+  const a = sounds[kind];
+  if (!a) return;
+  a.currentTime = 0;
+  a.play().catch(() => { /* autoplay bloqueado: ignorar silenciosamente */ });
+};
+
 interface LiveGameState {
   id: number;
   whitePlayerId: number;
@@ -64,6 +78,8 @@ export const LiveGamePage = () => {
   const [blackName, setBlackName] = useState<string>('Negras');
   const [confirmingResign, setConfirmingResign] = useState(false);
   const [copied, setCopied] = useState(false);
+  const lastMoveCountRef = useRef(0);
+  const prevStatusRef = useRef<string | null>(null);
 
   // Resuelve nombres de los jugadores cuando cambian los IDs.
   useEffect(() => {
@@ -123,6 +139,24 @@ export const LiveGamePage = () => {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [id]);
+
+  // Sonidos en cambios de estado (jugada nueva, inicio, fin).
+  useEffect(() => {
+    if (!state) return;
+    const prev = lastMoveCountRef.current;
+    const curr = state.moves.length;
+    if (curr > prev) {
+      const last = state.moves[curr - 1];
+      const inCheck = chessFromFen(state.currentFen)?.isCheck();
+      if (inCheck) playSound('check');
+      else if (last.san.includes('x')) playSound('capture');
+      else playSound('move');
+    }
+    lastMoveCountRef.current = curr;
+    if (state.status === 'FINISHED' && state.finishedAt) playSound('notify');
+    if (prevStatusRef.current === 'WAITING' && state.status === 'ACTIVE') playSound('notify');
+    prevStatusRef.current = state.status;
+  }, [state?.moves.length, state?.status]);
 
   // Auto-join si soy el rival y la sesión está WAITING.
   // Guard con ref: solo intentamos join una vez por id de sesión, sin
