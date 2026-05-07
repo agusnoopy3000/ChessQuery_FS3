@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Chessground } from 'chessground';
 import type { Api as CgApi } from 'chessground/api';
 import type { Config as CgConfig } from 'chessground/config';
@@ -67,6 +67,7 @@ const dataApi = {
 
 export const LiveGamePage = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const cgRef = useRef<HTMLDivElement>(null);
   const cgApi = useRef<CgApi | null>(null);
@@ -507,6 +508,99 @@ export const LiveGamePage = () => {
           <p style={{ color: 'crimson', marginTop: 12, fontSize: 13 }}>{error}</p>
         )}
       </Card>
+
+      {/* Modal fin de partida — overlay con resultado y CTAs */}
+      {state.status === 'FINISHED' && (
+        <GameOverModal
+          state={state}
+          myColor={myColor}
+          whiteName={whiteName}
+          blackName={blackName}
+          onClose={() => navigate('/play')}
+          onViewSaved={state.finalizedGameId ? () => navigate(`/player/${myPlayerId ?? ''}`) : null}
+        />
+      )}
+    </div>
+  );
+};
+
+interface GameOverModalProps {
+  state: LiveGameState;
+  myColor: 'white' | 'black' | null;
+  whiteName: string;
+  blackName: string;
+  onClose: () => void;
+  onViewSaved: (() => void) | null;
+}
+
+const GameOverModal = ({ state, myColor, whiteName, blackName, onClose, onViewSaved }: GameOverModalProps) => {
+  const winner = state.result === '1-0' ? 'white' : state.result === '0-1' ? 'black' : null;
+  const isDraw = state.result === '1/2-1/2';
+  const headline = (() => {
+    if (isDraw) return 'Tablas';
+    if (myColor && winner) return myColor === winner ? '¡Ganaste!' : 'Perdiste';
+    if (winner === 'white') return `${whiteName} gana`;
+    if (winner === 'black') return `${blackName} gana`;
+    return 'Partida finalizada';
+  })();
+  const reasonLabel = (() => {
+    switch (state.endReason) {
+      case 'CHECKMATE': return 'Jaque mate';
+      case 'RESIGN': return 'Por abandono';
+      case 'STALEMATE': return 'Ahogado';
+      case 'DRAW_INSUFFICIENT': return 'Material insuficiente';
+      case 'DRAW_REPETITION': return 'Triple repetición';
+      case 'DRAW_50MOVE': return 'Regla de 50 movimientos';
+      default: return state.endReason ?? '';
+    }
+  })();
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(0,0,0,0.65)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 16, animation: 'cq-fade-in 200ms ease-out',
+      }}
+      onClick={onClose}
+    >
+      <style>{`
+        @keyframes cq-fade-in { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes cq-pop-in { from { transform: scale(0.9); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+      `}</style>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'var(--surface, #1c1f1a)',
+          border: '1px solid var(--border, #2a2d27)',
+          borderRadius: 12,
+          padding: '32px 28px',
+          maxWidth: 420, width: '100%',
+          textAlign: 'center',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+          animation: 'cq-pop-in 250ms ease-out',
+        }}
+      >
+        <div style={{ fontSize: 56, marginBottom: 8 }}>
+          {isDraw ? '🤝' : myColor && winner === myColor ? '🏆' : myColor && winner ? '😔' : '♟'}
+        </div>
+        <h2 style={{ margin: '0 0 6px', fontSize: 28, fontWeight: 700 }}>{headline}</h2>
+        <p style={{ margin: '0 0 4px', fontSize: 14, color: 'var(--text-muted)' }}>{reasonLabel}</p>
+        <p style={{ margin: '0 0 24px', fontSize: 32, fontFamily: 'monospace', fontWeight: 700, letterSpacing: 2 }}>
+          {state.result}
+        </p>
+        <div style={{ display: 'grid', gap: 8 }}>
+          {onViewSaved && (
+            <Button variant="secondary" onClick={onViewSaved}>
+              Ver partida guardada #{state.finalizedGameId}
+            </Button>
+          )}
+          <Button variant="primary" onClick={onClose}>
+            Volver al portal
+          </Button>
+        </div>
+      </div>
     </div>
   );
 };
