@@ -96,6 +96,15 @@ management:
       application: ${spring.application.name}
 
 ---
+# ── Perfil dev (Flyway tolerante a checksum mismatch durante iteración) ─────
+spring:
+  config:
+    activate:
+      on-profile: dev
+  flyway:
+    validate-on-migrate: false
+
+---
 # ── Perfil Docker ────────────────────────────────────────────────────────────
 spring:
   config:

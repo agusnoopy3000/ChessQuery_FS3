@@ -1,5 +1,6 @@
 package cl.chessquery.gateway.filter;
 
+import cl.chessquery.gateway.auth.PlayerIdResolver;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
@@ -22,6 +23,7 @@ import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+import java.util.UUID;
 
 import javax.crypto.SecretKey;
 import java.math.BigInteger;
@@ -86,11 +88,15 @@ public class SupabaseJwtAuthFilter implements GlobalFilter, Ordered {
     private volatile long jwksFetchedAt = 0L;
     private static final long JWKS_TTL_MS = 5 * 60 * 1000L;
 
+    private final PlayerIdResolver playerIdResolver;
+
     public SupabaseJwtAuthFilter(
             @Value("${supabase.jwt-secret}") String jwtSecret,
-            @Value("${supabase.url:http://host.docker.internal:54321}") String supabaseUrl) {
+            @Value("${supabase.url:http://host.docker.internal:54321}") String supabaseUrl,
+            PlayerIdResolver playerIdResolver) {
         this.hmacKey = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
         this.jwksUrl = supabaseUrl.replaceAll("/+$", "") + "/auth/v1/.well-known/jwks.json";
+        this.playerIdResolver = playerIdResolver;
         log.info("SupabaseJwtAuthFilter initialized; jwks={}", jwksUrl);
     }
 
@@ -215,16 +221,35 @@ public class SupabaseJwtAuthFilter implements GlobalFilter, Ordered {
 
             log.debug("JWT validated for user={}, role={}", userId, role);
 
-            // Propagar headers downstream (mismo formato que MS-Auth)
-            ServerHttpRequest mutated = exchange.getRequest().mutate()
-                    .headers(h -> {
-                        h.set("X-User-Id", userId);
-                        h.set("X-User-Email", email != null ? email : "");
-                        h.set("X-User-Role", role != null ? role : "PLAYER");
-                    })
-                    .build();
+            // Resolver el UUID de Supabase a player.id numérico (cacheado).
+            // Los servicios downstream (MS-Tournament, MS-Game) bindean X-User-Id a Long.
+            UUID supabaseUuid;
+            try {
+                supabaseUuid = UUID.fromString(userId);
+            } catch (IllegalArgumentException ex) {
+                return unauthorized(exchange, "JWT subject is not a valid UUID");
+            }
 
-            return chain.filter(exchange.mutate().request(mutated).build());
+            final String emailFinal = email;
+            final String roleFinal = role;
+            return playerIdResolver.resolve(supabaseUuid)
+                    .flatMap(playerId -> {
+                        ServerHttpRequest mutated = exchange.getRequest().mutate()
+                                .headers(h -> {
+                                    h.set("X-User-Id", String.valueOf(playerId));
+                                    h.set("X-Supabase-User-Id", supabaseUuid.toString());
+                                    h.set("X-User-Email", emailFinal != null ? emailFinal : "");
+                                    h.set("X-User-Role", roleFinal != null ? roleFinal : "PLAYER");
+                                })
+                                .build();
+                        return chain.filter(exchange.mutate().request(mutated).build());
+                    })
+                    .onErrorResume(err -> {
+                        log.warn("Player resolution failed for sub={}: {}", supabaseUuid, err.toString());
+                        return writeErrorBody(exchange, HttpStatus.SERVICE_UNAVAILABLE,
+                                "USER_NOT_RESOLVED",
+                                "No se pudo resolver el usuario aún. Reintenta en unos segundos.");
+                    });
 
         } catch (ExpiredJwtException e) {
             log.debug("JWT expired for sub={}", e.getClaims() != null ? e.getClaims().getSubject() : "unknown");

@@ -85,6 +85,8 @@ gateway:
     url: ${BFF_ADMIN_URL}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost}
+  ms-users:
+    url: ${MS_USERS_URL:http://localhost:8081}
 
 # ── Actuator ──────────────────────────────────────────────────────────────
 management:

@@ -6,7 +6,7 @@ COMPOSE  = docker compose
 ENV_FILE = .env
 DC_FILE  = docker-compose.yml
 
-.PHONY: help up down logs reset ps clean-setup check-env
+.PHONY: help up down logs reset ps clean-setup check-env build demo-reset
 
 # ---------------------------------------------------------------------------
 # Ayuda por defecto
@@ -15,7 +15,9 @@ help:
 	@echo ""
 	@echo "  ChessQuery – Comandos de infraestructura"
 	@echo ""
-	@echo "  make up          Levanta todos los servicios en background"
+	@echo "  make up          Reconstruye imágenes y levanta todos los servicios"
+	@echo "  make build       Reconstruye imágenes Docker sin levantar (--no-cache)"
+	@echo "  make demo-reset  Limpia datos de demo conservando los seeds"
 	@echo "  make down        Detiene y elimina los contenedores"
 	@echo "  make logs        Muestra logs en tiempo real (Ctrl+C para salir)"
 	@echo "  make reset       Detiene contenedores y BORRA todos los volumes"
@@ -34,11 +36,19 @@ check-env:
 	fi
 
 # ---------------------------------------------------------------------------
-# up: Levanta la infraestructura (servicios) completa
+# build: reconstruye imágenes Docker desde cero (--no-cache)
+# ---------------------------------------------------------------------------
+build: check-env
+	@echo "[make] Reconstruyendo imágenes Docker (--no-cache)..."
+	$(COMPOSE) --env-file $(ENV_FILE) -f $(DC_FILE) build --no-cache
+
+# ---------------------------------------------------------------------------
+# up: rebuild incremental + levantar todos los servicios
+# (usa caché de capas; para rebuild total ejecuta `make build` antes)
 # ---------------------------------------------------------------------------
 up: check-env
-	@echo "[make] Levantando infraestructura ChessQuery..."
-	$(COMPOSE) --env-file $(ENV_FILE) -f $(DC_FILE) up -d --remove-orphans
+	@echo "[make] Construyendo imágenes (cache) y levantando infraestructura..."
+	$(COMPOSE) --env-file $(ENV_FILE) -f $(DC_FILE) up -d --build --remove-orphans
 	@echo ""
 	@echo "  Servicios disponibles:"
 	@echo "    PostgreSQL  auth_db       → localhost:5432"
@@ -83,6 +93,14 @@ reset:
 # ---------------------------------------------------------------------------
 ps:
 	$(COMPOSE) --env-file $(ENV_FILE) -f $(DC_FILE) ps
+
+# ---------------------------------------------------------------------------
+# demo-reset: limpia datos de demo conservando los seeds (jugadores chilenos,
+# aperturas ECO). NO toca volumes — los containers siguen levantados.
+# ---------------------------------------------------------------------------
+demo-reset:
+	@echo "[make] Reseteando datos de demo..."
+	@./scripts/demo-reset.sh
 
 # ---------------------------------------------------------------------------
 # clean-setup: recrea los contenedores one-shot de setup

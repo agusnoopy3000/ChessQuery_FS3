@@ -190,6 +190,12 @@ services:
         condition: service_healthy
     networks:
       - chessquery-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 90s
 
   ms-tournament:
     build:
@@ -215,6 +221,12 @@ services:
         condition: service_healthy
     networks:
       - chessquery-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 90s
 
   ms-game:
     build:
@@ -244,6 +256,12 @@ services:
         condition: service_healthy
     networks:
       - chessquery-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8083/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 90s
 
   ms-analytics:
     build:
@@ -268,6 +286,12 @@ services:
         condition: service_healthy
     networks:
       - chessquery-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8084/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 90s
 
   ms-notifications:
     build:
@@ -293,6 +317,12 @@ services:
         condition: service_healthy
     networks:
       - chessquery-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8085/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 90s
 
   # -------------------------------------------------------------------------
   # MICROSERVICIO PYTHON — ETL
@@ -424,6 +454,7 @@ services:
     environment:
       SERVER_PORT: "8080"
       # MS_AUTH_URL eliminado — Supabase Auth gestiona login/refresh
+      MS_USERS_URL: http://ms-users:8081
       BFF_PLAYER_URL: http://bff-player:3001
       BFF_ORGANIZER_URL: http://bff-organizer:3002
       BFF_ADMIN_URL: http://bff-admin:3003
@@ -446,8 +477,15 @@ services:
       - bff-organizer
       - bff-admin
       - redis
+      - ms-users
     networks:
       - chessquery-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 90s
 
   # -------------------------------------------------------------------------
   # MENSAJERÍA – RabbitMQ 3.13 con Management Plugin
