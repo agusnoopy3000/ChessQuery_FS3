@@ -80,6 +80,10 @@ export const LiveGamePage = () => {
   const [copied, setCopied] = useState(false);
   const lastMoveCountRef = useRef(0);
   const prevStatusRef = useRef<string | null>(null);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteSent, setInviteSent] = useState(false);
+  const [inviteSending, setInviteSending] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
 
   // Resuelve nombres de los jugadores cuando cambian los IDs.
   useEffect(() => {
@@ -348,11 +352,60 @@ export const LiveGamePage = () => {
         {state.status === 'WAITING' && myColor === 'white' && (
           <Card style={{ marginBottom: 16, background: 'var(--surface-2)' }}>
             <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>
-              📨 URL de invitación
+              📧 Invitar por email
             </p>
             <p style={{ margin: '4px 0 8px', fontSize: 12, color: 'var(--text-muted)' }}>
-              Compartila con el rival. Si no tiene cuenta, lo manda al registro;
-              si ya está logueado, entra directo a la partida.
+              Mandamos un link mágico al rival. Hace click y entra directo a la partida.
+            </p>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'stretch', marginBottom: 10 }}>
+              <input
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="rival@ejemplo.cl"
+                disabled={inviteSending || inviteSent}
+                style={{
+                  flex: 1,
+                  background: 'var(--input-bg, #0e100d)',
+                  border: '1px solid var(--border, #2a2d27)',
+                  borderRadius: 6,
+                  padding: '8px 10px',
+                  fontSize: 13,
+                  color: 'var(--text, #e8ead4)',
+                }}
+              />
+              <Button
+                size="sm"
+                onClick={async () => {
+                  setInviteError(null);
+                  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteEmail)) {
+                    setInviteError('Email inválido');
+                    return;
+                  }
+                  setInviteSending(true);
+                  try {
+                    const { error: otpErr } = await supabase.auth.signInWithOtp({
+                      email: inviteEmail,
+                      options: { emailRedirectTo: shareUrl },
+                    });
+                    if (otpErr) throw otpErr;
+                    setInviteSent(true);
+                  } catch (e) {
+                    setInviteError(message(e));
+                  } finally {
+                    setInviteSending(false);
+                  }
+                }}
+                disabled={inviteSending || inviteSent}
+              >
+                {inviteSent ? '✓ Enviado' : inviteSending ? 'Enviando…' : 'Invitar'}
+              </Button>
+            </div>
+            {inviteError && (
+              <p style={{ margin: '0 0 8px', color: 'crimson', fontSize: 12 }}>{inviteError}</p>
+            )}
+            <p style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--text-muted)' }}>
+              O compartí el link directo:
             </p>
             <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
               <input
