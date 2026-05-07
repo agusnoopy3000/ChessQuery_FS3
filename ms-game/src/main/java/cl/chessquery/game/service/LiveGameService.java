@@ -64,7 +64,7 @@ public class LiveGameService {
     @Transactional(readOnly = true)
     public LiveGameResponse get(Long id) {
         LiveGameSession s = findOrThrow(id);
-        List<LiveGameMove> moves = moveRepo.findBySessionIdOrderByMoveNumberAscColorAsc(id);
+        List<LiveGameMove> moves = moveRepo.findBySessionIdOrderByCreatedAtAsc(id);
         return toResponse(s, moves);
     }
 
@@ -88,7 +88,7 @@ public class LiveGameService {
         s.setStartedAt(now);
         sessionRepo.save(s);
         log.info("LiveGame {} joined: black={}", id, req.playerId());
-        LiveGameResponse response = toResponse(s, moveRepo.findBySessionIdOrderByMoveNumberAscColorAsc(id));
+        LiveGameResponse response = toResponse(s, moveRepo.findBySessionIdOrderByCreatedAtAsc(id));
         Map<String, Object> startedPayload = new java.util.HashMap<>();
         startedPayload.put("blackPlayerId", req.playerId());
         startedPayload.put("startedAt", now.toString());
@@ -170,7 +170,7 @@ public class LiveGameService {
         // Construir response una sola vez para devolver Y broadcastear.
         // Enviar el estado completo en el broadcast permite al rival actualizar
         // su tablero sin un GET adicional (elimina ~50-200ms de round-trip).
-        LiveGameResponse response = toResponse(s, moveRepo.findBySessionIdOrderByMoveNumberAscColorAsc(id));
+        LiveGameResponse response = toResponse(s, moveRepo.findBySessionIdOrderByCreatedAtAsc(id));
 
         Map<String, Object> movePayload = new java.util.HashMap<>();
         movePayload.put("moveNumber", moveNumber);
@@ -261,7 +261,7 @@ public class LiveGameService {
         finishSession(s, result, "RESIGN", now);
         sessionRepo.save(s);
         broadcastFinished(s);
-        return toResponse(s, moveRepo.findBySessionIdOrderByMoveNumberAscColorAsc(id));
+        return toResponse(s, moveRepo.findBySessionIdOrderByCreatedAtAsc(id));
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────
@@ -285,7 +285,7 @@ public class LiveGameService {
         }
 
         // Construir PGN desde la lista de jugadas
-        List<LiveGameMove> moves = moveRepo.findBySessionIdOrderByMoveNumberAscColorAsc(s.getId());
+        List<LiveGameMove> moves = moveRepo.findBySessionIdOrderByCreatedAtAsc(s.getId());
         String pgn = buildPgn(s, moves, result);
 
         try {
@@ -315,7 +315,7 @@ public class LiveGameService {
     }
 
     private void broadcastFinished(LiveGameSession s) {
-        LiveGameResponse response = toResponse(s, moveRepo.findBySessionIdOrderByMoveNumberAscColorAsc(s.getId()));
+        LiveGameResponse response = toResponse(s, moveRepo.findBySessionIdOrderByCreatedAtAsc(s.getId()));
         Map<String, Object> payload = new java.util.HashMap<>();
         payload.put("result", s.getResult() == null ? "" : s.getResult());
         payload.put("endReason", s.getEndReason() == null ? "" : s.getEndReason());
@@ -349,15 +349,26 @@ public class LiveGameService {
     /** PGN mínimo válido a partir de los movimientos persistidos. */
     private String buildPgn(LiveGameSession s, List<LiveGameMove> moves, String result) {
         StringBuilder sb = new StringBuilder();
+        // Seven Tag Roster (orden requerido por PGN spec): Event, Site, Date, Round, White, Black, Result.
         sb.append("[Event \"ChessQuery Live\"]\n");
         sb.append("[Site \"chessquery.local\"]\n");
         sb.append("[Date \"").append(Instant.now().toString().substring(0, 10).replace('-', '.')).append("\"]\n");
-        sb.append("[White \"").append(s.getWhitePlayerId()).append("\"]\n");
-        sb.append("[Black \"").append(s.getBlackPlayerId()).append("\"]\n");
-        sb.append("[Result \"").append(result).append("\"]\n\n");
+        sb.append("[Round \"-\"]\n");
+        sb.append("[White \"Player ").append(s.getWhitePlayerId()).append("\"]\n");
+        sb.append("[Black \"Player ").append(s.getBlackPlayerId()).append("\"]\n");
+        sb.append("[Result \"").append(result).append("\"]\n");
+        // Tags adicionales útiles para parsers (lichess los reconoce).
+        if (s.getEndReason() != null) {
+            sb.append("[Termination \"").append(terminationLabel(s.getEndReason())).append("\"]\n");
+        }
+        if (s.getTimeControlInitialMs() != null) {
+            long base = s.getTimeControlInitialMs() / 1000;
+            long inc = s.getTimeControlIncrementMs() == null ? 0 : s.getTimeControlIncrementMs() / 1000;
+            sb.append("[TimeControl \"").append(base).append('+').append(inc).append("\"]\n");
+        }
+        sb.append('\n');
 
-        for (int i = 0; i < moves.size(); i++) {
-            LiveGameMove m = moves.get(i);
+        for (LiveGameMove m : moves) {
             if ("w".equals(m.getColor())) {
                 sb.append(m.getMoveNumber()).append(". ");
             }
@@ -365,6 +376,18 @@ public class LiveGameService {
         }
         sb.append(result).append('\n');
         return sb.toString();
+    }
+
+    private String terminationLabel(String endReason) {
+        return switch (endReason) {
+            case "CHECKMATE" -> "Normal";
+            case "RESIGN" -> "Abandoned";
+            case "STALEMATE" -> "Stalemate";
+            case "DRAW_INSUFFICIENT" -> "Insufficient material";
+            case "DRAW_REPETITION" -> "Threefold repetition";
+            case "DRAW_50MOVE" -> "Fifty-move rule";
+            default -> "Unterminated";
+        };
     }
 
     private LiveGameResponse toResponse(LiveGameSession s, List<LiveGameMove> moves) {
