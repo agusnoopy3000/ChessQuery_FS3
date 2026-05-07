@@ -115,4 +115,10 @@ export class PlayerController {
     const userId = getUserId(req);
     return this.playerService.resignLiveGame(userId, id);
   }
+
+  @Post('play/live/:id/rematch')
+  async rematchLive(@Req() req: Request, @Param('id') id: string) {
+    const userId = getUserId(req);
+    return this.playerService.rematchLiveGame(userId, id);
+  }
 }

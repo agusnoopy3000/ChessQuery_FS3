@@ -65,6 +65,8 @@ const dataApi = {
     api.post<LiveGameState>(`/api/player/play/live/${id}/move`, { uci }).then((r) => r.data),
   resign: (id: string) =>
     api.post<LiveGameState>(`/api/player/play/live/${id}/resign`).then((r) => r.data),
+  rematch: (id: string) =>
+    api.post<LiveGameState>(`/api/player/play/live/${id}/rematch`).then((r) => r.data),
 };
 
 export const LiveGamePage = () => {
@@ -88,6 +90,8 @@ export const LiveGamePage = () => {
   const [inviteSending, setInviteSending] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [opponentOnline, setOpponentOnline] = useState(false);
+  const [rematchSessionId, setRematchSessionId] = useState<number | null>(null);
+  const [rematchCreating, setRematchCreating] = useState(false);
 
   // Resuelve nombres de los jugadores cuando cambian los IDs.
   useEffect(() => {
@@ -156,6 +160,10 @@ export const LiveGamePage = () => {
       .on('broadcast', { event: 'move.played' }, ({ payload }) => applyOrFetch(payload))
       .on('broadcast', { event: 'game.started' }, ({ payload }) => applyOrFetch(payload))
       .on('broadcast', { event: 'game.finished' }, ({ payload }) => applyOrFetch(payload))
+      .on('broadcast', { event: 'game.rematch.created' }, ({ payload }) => {
+        const newId = (payload as { newSessionId?: number })?.newSessionId;
+        if (typeof newId === 'number') setRematchSessionId(newId);
+      })
       .on('presence', { event: 'sync' }, refreshOpponent)
       .on('presence', { event: 'join' }, refreshOpponent)
       .on('presence', { event: 'leave' }, refreshOpponent)
@@ -568,6 +576,25 @@ export const LiveGamePage = () => {
           blackName={blackName}
           onClose={() => navigate('/play')}
           onViewSaved={state.finalizedGameId ? () => navigate(`/player/${myPlayerId ?? ''}`) : null}
+          onRematch={async () => {
+            if (!id) return;
+            // Si el rival ya creó la revancha, navegamos directo. Si no, la creamos.
+            if (rematchSessionId != null) {
+              navigate(`/play/${rematchSessionId}`);
+              return;
+            }
+            setRematchCreating(true);
+            try {
+              const next = await dataApi.rematch(id);
+              navigate(`/play/${next.id}`);
+            } catch (e) {
+              setError(message(e));
+            } finally {
+              setRematchCreating(false);
+            }
+          }}
+          rematchPending={rematchSessionId != null}
+          rematchCreating={rematchCreating}
         />
       )}
     </div>
@@ -581,9 +608,15 @@ interface GameOverModalProps {
   blackName: string;
   onClose: () => void;
   onViewSaved: (() => void) | null;
+  onRematch: () => void;
+  rematchPending: boolean;
+  rematchCreating: boolean;
 }
 
-const GameOverModal = ({ state, myColor, whiteName, blackName, onClose, onViewSaved }: GameOverModalProps) => {
+const GameOverModal = ({
+  state, myColor, whiteName, blackName, onClose, onViewSaved,
+  onRematch, rematchPending, rematchCreating,
+}: GameOverModalProps) => {
   const winner = state.result === '1-0' ? 'white' : state.result === '0-1' ? 'black' : null;
   const isDraw = state.result === '1/2-1/2';
   const headline = (() => {
@@ -641,12 +674,15 @@ const GameOverModal = ({ state, myColor, whiteName, blackName, onClose, onViewSa
           {state.result}
         </p>
         <div style={{ display: 'grid', gap: 8 }}>
+          <Button variant="primary" onClick={onRematch} loading={rematchCreating}>
+            {rematchPending ? '🔁 Aceptar revancha del rival' : '🔁 Revancha (colores invertidos)'}
+          </Button>
           {onViewSaved && (
             <Button variant="secondary" onClick={onViewSaved}>
               Ver partida guardada #{state.finalizedGameId}
             </Button>
           )}
-          <Button variant="primary" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose}>
             Volver al portal
           </Button>
         </div>

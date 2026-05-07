@@ -47,4 +47,11 @@ public class LiveGameController {
     public LiveGameResponse resign(@PathVariable Long id, @Valid @RequestBody ResignRequest req) {
         return live.resign(id, req);
     }
+
+    @Operation(summary = "Revancha — crea nueva sesión con colores invertidos (status WAITING)")
+    @PostMapping("/{id}/rematch")
+    @ResponseStatus(HttpStatus.CREATED)
+    public LiveGameResponse rematch(@PathVariable Long id, @Valid @RequestBody RematchRequest req) {
+        return live.rematch(id, req);
+    }
 }

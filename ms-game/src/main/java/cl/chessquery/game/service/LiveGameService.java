@@ -189,6 +189,58 @@ public class LiveGameService {
         return response;
     }
 
+    // ── Rematch ────────────────────────────────────────────────────────────
+
+    /**
+     * Crea una nueva sesión con colores invertidos a partir de una sesión
+     * FINISHED. Convención: el original.blackPlayerId pasa a ser white en
+     * la nueva (color swap). Status WAITING. El rival original se entera
+     * vía broadcast 'game.rematch.created' en el canal de la sesión vieja.
+     */
+    @Transactional
+    public LiveGameResponse rematch(Long id, RematchRequest req) {
+        LiveGameSession original = findOrThrow(id);
+        if (original.getStatus() != SessionStatus.FINISHED) {
+            throw new ApiException(409, "SESSION_NOT_FINISHED",
+                    "Solo se puede pedir revancha de una partida finalizada");
+        }
+        if (original.getBlackPlayerId() == null) {
+            throw new ApiException(400, "NO_OPPONENT",
+                    "No hay rival con quien hacer revancha");
+        }
+        boolean isParticipant = req.playerId().equals(original.getWhitePlayerId())
+                || req.playerId().equals(original.getBlackPlayerId());
+        if (!isParticipant) {
+            throw new ApiException(403, "NOT_A_PLAYER",
+                    "Solo los participantes pueden pedir revancha");
+        }
+
+        // Color swap: el black original pasa a ser white en la nueva.
+        LiveGameSession s = LiveGameSession.builder()
+                .whitePlayerId(original.getBlackPlayerId())
+                .status(SessionStatus.WAITING)
+                .initialFen(INITIAL_FEN)
+                .currentFen(INITIAL_FEN)
+                .turn("w")
+                .timeControlInitialMs(original.getTimeControlInitialMs())
+                .timeControlIncrementMs(original.getTimeControlIncrementMs())
+                .clockWhiteMs(original.getTimeControlInitialMs())
+                .clockBlackMs(original.getTimeControlInitialMs())
+                .whiteEloBefore(original.getBlackEloBefore())
+                .build();
+        sessionRepo.save(s);
+        log.info("LiveGame {} rematch creado como {} (whiteWasBlack={})",
+                id, s.getId(), original.getBlackPlayerId());
+
+        // Notificar a quien sigue suscrito al canal viejo (modal abierto).
+        Map<String, Object> rematchPayload = new java.util.HashMap<>();
+        rematchPayload.put("newSessionId", s.getId());
+        rematchPayload.put("requestedBy", req.playerId());
+        broadcaster.publish(id, "game.rematch.created", rematchPayload);
+
+        return toResponse(s, List.of());
+    }
+
     // ── Resign ─────────────────────────────────────────────────────────────
 
     @Transactional

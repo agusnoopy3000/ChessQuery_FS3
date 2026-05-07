@@ -261,6 +261,14 @@ export class PlayerService {
     });
   }
 
+  async rematchLiveGame(userId: string, id: string): Promise<unknown> {
+    const { msGame } = this.http.urls;
+    const playerId = await this.resolvePlayerId(userId);
+    return this.http.post<unknown>(`${msGame}/games/live/${id}/rematch`, {
+      playerId,
+    });
+  }
+
   async getLichessProfile(playerId: string): Promise<{
     username: string | null;
     user: unknown | null;

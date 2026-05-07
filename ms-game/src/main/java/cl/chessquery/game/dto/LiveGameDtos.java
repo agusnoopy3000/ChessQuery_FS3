@@ -38,6 +38,9 @@ public final class LiveGameDtos {
     /** POST /games/live/{id}/resign. */
     public record ResignRequest(@NotNull Long playerId) {}
 
+    /** POST /games/live/{id}/rematch — clicker initia revancha con colores invertidos. */
+    public record RematchRequest(@NotNull Long playerId) {}
+
     public record LiveMoveResponse(
             Integer moveNumber,
             String color,
