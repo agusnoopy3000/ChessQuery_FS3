@@ -325,18 +325,30 @@ export const LiveGamePage = () => {
   const isMyTurn = myColor !== null && turnColorView === myColor && state.status === 'ACTIVE';
 
   return (
-    <div
-      className="page-shell"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr) 340px',
-        gap: 24,
-        padding: 24,
-        maxWidth: 1100,
-        margin: '0 auto',
-        alignItems: 'start',
-      }}
-    >
+    <div className="page-shell cq-live-grid">
+      <style>{`
+        .cq-live-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 340px;
+          gap: 24px;
+          padding: 24px;
+          max-width: 1100px;
+          margin: 0 auto;
+          align-items: start;
+        }
+        .cq-live-board { width: min(560px, 100%); aspect-ratio: 1 / 1; }
+        @media (max-width: 900px) {
+          .cq-live-grid {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 12px;
+            padding: 12px;
+          }
+          .cq-live-board { width: min(560px, 100vw); max-width: calc(100vw - 24px); }
+        }
+        @media (max-width: 600px) {
+          .cq-live-board { width: calc(100vw - 16px); max-width: 480px; }
+        }
+      `}</style>
       {/* Columna del tablero — centrado vertical y horizontal */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
         <style>{`
@@ -368,13 +380,7 @@ export const LiveGamePage = () => {
           </div>
         )}
 
-        <div
-          ref={cgRef}
-          style={{
-            width: 'min(560px, 90vw)',
-            aspectRatio: '1 / 1',
-          }}
-        />
+        <div ref={cgRef} className="cq-live-board" />
 
         <div style={{ alignSelf: 'flex-start', fontSize: 14, fontWeight: 600 }}>
           {myColor === 'black' ? '⚫' : '⚪'} {bottomName} {myColor && '(tú)'}
