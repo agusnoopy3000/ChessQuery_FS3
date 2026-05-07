@@ -319,6 +319,8 @@ export const LiveGamePage = () => {
   const topName = myColor === 'black' ? whiteName : blackName;
   const bottomName = myColor === 'black' ? blackName : whiteName;
   const turnLabel = state.turn === 'w' ? whiteName : blackName;
+  const turnColorView: 'white' | 'black' = state.turn === 'w' ? 'white' : 'black';
+  const isMyTurn = myColor !== null && turnColorView === myColor && state.status === 'ACTIVE';
 
   return (
     <div
@@ -335,6 +337,16 @@ export const LiveGamePage = () => {
     >
       {/* Columna del tablero — centrado vertical y horizontal */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+        <style>{`
+          @keyframes cq-pulse-dot { 0%, 100% { transform: scale(1); opacity: 1 } 50% { transform: scale(1.4); opacity: 0.6 } }
+          .cq-turn-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
+          .cq-turn-banner { display: flex; align-items: center; padding: 8px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; transition: all 200ms ease; }
+          .cq-turn-mine { background: rgba(120,200,80,0.18); color: #b9e090; border: 1px solid rgba(120,200,80,0.4); }
+          .cq-turn-mine .cq-turn-dot { background: #7bd96a; animation: cq-pulse-dot 1.4s ease-in-out infinite; }
+          .cq-turn-theirs { background: var(--surface-2, #15171a); color: var(--text-muted, #888); border: 1px solid var(--border, #2a2d27); }
+          .cq-turn-theirs .cq-turn-dot { background: #777; }
+        `}</style>
+
         <div style={{ alignSelf: 'flex-start', fontSize: 14, fontWeight: 600 }}>
           {myColor === 'black' ? '⚪' : '⚫'} {topName}
           {myColor && state.status === 'ACTIVE' && (
@@ -346,6 +358,13 @@ export const LiveGamePage = () => {
             </span>
           )}
         </div>
+
+        {state.status === 'ACTIVE' && myColor && (
+          <div className={`cq-turn-banner ${isMyTurn ? 'cq-turn-mine' : 'cq-turn-theirs'}`}>
+            <span className="cq-turn-dot" />
+            {isMyTurn ? 'Es tu turno' : `Esperando a ${opponentName}…`}
+          </div>
+        )}
 
         <div
           ref={cgRef}
