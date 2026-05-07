@@ -84,6 +84,7 @@ export const LiveGamePage = () => {
   const [inviteSent, setInviteSent] = useState(false);
   const [inviteSending, setInviteSending] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const [opponentOnline, setOpponentOnline] = useState(false);
 
   // Resuelve nombres de los jugadores cuando cambian los IDs.
   useEffect(() => {
@@ -123,7 +124,7 @@ export const LiveGamePage = () => {
     return () => { cancelled = true; };
   }, [id]);
 
-  // Subscripción a Supabase Realtime.
+  // Subscripción a Supabase Realtime + presencia.
   // Backend envía el estado completo en `payload.state`, así que aplicamos
   // directo sin GET extra (~50-200ms menos de latencia entre jugadores).
   useEffect(() => {
@@ -135,14 +136,33 @@ export const LiveGamePage = () => {
         dataApi.get(id).then(setState).catch(() => {});
       }
     };
-    const channel = supabase.channel(`game:${id}`, { config: { broadcast: { self: false } } });
+    const channel = supabase.channel(`game:${id}`, {
+      config: {
+        broadcast: { self: false },
+        presence: { key: myPlayerId != null ? String(myPlayerId) : undefined },
+      },
+    });
+    const refreshOpponent = () => {
+      if (myPlayerId == null || !state) { setOpponentOnline(false); return; }
+      const opponentId = myPlayerId === state.whitePlayerId ? state.blackPlayerId : state.whitePlayerId;
+      if (opponentId == null) { setOpponentOnline(false); return; }
+      const presenceState = channel.presenceState() as Record<string, unknown>;
+      setOpponentOnline(String(opponentId) in presenceState);
+    };
     channel
       .on('broadcast', { event: 'move.played' }, ({ payload }) => applyOrFetch(payload))
       .on('broadcast', { event: 'game.started' }, ({ payload }) => applyOrFetch(payload))
       .on('broadcast', { event: 'game.finished' }, ({ payload }) => applyOrFetch(payload))
-      .subscribe();
+      .on('presence', { event: 'sync' }, refreshOpponent)
+      .on('presence', { event: 'join' }, refreshOpponent)
+      .on('presence', { event: 'leave' }, refreshOpponent)
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED' && myPlayerId != null) {
+          await channel.track({ playerId: myPlayerId, online_at: new Date().toISOString() });
+        }
+      });
     return () => { supabase.removeChannel(channel); };
-  }, [id]);
+  }, [id, myPlayerId, state?.whitePlayerId, state?.blackPlayerId]);
 
   // Sonidos en cambios de estado (jugada nueva, inicio, fin).
   useEffect(() => {
@@ -299,6 +319,14 @@ export const LiveGamePage = () => {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
         <div style={{ alignSelf: 'flex-start', fontSize: 14, fontWeight: 600 }}>
           {myColor === 'black' ? '⚪' : '⚫'} {topName}
+          {myColor && state.status === 'ACTIVE' && (
+            <span
+              title={opponentOnline ? 'Conectado' : 'Desconectado'}
+              style={{ marginLeft: 8, fontSize: 10 }}
+            >
+              {opponentOnline ? '🟢' : '🔴'}
+            </span>
+          )}
         </div>
 
         <div
