@@ -66,6 +66,8 @@ public final class LiveGameDtos {
             List<LiveMoveResponse> moves,
             Instant startedAt,
             Instant finishedAt,
-            Instant lastMoveAt
+            Instant lastMoveAt,
+            String detectedOpeningEco,
+            String detectedOpeningName
     ) {}
 }

@@ -7,6 +7,7 @@ import cl.chessquery.game.entity.LiveGameMove;
 import cl.chessquery.game.entity.LiveGameSession;
 import cl.chessquery.game.entity.LiveGameSession.SessionStatus;
 import cl.chessquery.game.exception.ApiException;
+import cl.chessquery.game.opening.OpeningDetector;
 import cl.chessquery.game.repository.LiveGameMoveRepository;
 import cl.chessquery.game.repository.LiveGameSessionRepository;
 import cl.chessquery.game.realtime.LiveGameBroadcaster;
@@ -35,6 +36,7 @@ public class LiveGameService {
     private final LiveGameMoveRepository    moveRepo;
     private final GameService                gameService;
     private final LiveGameBroadcaster        broadcaster;
+    private final OpeningDetector            openingDetector;
 
     // ── Crear sesión (creator = white) ─────────────────────────────────────
 
@@ -320,6 +322,22 @@ public class LiveGameService {
                         m.getFenAfter(), m.getClockWhiteMs(), m.getClockBlackMs(),
                         m.getCreatedAt()))
                 .toList();
+        String openingEco = null;
+        String openingName = null;
+        if (moves.size() >= 2 && moves.size() <= 30) {
+            // Solo detectamos durante apertura (jugadas 2-15). Después no aporta.
+            String sanLine = moves.stream().map(LiveGameMove::getSan)
+                    .collect(java.util.stream.Collectors.joining(" "));
+            try {
+                var op = openingDetector.detectOpening(sanLine);
+                if (op.isPresent()) {
+                    openingEco = op.get().getEcoCode();
+                    openingName = op.get().getName();
+                }
+            } catch (Exception e) {
+                log.debug("No se pudo detectar apertura inline: {}", e.getMessage());
+            }
+        }
         return new LiveGameResponse(
                 s.getId(),
                 s.getWhitePlayerId(),
@@ -337,7 +355,9 @@ public class LiveGameService {
                 mr,
                 s.getStartedAt(),
                 s.getFinishedAt(),
-                s.getLastMoveAt()
+                s.getLastMoveAt(),
+                openingEco,
+                openingName
         );
     }
 }

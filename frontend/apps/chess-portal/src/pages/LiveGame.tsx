@@ -53,6 +53,8 @@ interface LiveGameState {
   moves: LiveMove[];
   startedAt: string | null;
   finishedAt: string | null;
+  detectedOpeningEco: string | null;
+  detectedOpeningName: string | null;
 }
 
 const dataApi = {
@@ -504,6 +506,29 @@ export const LiveGamePage = () => {
               </Button>
             </div>
           </Card>
+        )}
+
+        {state.detectedOpeningName && (
+          <div
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '8px 10px', marginBottom: 12,
+              background: 'rgba(120,180,255,0.08)',
+              border: '1px solid rgba(120,180,255,0.25)',
+              borderRadius: 6, fontSize: 13,
+            }}
+            title="Apertura detectada automáticamente del PGN"
+          >
+            <span style={{ fontSize: 16 }}>📖</span>
+            <span>
+              <strong>{state.detectedOpeningName}</strong>
+              {state.detectedOpeningEco && (
+                <span style={{ marginLeft: 6, color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: 11 }}>
+                  {state.detectedOpeningEco}
+                </span>
+              )}
+            </span>
+          </div>
         )}
 
         <h3 style={{ margin: '16px 0 8px' }}>Jugadas</h3>
