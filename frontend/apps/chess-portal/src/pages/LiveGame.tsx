@@ -164,6 +164,23 @@ export const LiveGamePage = () => {
     return () => { supabase.removeChannel(channel); };
   }, [id, myPlayerId, state?.whitePlayerId, state?.blackPlayerId]);
 
+  // Rehidratación al volver del background (visibilitychange + reconnect).
+  // Resuelve "se quedó pegado" cuando el OS suspendió la pestaña.
+  useEffect(() => {
+    if (!id) return;
+    const refresh = () => {
+      if (document.visibilityState === 'visible') {
+        dataApi.get(id).then(setState).catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('online', refresh);
+    return () => {
+      document.removeEventListener('visibilitychange', refresh);
+      window.removeEventListener('online', refresh);
+    };
+  }, [id]);
+
   // Sonidos en cambios de estado (jugada nueva, inicio, fin).
   useEffect(() => {
     if (!state) return;
