@@ -6,10 +6,10 @@ Guion ordenado y lista de refinamiento previo. Pensado para una demo de
 ## Pre-flight (5 min antes de empezar)
 
 - [ ] `supabase status` muestra todo running. Si no: `supabase start`.
-- [ ] `cd infrastructure && make up` y todos los containers `healthy`.
-- [ ] `curl http://localhost:8080/actuator/health` → 200.
+- [ ] `cd infrastructure && make up` y todos los containers `healthy` (R2 — healthchecks `/actuator/health` activos).
+- [ ] Resetear datos: `make demo-reset` (R18 — preserva los 10 jugadores chilenos seed y 90 aperturas ECO; borra usuarios `*@demo.cl`, sesiones live, games, torneos DRAFT/OPEN). Más rápido y seguro que `make reset && make up`.
+- [ ] Verificar healthchecks: `for p in 8080 8081 8082 8083 8084 8085; do curl -fs http://localhost:$p/actuator/health | grep -q '"UP"' && echo "$p OK" || echo "$p DOWN"; done`.
 - [ ] Abrir Supabase Studio en otra pestaña (`http://127.0.0.1:54323`) — la vamos a usar dos veces.
-- [ ] Resetear datos demo: `make reset && make up` si se quiere arrancar limpio (cuidado: borra todos los registros). Alternativa más suave: borrar a mano los usuarios de prueba previos en Studio → Authentication → Users.
 - [ ] Sonido del laptop ON (sin mute) para que se escuchen los audios de jugada.
 - [ ] Volumen de notificaciones del sistema OFF (para que no aparezca el mailpit popup en pantalla).
 - [ ] Mailpit abierto en otra pestaña (`http://127.0.0.1:54324`) — vamos a mostrar el magic link en vivo.
@@ -33,9 +33,16 @@ Guion ordenado y lista de refinamiento previo. Pensado para una demo de
    - **Opción Y (preferida) — Magic Link**: ingresar `bruno@demo.cl` en la nueva caja "Invitar por email" → click. Mostrar Mailpit recibiendo el correo en tiempo real → click en el link → Bruno entra directo a la partida.
 6. **Jugar 4–6 jugadas**. Resaltar:
    - Sonidos de jugada (move/capture/check) — *"feedback sensorial estándar de plataformas como lichess"*.
-   - Indicador 🟢 al lado del nombre del rival — *"presencia en tiempo real con Supabase Realtime"*.
-   - Latencia entre máquinas: <300 ms.
-7. **Máquina A** rinde (botón "Rendirse" → confirmar).
+   - Header de jugador estilo lichess: nombre · ELO · 🇨🇱 (R7). Si no hay ELO: "Sin rating".
+   - Material capturado y delta debajo de cada jugador (R4) — derivado del FEN client-side.
+   - Indicador 🟢 al lado del nombre del rival + toasts "Rival conectado/desconectado" (R8).
+   - Indicador pulsante "Es tu turno" arriba del board.
+   - Apertura detectada inline (📖 ECO + nombre).
+   - Pre-moves habilitados (R9): mientras esperás al rival, podés encolar tu próxima jugada.
+   - Promoción con picker Q/R/B/N (R10) si llega un peón a la última fila.
+   - Botón ← → para revisar la historia de jugadas (R12) — board read-only en posiciones intermedias.
+   - Botón "🤝 Ofrecer tablas" (R11) — broadcast Realtime, modal en el rival, cierre `1/2-1/2` por acuerdo.
+7. **Máquina A** rinde (botón "Rendirse" → confirmar) — modal de fin con resultado grande y CTA "Revancha".
 8. **Mostrar persistencia**:
    - Studio → Database → tabla `game` → última fila tiene `result=0-1`, `pgn_url=storage://...`.
    - Studio → Storage → `chessquery-pgn` → archivo `games/2026/05/{id}.pgn` descargable.
@@ -49,7 +56,7 @@ Guion ordenado y lista de refinamiento previo. Pensado para una demo de
 
 **Duración**: ~5 min. **Mensaje**: "el rol ORGANIZER tiene un panel separado y el ciclo torneo→inscripción→ronda funciona end-to-end".
 
-> **REQUIERE FIX P0 ANTES DE LA DEMO**: hoy `POST /api/organizer/tournaments` falla con `400 INVALID_PARAMETER` porque el gateway propaga la UUID de Supabase en `X-User-Id` en vez del `player.id` numérico que ms-tournament espera. Sin este fix, el flujo se cae al crear el torneo.
+> **R1 resuelto**: el `SupabaseJwtAuthFilter` ya resuelve UUID Supabase → `player.id` numérico vía `PlayerIdResolver` con caché Caffeine (TTL 5 min, max 10k entradas). Si MS-Users no responde tras 1 retry, devuelve `503 USER_NOT_RESOLVED`.
 
 ### Pasos
 
@@ -119,34 +126,43 @@ Guion ordenado y lista de refinamiento previo. Pensado para una demo de
 
 ## Lista de refinamiento (orden de prioridad para la demo)
 
-### P0 — bloqueantes
+### Estado al 2026-05-08 (después de la rama `feat/pre-demo-refinement`)
 
-- [ ] **Fix X-User-Id en gateway**: resolver supabase_user_id → player.id en `SupabaseJwtAuthFilter` y propagar el id numérico. Sin esto el flujo 2 NO corre.
-- [ ] **Reset script para datos demo**: un `make demo-reset` que borre los users de prueba dejando los seed chilenos. Hoy `make reset` borra todo y hay que esperar el re-seed.
-- [ ] **Probar flujos 1 y 2 de punta a punta una vez en serio**, cronometrando, en un setup limpio. Detectar fricciones de UX antes de que las descubra el evaluador.
+**Hecho ✅**
 
-### P1 — fuerte mejora visual / narrativa
+- [x] R1 — `X-User-Id` resolución UUID Supabase → `player.id` en gateway con caché Caffeine.
+- [x] R2 — healthchecks `/actuator/health` en api-gateway + 5 microservicios Java.
+- [x] R4 — material capturado + delta visual debajo de cada jugador.
+- [x] R6 — `lichessUsername` y `clubName` persisten desde el Register vía webhook → MS-Users.
+- [x] R7 — header estilo lichess: nombre · ELO · 🇨🇱.
+- [x] R8 — toast queue para eventos Realtime.
+- [x] R9 — pre-moves habilitados.
+- [x] R10 — picker Q/R/B/N para promoción.
+- [x] R11 — oferta/aceptación de tablas (broadcast Realtime + endpoint `/games/live/{id}/draw`).
+- [x] R12 — navegación ← → por historial.
+- [x] R13 — `make build` (--no-cache) + `make up` con build incremental.
+- [x] R14 — `.env.example` limpio.
+- [x] R15 — `init-minio.sh` borrado.
+- [x] R16 — Flyway `validate-on-migrate=false` en ms-game perfil dev.
+- [x] R17 — `LiveGameServiceTest` (3 casos: full flow + PGN bien formado, move ilegal → 400, fuera de turno → 403).
+- [x] R18 — `make demo-reset` + `scripts/demo-reset.sh`.
 
-- [ ] Reloj funcional (`clock_white_ms` / `clock_black_ms` ya existen en backend, falta tick + decremento).
-- [ ] Sonido check ya está; agregar sonido de mate (reusar `notify` está OK pero un mate específico mejora).
-- [ ] Persistir `lichessUsername` y `club` del Register (hoy se capturan en el form pero no se mandan al endpoint update Player).
-- [ ] Pulido visual de la card "Invitar por email" — confirmar que el feedback ✓ Enviado dura suficiente y el error de email inválido es legible.
+**Pendiente — P1**
 
-### P2 — quality-of-life si sobra tiempo
+- [ ] R5 — reloj funcional (tick 100ms, sync server, time-out → resultado al rival). ~3h.
 
-- [ ] Pre-moves (`chessground premovable.enabled=true`).
-- [ ] Under-promotion UI (hoy fuerza dama).
-- [ ] Oferta/aceptación de tablas.
-- [ ] SSO entre chess-portal y organizer-panel (hoy hay que loguearse en cada una). Para la demo se puede tapar con dos pestañas privadas distintas y un email distinto por rol.
+**Pendiente — investigación / verificación**
 
-### P3 — post-demo
+- [ ] R3 — magic link LAN IP (workaround: demo desde desktop).
+- [ ] R19 — dry-run cronometrado, dos pestañas, setup limpio.
+- [ ] R20 — verificar flujos sugeridos (torneo end-to-end, standings + ELO, búsqueda fuzzy, circuit breaker MS-Users).
 
-- [ ] Healthchecks de los servicios Java en docker-compose.
-- [ ] `make build` o `make up --build` en el Makefile (hoy `make up` levanta imágenes stale si cambió el código).
-- [ ] Limpiar `.env.example` (S3_*, MINIO_*, AUTH_DB_URL — todos servicios removidos).
-- [ ] Borrar `infrastructure/scripts/init-minio.sh` (no se ejecuta).
-- [ ] `spring.flyway.validate-on-migrate=false` en ms-game perfil dev.
-- [ ] Reactivar MS-Notifications con UI inbox.
+**Post-demo / opcional**
+
+- [ ] N1 — inbox de notificaciones (campana 🔔 con MS-Notifications real).
+- [ ] N2 — email transaccional al cierre de partida (Mailpit + plantilla).
+- [ ] N3 — presencia de espectadores ("👁 N viendo").
+- [ ] SSO entre chess-portal y organizer-panel.
 
 ---
 
@@ -165,5 +181,8 @@ Guion ordenado y lista de refinamiento previo. Pensado para una demo de
 | Magic link no llega | Volver a "copiar URL y pegar". Mostrar Mailpit como evidencia técnica de que el envío salió pero al evaluador le da igual. |
 | Tablero se queda pegado | Refrescar la pestaña. La rehidratación al `visibilitychange` lo trae de vuelta sin perder estado. |
 | Container crashea | `docker compose restart <servicio>` — los datos están en volumes, no se pierde nada. Tener este comando en el portapapeles. |
+| Healthcheck dice unhealthy en algún ms | `make ps` para ver cuál; `docker logs chessquery_<svc>` para diagnosticar; `docker compose restart <svc>` resuelve la mayoría de los casos. |
+| Gateway responde 503 USER_NOT_RESOLVED | Race entre el JWT de Supabase y el consumer del webhook user.registered. Esperar 1s y retry; si persiste, recrear el usuario en Studio. |
+| Modal de promoción no aparece | Verificar versión publicada del frontend (R10 pide modal Q/R/B/N). Plan B: avisar y promocionar a dama "como en la práctica". |
 | Supabase Studio no carga | Es secundario; los datos se pueden mostrar via `psql` directo a `localhost:5433` (user_db) o vía las APIs REST. |
 | Crash total y ya pasaron 3 min | Saltar al punto narrativo: enseñar el repo en GitHub, los commits recientes, la arquitectura del CONTEXT.md. La demo en vivo no es lo único que se evalúa. |

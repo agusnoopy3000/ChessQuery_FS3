@@ -48,6 +48,12 @@ public class LiveGameController {
         return live.resign(id, req);
     }
 
+    @Operation(summary = "Cerrar la partida en tablas por acuerdo mutuo (R11)")
+    @PostMapping("/{id}/draw")
+    public LiveGameResponse draw(@PathVariable Long id, @Valid @RequestBody ResignRequest req) {
+        return live.drawAgreement(id, req);
+    }
+
     @Operation(summary = "Revancha — crea nueva sesión con colores invertidos (status WAITING)")
     @PostMapping("/{id}/rematch")
     @ResponseStatus(HttpStatus.CREATED)

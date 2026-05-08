@@ -116,6 +116,12 @@ export class PlayerController {
     return this.playerService.resignLiveGame(userId, id);
   }
 
+  @Post('play/live/:id/draw')
+  async drawLive(@Req() req: Request, @Param('id') id: string) {
+    const userId = getUserId(req);
+    return this.playerService.drawLiveGame(userId, id);
+  }
+
   @Post('play/live/:id/rematch')
   async rematchLive(@Req() req: Request, @Param('id') id: string) {
     const userId = getUserId(req);

@@ -67,6 +67,8 @@ const dataApi = {
     api.post<LiveGameState>(`/api/player/play/live/${id}/move`, { uci }).then((r) => r.data),
   resign: (id: string) =>
     api.post<LiveGameState>(`/api/player/play/live/${id}/resign`).then((r) => r.data),
+  draw: (id: string) =>
+    api.post<LiveGameState>(`/api/player/play/live/${id}/draw`).then((r) => r.data),
   rematch: (id: string) =>
     api.post<LiveGameState>(`/api/player/play/live/${id}/rematch`).then((r) => r.data),
 };
@@ -77,6 +79,7 @@ export const LiveGamePage = () => {
   const { user } = useAuth();
   const cgRef = useRef<HTMLDivElement>(null);
   const cgApi = useRef<CgApi | null>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const [state, setState] = useState<LiveGameState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -86,6 +89,9 @@ export const LiveGamePage = () => {
   const [whiteProfile, setWhiteProfile] = useState<Player | null>(null);
   const [blackProfile, setBlackProfile] = useState<Player | null>(null);
   const [toasts, setToasts] = useState<{ id: number; text: string }[]>([]);
+  const [promotionPick, setPromotionPick] = useState<{ orig: Key; dest: Key } | null>(null);
+  const [viewIndex, setViewIndex] = useState<number | null>(null); // null = posición actual
+  const [drawOfferState, setDrawOfferState] = useState<'idle' | 'sent' | 'received'>('idle');
   const [confirmingResign, setConfirmingResign] = useState(false);
   const [copied, setCopied] = useState(false);
   const lastMoveCountRef = useRef(0);
@@ -190,15 +196,25 @@ export const LiveGamePage = () => {
         const newId = (payload as { newSessionId?: number })?.newSessionId;
         if (typeof newId === 'number') setRematchSessionId(newId);
       })
+      // R11: oferta de tablas — broadcast Realtime entre los dos jugadores.
+      .on('broadcast', { event: 'draw.offered' }, () => {
+        setDrawOfferState('received');
+        pushToast('Tu rival ofrece tablas');
+      })
+      .on('broadcast', { event: 'draw.rejected' }, () => {
+        setDrawOfferState('idle');
+        pushToast('Tu rival rechazó las tablas');
+      })
       .on('presence', { event: 'sync' }, refreshOpponent)
       .on('presence', { event: 'join' }, refreshOpponent)
       .on('presence', { event: 'leave' }, refreshOpponent)
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED' && myPlayerId != null) {
+          channelRef.current = channel;
           await channel.track({ playerId: myPlayerId, online_at: new Date().toISOString() });
         }
       });
-    return () => { supabase.removeChannel(channel); };
+    return () => { channelRef.current = null; supabase.removeChannel(channel); };
   }, [id, myPlayerId, state?.whitePlayerId, state?.blackPlayerId]);
 
   // Rehidratación al volver del background (visibilitychange + reconnect).
@@ -249,23 +265,35 @@ export const LiveGamePage = () => {
     dataApi.join(id).then(setState).catch((e) => setError(message(e)));
   }, [id, state, user]);
 
+  // FEN a renderizar: posición actual o histórica (R12).
+  const viewedFen = useMemo(() => {
+    if (!state) return null;
+    if (viewIndex == null) return state.currentFen;
+    if (viewIndex < 0 || viewIndex >= state.moves.length) return state.currentFen;
+    return state.moves[viewIndex].fenAfter;
+  }, [state, viewIndex]);
+  const isReviewing = viewIndex != null && state != null && viewIndex < state.moves.length - 1;
+
   // Render del tablero
   useEffect(() => {
-    if (!cgRef.current || !state) return;
+    if (!cgRef.current || !state || viewedFen == null) return;
 
-    const chess = chessFromFen(state.currentFen);
+    const chess = chessFromFen(viewedFen);
     const dests = chess ? chessgroundDests(chess) : new Map();
     const turnColor: 'white' | 'black' = state.turn === 'w' ? 'white' : 'black';
-    const isMyTurn = myColor !== null && turnColor === myColor && state.status === 'ACTIVE';
+    const isMyTurn = myColor !== null && turnColor === myColor && state.status === 'ACTIVE' && !isReviewing;
+    // Pre-move habilitado cuando es la partida en vivo y hay rival (R9).
+    const allowPremove = myColor !== null && state.status === 'ACTIVE' && !isReviewing && !isMyTurn;
 
     const config: CgConfig = {
-      fen: state.currentFen,
+      fen: viewedFen,
       turnColor,
       orientation: myColor ?? 'white',
       check: chess?.isCheck() ? turnColor : undefined,
+      viewOnly: isReviewing,
       movable: {
         free: false,
-        color: isMyTurn ? myColor! : undefined,
+        color: isMyTurn ? myColor! : (allowPremove ? myColor! : undefined),
         dests: isMyTurn ? dests : new Map(),
         showDests: true,
         events: {
@@ -274,8 +302,19 @@ export const LiveGamePage = () => {
           },
         },
       },
-      premovable: { enabled: false },
-      draggable: { enabled: isMyTurn },
+      premovable: {
+        enabled: allowPremove,
+        showDests: true,
+        events: {
+          set: (orig, dest) => {
+            // R9: solo registramos; chessground reproduce el premove
+            // automáticamente cuando el turno vuelve y dispara movable.events.after.
+            void orig; void dest;
+          },
+          unset: () => { /* premove cancelado */ },
+        },
+      },
+      draggable: { enabled: isMyTurn || allowPremove },
       animation: { enabled: true, duration: 200 },
       highlight: { lastMove: true, check: true },
     };
@@ -285,16 +324,21 @@ export const LiveGamePage = () => {
     } else {
       cgApi.current = Chessground(cgRef.current, config);
     }
-  }, [state, myColor]);
+  }, [state, myColor, viewedFen, isReviewing]);
 
   // Cleanup chessground al desmontar
   useEffect(() => () => { cgApi.current?.destroy?.(); cgApi.current = null; }, []);
 
   const handleMove = async (orig: Key, dest: Key, chess: Chess | null) => {
     if (!id || !chess || !state) return;
-    let uci = `${orig}${dest}`;
-    const movePromotion = inferPromotion(orig, dest, chess);
-    if (movePromotion) uci += movePromotion;
+    // R10: si la jugada es promoción de peón, abrir picker en vez de forzar Q.
+    if (isPromotionMove(orig, dest, chess)) {
+      setPromotionPick({ orig, dest });
+      // Revertimos visualmente: el modal se encarga de mandar el move final.
+      cgApi.current?.set({ fen: state.currentFen });
+      return;
+    }
+    const uci = `${orig}${dest}`;
 
     // Optimistic UI: aplicamos la jugada localmente con chessops antes de
     // que el backend confirme. Si rechaza, revertimos al FEN previo.
@@ -313,6 +357,54 @@ export const LiveGamePage = () => {
       }
     } catch { /* errores client-side los maneja el server */ }
 
+    setBusy(true);
+    try {
+      const next = await dataApi.move(id, uci);
+      setState(next);
+    } catch (e) {
+      setError(message(e));
+      cgApi.current?.set({ fen: fenBeforeMove });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // R11: oferta/aceptación de tablas vía Realtime broadcast.
+  const offerDraw = () => {
+    if (!channelRef.current) return;
+    channelRef.current.send({ type: 'broadcast', event: 'draw.offered', payload: {} });
+    setDrawOfferState('sent');
+    pushToast('Oferta de tablas enviada');
+  };
+  const acceptDraw = async () => {
+    if (!id) return;
+    if (channelRef.current) {
+      channelRef.current.send({ type: 'broadcast', event: 'game.finished', payload: {} });
+    }
+    setDrawOfferState('idle');
+    setBusy(true);
+    try {
+      const next = await dataApi.draw(id);
+      setState(next);
+    } catch (e) {
+      setError(message(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const rejectDraw = () => {
+    if (!channelRef.current) return;
+    channelRef.current.send({ type: 'broadcast', event: 'draw.rejected', payload: {} });
+    setDrawOfferState('idle');
+  };
+
+  // R10: el modal de promoción usa este helper para enviar la jugada con
+  // la pieza elegida. Mantiene el optimismo visual usando el FEN actual.
+  const submitPromotion = async (piece: 'q' | 'r' | 'b' | 'n') => {
+    if (!id || !state || !promotionPick) return;
+    const uci = `${promotionPick.orig}${promotionPick.dest}${piece}`;
+    setPromotionPick(null);
+    const fenBeforeMove = state.currentFen;
     setBusy(true);
     try {
       const next = await dataApi.move(id, uci);
@@ -450,14 +542,63 @@ export const LiveGamePage = () => {
         />
 
         {state.status === 'ACTIVE' && myColor && (
-          <Button
-            onClick={handleResign}
-            disabled={busy}
-            variant="danger"
-            style={{ marginTop: 8 }}
-          >
-            {confirmingResign ? '¿Seguro? Click para confirmar' : 'Rendirse'}
-          </Button>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <Button
+              onClick={handleResign}
+              disabled={busy}
+              variant="danger"
+            >
+              {confirmingResign ? '¿Seguro? Click para confirmar' : 'Rendirse'}
+            </Button>
+            <Button
+              onClick={offerDraw}
+              disabled={busy || drawOfferState === 'sent'}
+              variant="secondary"
+              title="Ofrecer tablas al rival"
+            >
+              {drawOfferState === 'sent' ? '🤝 Oferta enviada' : '🤝 Ofrecer tablas'}
+            </Button>
+          </div>
+        )}
+
+        {/* R12: navegación por historial */}
+        {state.moves.length > 0 && (
+          <div style={{ display: 'flex', gap: 6, marginTop: 8, alignItems: 'center', fontSize: 12, color: 'var(--text-muted)' }}>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setViewIndex((i) => {
+                const cur = i ?? state.moves.length - 1;
+                return Math.max(-1, cur - 1);
+              })}
+              disabled={viewIndex !== null && viewIndex <= -1}
+              title="Jugada anterior"
+            >←</Button>
+            <span>
+              {viewIndex == null
+                ? `Jugada ${state.moves.length}/${state.moves.length}`
+                : viewIndex < 0
+                  ? `Inicial / ${state.moves.length}`
+                  : `Jugada ${viewIndex + 1}/${state.moves.length}`}
+            </span>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setViewIndex((i) => {
+                if (i == null) return null;
+                const next = i + 1;
+                if (next >= state.moves.length - 1) return null; // volver al "actual"
+                return next;
+              })}
+              disabled={viewIndex == null}
+              title="Jugada siguiente"
+            >→</Button>
+            {viewIndex != null && (
+              <Button size="sm" variant="ghost" onClick={() => setViewIndex(null)}>
+                Volver al actual
+              </Button>
+            )}
+          </div>
         )}
       </div>
 
@@ -622,6 +763,47 @@ export const LiveGamePage = () => {
         )}
       </Card>
 
+      {/* R10: modal under-promotion picker */}
+      {promotionPick && myColor && (
+        <PromotionPicker
+          color={myColor}
+          onPick={submitPromotion}
+          onCancel={() => {
+            setPromotionPick(null);
+            // Restauramos el board al FEN actual para que el usuario pueda reintentar.
+            cgApi.current?.set({ fen: state.currentFen });
+          }}
+        />
+      )}
+
+      {/* R11: modal oferta de tablas recibida */}
+      {drawOfferState === 'received' && state.status === 'ACTIVE' && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1050, background: 'rgba(0,0,0,0.55)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--surface, #1c1f1a)', border: '1px solid var(--border, #2a2d27)',
+              borderRadius: 12, padding: '24px 24px', maxWidth: 360, width: '100%', textAlign: 'center',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+            }}
+          >
+            <div style={{ fontSize: 40, marginBottom: 8 }}>🤝</div>
+            <h2 style={{ margin: '0 0 8px', fontSize: 20 }}>Tu rival ofrece tablas</h2>
+            <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--text-muted)' }}>
+              Si aceptas, la partida termina en 1/2-1/2.
+            </p>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+              <Button variant="primary" onClick={acceptDraw} disabled={busy}>Aceptar tablas</Button>
+              <Button variant="ghost" onClick={rejectDraw} disabled={busy}>Rechazar</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal fin de partida — overlay con resultado y CTAs */}
       {state.status === 'FINISHED' && (
         <GameOverModal
@@ -652,6 +834,57 @@ export const LiveGamePage = () => {
           rematchCreating={rematchCreating}
         />
       )}
+    </div>
+  );
+};
+
+interface PromotionPickerProps {
+  color: 'white' | 'black';
+  onPick: (piece: 'q' | 'r' | 'b' | 'n') => void;
+  onCancel: () => void;
+}
+
+const PromotionPicker = ({ color, onPick, onCancel }: PromotionPickerProps) => {
+  const symbols: Record<'q' | 'r' | 'b' | 'n', string> = color === 'white'
+    ? { q: '♕', r: '♖', b: '♗', n: '♘' }
+    : { q: '♛', r: '♜', b: '♝', n: '♞' };
+  const labels: Record<'q' | 'r' | 'b' | 'n', string> = { q: 'Reina', r: 'Torre', b: 'Alfil', n: 'Caballo' };
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,0.55)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+      }}
+      onClick={onCancel}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'var(--surface, #1c1f1a)', border: '1px solid var(--border, #2a2d27)',
+          borderRadius: 12, padding: 20, maxWidth: 320, width: '100%', textAlign: 'center',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+        }}
+      >
+        <h3 style={{ margin: '0 0 12px', fontSize: 16 }}>Elegí pieza para promocionar</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+          {(['q', 'r', 'b', 'n'] as const).map((p) => (
+            <button
+              key={p}
+              onClick={() => onPick(p)}
+              autoFocus={p === 'q'}
+              style={{
+                background: p === 'q' ? 'rgba(106,191,116,0.18)' : 'var(--surface-2, #15171a)',
+                border: `1px solid ${p === 'q' ? 'rgba(106,191,116,0.5)' : 'var(--border, #2a2d27)'}`,
+                borderRadius: 10, padding: '14px 0', cursor: 'pointer',
+                fontSize: 32, lineHeight: 1, color: 'var(--text, #e8ead4)',
+              }}
+              title={labels[p]}
+            >
+              {symbols[p]}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 };
@@ -801,18 +1034,13 @@ function chessFromFen(fen: string): Chess | null {
   return pos.isErr ? null : pos.value;
 }
 
-function inferPromotion(orig: Key, dest: Key, chess: Chess): string | null {
-  // Si la pieza en orig es peón y dest está en la última fila → promoción default Q.
-  // V1 no permite under-promotion; el usuario puede pedirlo después.
+function isPromotionMove(orig: Key, dest: Key, chess: Chess): boolean {
   const fromSq = parseSquare(orig);
-  if (fromSq === undefined) return null;
+  if (fromSq === undefined) return false;
   const piece = chess.board.get(fromSq);
-  if (!piece || piece.role !== 'pawn') return null;
+  if (!piece || piece.role !== 'pawn') return false;
   const destRank = parseInt(dest[1], 10);
-  if ((piece.color === 'white' && destRank === 8) || (piece.color === 'black' && destRank === 1)) {
-    return 'q';
-  }
-  return null;
+  return (piece.color === 'white' && destRank === 8) || (piece.color === 'black' && destRank === 1);
 }
 
 function groupMoves(moves: LiveMove[]): { white: string; black: string | null }[] {

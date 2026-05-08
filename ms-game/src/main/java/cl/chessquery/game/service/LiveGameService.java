@@ -264,6 +264,32 @@ public class LiveGameService {
         return toResponse(s, moveRepo.findBySessionIdOrderByCreatedAtAsc(id));
     }
 
+    // ── Draw by agreement (R11) ───────────────────────────────────────────
+
+    /**
+     * Cierra la partida con resultado 1/2-1/2 cuando ambos jugadores acuerdan
+     * tablas. Solo participa quien está jugando; la negociación de la oferta
+     * la hacen los clientes vía Realtime broadcast (draw.offered/accepted/rejected).
+     */
+    @Transactional
+    public LiveGameResponse drawAgreement(Long id, ResignRequest req) {
+        LiveGameSession s = findOrThrow(id);
+        if (s.getStatus() != SessionStatus.ACTIVE) {
+            throw new ApiException(409, "SESSION_NOT_ACTIVE",
+                    "La sesión no está activa");
+        }
+        if (!req.playerId().equals(s.getWhitePlayerId())
+                && !req.playerId().equals(s.getBlackPlayerId())) {
+            throw new ApiException(403, "NOT_A_PLAYER",
+                    "El jugador " + req.playerId() + " no participa en esta partida");
+        }
+        Instant now = Instant.now();
+        finishSession(s, "1/2-1/2", "DRAW_AGREEMENT", now);
+        sessionRepo.save(s);
+        broadcastFinished(s);
+        return toResponse(s, moveRepo.findBySessionIdOrderByCreatedAtAsc(id));
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────
 
     private LiveGameSession findOrThrow(Long id) {
