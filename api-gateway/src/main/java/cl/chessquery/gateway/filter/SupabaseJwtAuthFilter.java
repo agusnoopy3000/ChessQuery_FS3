@@ -44,6 +44,11 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 
 /**
  * Filtro global que valida JWT de Supabase Auth localmente (sin llamadas HTTP externas).
@@ -87,6 +92,19 @@ public class SupabaseJwtAuthFilter implements GlobalFilter, Ordered {
     private final Map<String, Key> jwksCache = new ConcurrentHashMap<>();
     private volatile long jwksFetchedAt = 0L;
     private static final long JWKS_TTL_MS = 5 * 60 * 1000L;
+    /**
+     * Refresh del JWKS en background — NUNCA bloquea el thread reactor que
+     * está procesando el request del usuario. Sin esto, cada 5 min cuando
+     * expira el cache el primer request bloquea el thread NIO durante el
+     * fetch HTTP a Supabase (~500-2500ms en local) y serializa todo lo que
+     * llega en paralelo, disparando timeouts en el cliente.
+     */
+    private final ScheduledExecutorService jwksRefresher =
+            Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "jwks-refresher");
+                t.setDaemon(true);
+                return t;
+            });
 
     private final PlayerIdResolver playerIdResolver;
 
@@ -100,6 +118,18 @@ public class SupabaseJwtAuthFilter implements GlobalFilter, Ordered {
         log.info("SupabaseJwtAuthFilter initialized; jwks={}", jwksUrl);
     }
 
+    @PostConstruct
+    void startJwksRefresh() {
+        // Pre-fetch en startup + refresh cada 4min (un poco antes del TTL).
+        jwksRefresher.submit(this::refreshJwks);
+        jwksRefresher.scheduleAtFixedRate(this::refreshJwks, 4, 4, TimeUnit.MINUTES);
+    }
+
+    @PreDestroy
+    void stopJwksRefresh() {
+        jwksRefresher.shutdownNow();
+    }
+
     /**
      * Locator que selecciona la clave correcta según el header del JWT:
      * - Si tiene `kid` y la encontramos en JWKS → ES256 (Supabase asimétrico).
@@ -110,14 +140,14 @@ public class SupabaseJwtAuthFilter implements GlobalFilter, Ordered {
         String alg = header.getAlgorithm();
         if (kid != null && !kid.isEmpty() && alg != null && alg.startsWith("ES")) {
             Key k = jwksCache.get(kid);
-            if (k == null || isJwksStale()) {
-                refreshJwks();
-                k = jwksCache.get(kid);
+            if (k != null) return k;
+            // Cache miss: disparamos refresh en background (no bloqueante)
+            // y caemos al HMAC fallback para no bloquear el thread del request.
+            // Si el kid es legítimo, la próxima request lo encontrará en cache.
+            if (isJwksStale()) {
+                jwksRefresher.submit(this::refreshJwks);
             }
-            if (k != null) {
-                return k;
-            }
-            log.warn("kid={} not in JWKS cache, falling back to HMAC", kid);
+            log.warn("kid={} not in JWKS cache, falling back to HMAC (refresh disparado en background)", kid);
         }
         return hmacKey;
     }

@@ -24,15 +24,32 @@ export const createSupabaseClient = (url: string, anonKey: string): SupabaseClie
   const storage = typeof window !== 'undefined' && window.sessionStorage
     ? window.sessionStorage
     : undefined;
+
+  // Aislamiento real cross-tab:
+  // - sessionStorage por sí solo NO alcanza, porque supabase-js abre un
+  //   BroadcastChannel cuyo nombre es el storageKey. Si dos tabs comparten
+  //   storageKey, el SIGNED_IN de una propaga el sub/jwt nuevo a la otra
+  //   y pisa la sesión del primer usuario.
+  // - Generamos un storageKey único por pestaña (random) y lo guardamos
+  //   en sessionStorage para que sobreviva reloads de la misma tab.
+  let storageKey = 'chessquery-auth';
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    const existing = window.sessionStorage.getItem('cq-auth-tab-key');
+    if (existing) {
+      storageKey = existing;
+    } else {
+      storageKey = `chessquery-auth-${Math.random().toString(36).slice(2, 10)}`;
+      window.sessionStorage.setItem('cq-auth-tab-key', storageKey);
+    }
+  }
+
   return createClient(url, anonKey, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: false,
       storage,
-      // sessionStorage no dispara `storage` events cross-tab, pero por
-      // las dudas desactivamos cualquier multi-tab sync explícito.
-      storageKey: 'chessquery-auth',
+      storageKey,
     },
   });
 };

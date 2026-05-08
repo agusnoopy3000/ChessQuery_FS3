@@ -36,30 +36,52 @@ export interface CreateSupabaseApiClientOptions {
 
 /**
  * Cliente axios que adjunta el access token de Supabase en cada request.
- * El refresh lo gestiona el propio Supabase Client (autoRefreshToken=true);
- * en caso de 401 invocamos onAuthFailure para que la app redirija a /login.
+ *
+ * IMPORTANTE: cacheamos el token en memoria y lo refrescamos vía
+ * onAuthStateChange en vez de llamar a `supabase.auth.getSession()` en cada
+ * request. El SDK serializa internamente las llamadas a getSession() con
+ * un mutex; con N requests paralelas (live move + polling de notif +
+ * dashboard) eso forma una cola que puede pasar de 10s y disparar el
+ * timeout del cliente.
+ *
+ * El refresh automático lo sigue gestionando el SDK (autoRefreshToken=true);
+ * cuando rota el token recibimos un evento TOKEN_REFRESHED y actualizamos
+ * el cache.
+ *
+ * En 401 NO hacemos signOut automático (era demasiado agresivo —
+ * cualquier 401 transitorio cerraba la sesión completa). Solo notificamos
+ * a la app vía onAuthFailure si está suscrita.
  */
 export const createSupabaseApiClient = ({
   baseURL,
   supabase,
   onAuthFailure,
 }: CreateSupabaseApiClientOptions): AxiosInstance => {
-  const client = axios.create({ baseURL, timeout: 10000 });
+  const client = axios.create({ baseURL, timeout: 20000 });
 
-  client.interceptors.request.use(async (config) => {
-    const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
-    if (token) {
-      config.headers.set('Authorization', `Bearer ${token}`);
+  let cachedToken: string | null = null;
+
+  // Inicializar cache con la sesión actual (si existe).
+  void supabase.auth.getSession().then(({ data }) => {
+    cachedToken = data.session?.access_token ?? null;
+  });
+
+  // Mantener cache actualizado con cualquier cambio de auth state.
+  supabase.auth.onAuthStateChange((_event, session) => {
+    cachedToken = session?.access_token ?? null;
+  });
+
+  client.interceptors.request.use((config) => {
+    if (cachedToken) {
+      config.headers.set('Authorization', `Bearer ${cachedToken}`);
     }
     return config;
   });
 
   client.interceptors.response.use(
     (r) => r,
-    async (error) => {
+    (error) => {
       if (error.response?.status === 401) {
-        await supabase.auth.signOut();
         onAuthFailure?.();
       }
       throw error;
