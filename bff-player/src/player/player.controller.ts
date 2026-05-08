@@ -122,6 +122,12 @@ export class PlayerController {
     return this.playerService.drawLiveGame(userId, id);
   }
 
+  @Post('play/live/:id/timeout')
+  async timeoutLive(@Req() req: Request, @Param('id') id: string) {
+    const userId = getUserId(req);
+    return this.playerService.timeoutLiveGame(userId, id);
+  }
+
   @Post('play/live/:id/rematch')
   async rematchLive(@Req() req: Request, @Param('id') id: string) {
     const userId = getUserId(req);

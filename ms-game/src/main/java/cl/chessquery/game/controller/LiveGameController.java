@@ -54,6 +54,12 @@ public class LiveGameController {
         return live.drawAgreement(id, req);
     }
 
+    @Operation(summary = "Reportar pérdida por tiempo (R5) — el oponente gana")
+    @PostMapping("/{id}/timeout")
+    public LiveGameResponse timeout(@PathVariable Long id, @Valid @RequestBody ResignRequest req) {
+        return live.timeout(id, req);
+    }
+
     @Operation(summary = "Revancha — crea nueva sesión con colores invertidos (status WAITING)")
     @PostMapping("/{id}/rematch")
     @ResponseStatus(HttpStatus.CREATED)

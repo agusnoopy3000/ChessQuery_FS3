@@ -57,18 +57,25 @@ interface LiveGameState {
   finishedAt: string | null;
   detectedOpeningEco: string | null;
   detectedOpeningName: string | null;
+  timeControlInitialMs?: number | null;
+  timeControlIncrementMs?: number | null;
+  clockWhiteMs?: number | null;
+  clockBlackMs?: number | null;
+  lastMoveAt?: string | null;
 }
 
 const dataApi = {
   get: (id: string) => api.get<LiveGameState>(`/api/player/play/live/${id}`).then((r) => r.data),
   join: (id: string, eloBefore?: number) =>
     api.post<LiveGameState>(`/api/player/play/live/${id}/join`, { eloBefore }).then((r) => r.data),
-  move: (id: string, uci: string) =>
-    api.post<LiveGameState>(`/api/player/play/live/${id}/move`, { uci }).then((r) => r.data),
+  move: (id: string, uci: string, clocks?: { clockWhiteMs?: number; clockBlackMs?: number }) =>
+    api.post<LiveGameState>(`/api/player/play/live/${id}/move`, { uci, ...(clocks ?? {}) }).then((r) => r.data),
   resign: (id: string) =>
     api.post<LiveGameState>(`/api/player/play/live/${id}/resign`).then((r) => r.data),
   draw: (id: string) =>
     api.post<LiveGameState>(`/api/player/play/live/${id}/draw`).then((r) => r.data),
+  timeout: (id: string) =>
+    api.post<LiveGameState>(`/api/player/play/live/${id}/timeout`).then((r) => r.data),
   rematch: (id: string) =>
     api.post<LiveGameState>(`/api/player/play/live/${id}/rematch`).then((r) => r.data),
 };
@@ -92,6 +99,12 @@ export const LiveGamePage = () => {
   const [promotionPick, setPromotionPick] = useState<{ orig: Key; dest: Key } | null>(null);
   const [viewIndex, setViewIndex] = useState<number | null>(null); // null = posición actual
   const [drawOfferState, setDrawOfferState] = useState<'idle' | 'sent' | 'received'>('idle');
+  // R5: relojes locales en ms; null = sin time control. Se sincronizan con
+  // el server cada vez que llega un nuevo state (lo que también incluye
+  // moves del rival), corrigiendo drift.
+  const [clockWhiteMs, setClockWhiteMs] = useState<number | null>(null);
+  const [clockBlackMs, setClockBlackMs] = useState<number | null>(null);
+  const timeoutFiredRef = useRef(false);
   const [confirmingResign, setConfirmingResign] = useState(false);
   const [copied, setCopied] = useState(false);
   const lastMoveCountRef = useRef(0);
@@ -130,6 +143,36 @@ export const LiveGamePage = () => {
     return () => { cancelled = true; };
   }, [state?.whitePlayerId, state?.blackPlayerId]);
 
+  // R5: sincronizar relojes desde el server cada vez que el state cambia.
+  // Cuando el server confirma un move, manda los clocks autoritativos; el
+  // tick local sólo decrementa entre confirmaciones (anti-drift).
+  useEffect(() => {
+    if (!state) return;
+    if (state.timeControlInitialMs == null) {
+      setClockWhiteMs(null);
+      setClockBlackMs(null);
+      return;
+    }
+    setClockWhiteMs(state.clockWhiteMs ?? state.timeControlInitialMs);
+    setClockBlackMs(state.clockBlackMs ?? state.timeControlInitialMs);
+    timeoutFiredRef.current = false;
+  }, [state?.id, state?.moves.length, state?.status]);
+
+  // R5: tick local cada 100ms del lado al que le toca jugar.
+  useEffect(() => {
+    if (!state || state.status !== 'ACTIVE') return;
+    if (state.timeControlInitialMs == null) return;
+    const tickMs = 100;
+    const interval = setInterval(() => {
+      if (state.turn === 'w') {
+        setClockWhiteMs((c) => (c == null ? c : Math.max(0, c - tickMs)));
+      } else {
+        setClockBlackMs((c) => (c == null ? c : Math.max(0, c - tickMs)));
+      }
+    }, tickMs);
+    return () => clearInterval(interval);
+  }, [state?.id, state?.turn, state?.status]);
+
   // Toast queue — autodismiss en 3s, una sola visible a la vez.
   const pushToast = (text: string) => {
     setToasts((prev) => [...prev, { id: Date.now() + Math.random(), text }]);
@@ -147,6 +190,18 @@ export const LiveGamePage = () => {
     if (myPlayerId === state.blackPlayerId) return 'black';
     return null;
   }, [state, myPlayerId]);
+
+  // R5: cuando MI reloj llega a 0, notifico al server. El otro lado lo verá
+  // por broadcast game.finished. Single-fire guard para evitar spam.
+  useEffect(() => {
+    if (!id || !state || state.status !== 'ACTIVE' || !myColor) return;
+    if (timeoutFiredRef.current) return;
+    const myClock = myColor === 'white' ? clockWhiteMs : clockBlackMs;
+    if (myClock != null && myClock <= 0) {
+      timeoutFiredRef.current = true;
+      dataApi.timeout(id).then(setState).catch((e) => setError(message(e)));
+    }
+  }, [id, state, myColor, clockWhiteMs, clockBlackMs]);
 
   // Carga inicial
   useEffect(() => {
@@ -359,7 +414,7 @@ export const LiveGamePage = () => {
 
     setBusy(true);
     try {
-      const next = await dataApi.move(id, uci);
+      const next = await dataApi.move(id, uci, clockPayload());
       setState(next);
     } catch (e) {
       setError(message(e));
@@ -367,6 +422,12 @@ export const LiveGamePage = () => {
     } finally {
       setBusy(false);
     }
+  };
+
+  // R5: payload de relojes que mandamos con cada move (null si sin TC).
+  const clockPayload = (): { clockWhiteMs?: number; clockBlackMs?: number } | undefined => {
+    if (clockWhiteMs == null || clockBlackMs == null) return undefined;
+    return { clockWhiteMs, clockBlackMs };
   };
 
   // R11: oferta/aceptación de tablas vía Realtime broadcast.
@@ -407,7 +468,7 @@ export const LiveGamePage = () => {
     const fenBeforeMove = state.currentFen;
     setBusy(true);
     try {
-      const next = await dataApi.move(id, uci);
+      const next = await dataApi.move(id, uci, clockPayload());
       setState(next);
     } catch (e) {
       setError(message(e));
@@ -458,6 +519,13 @@ export const LiveGamePage = () => {
   const bottomCaptured = myColor === 'black' ? material.capturedByBlack : material.capturedByWhite;
   const topDelta = myColor === 'black' ? material.delta : -material.delta;
   const bottomDelta = -topDelta;
+
+  // R5: clocks ya orientados a top/bottom según el color del usuario.
+  const topClockMs = myColor === 'black' ? clockWhiteMs : clockBlackMs;
+  const bottomClockMs = myColor === 'black' ? clockBlackMs : clockWhiteMs;
+  const topActive = state.status === 'ACTIVE'
+    && ((myColor === 'black' && state.turn === 'w') || (myColor !== 'black' && state.turn === 'b'));
+  const bottomActive = state.status === 'ACTIVE' && !topActive;
 
   return (
     <div className="page-shell cq-live-grid">
@@ -512,15 +580,18 @@ export const LiveGamePage = () => {
           .cq-turn-theirs .cq-turn-dot { background: #777; }
         `}</style>
 
-        <PlayerHeaderRow
-          name={topName}
-          profile={topProfile}
-          colorIcon={myColor === 'black' ? '⚪' : '⚫'}
-          showPresence={!!myColor && state.status === 'ACTIVE'}
-          online={opponentOnline}
-          captured={topCaptured}
-          delta={topDelta}
-        />
+        <div style={{ alignSelf: 'stretch', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 8 }}>
+          <PlayerHeaderRow
+            name={topName}
+            profile={topProfile}
+            colorIcon={myColor === 'black' ? '⚪' : '⚫'}
+            showPresence={!!myColor && state.status === 'ACTIVE'}
+            online={opponentOnline}
+            captured={topCaptured}
+            delta={topDelta}
+          />
+          {topClockMs != null && <ClockDisplay ms={topClockMs} active={topActive} />}
+        </div>
 
         {state.status === 'ACTIVE' && myColor && (
           <div className={`cq-turn-banner ${isMyTurn ? 'cq-turn-mine' : 'cq-turn-theirs'}`}>
@@ -531,15 +602,18 @@ export const LiveGamePage = () => {
 
         <div ref={cgRef} className="cq-live-board" />
 
-        <PlayerHeaderRow
-          name={`${bottomName}${myColor ? ' (tú)' : ''}`}
-          profile={bottomProfile}
-          colorIcon={myColor === 'black' ? '⚫' : '⚪'}
-          showPresence={false}
-          online={false}
-          captured={bottomCaptured}
-          delta={bottomDelta}
-        />
+        <div style={{ alignSelf: 'stretch', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 8 }}>
+          <PlayerHeaderRow
+            name={`${bottomName}${myColor ? ' (tú)' : ''}`}
+            profile={bottomProfile}
+            colorIcon={myColor === 'black' ? '⚫' : '⚪'}
+            showPresence={false}
+            online={false}
+            captured={bottomCaptured}
+            delta={bottomDelta}
+          />
+          {bottomClockMs != null && <ClockDisplay ms={bottomClockMs} active={bottomActive} />}
+        </div>
 
         {state.status === 'ACTIVE' && myColor && (
           <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -838,6 +912,44 @@ export const LiveGamePage = () => {
   );
 };
 
+interface ClockDisplayProps {
+  ms: number;
+  active: boolean;
+}
+
+const formatClock = (ms: number): string => {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  if (ms < 10_000) {
+    const tenths = Math.floor((Math.max(0, ms) % 1000) / 100);
+    return `${m}:${s.toString().padStart(2, '0')}.${tenths}`;
+  }
+  return `${m}:${s.toString().padStart(2, '0')}`;
+};
+
+const ClockDisplay = ({ ms, active }: ClockDisplayProps) => {
+  const low = ms < 10_000;
+  return (
+    <div
+      style={{
+        fontFamily: 'Space Mono, monospace',
+        fontSize: 18,
+        fontWeight: 700,
+        padding: '4px 10px',
+        borderRadius: 6,
+        minWidth: 76,
+        textAlign: 'center',
+        background: active ? (low ? 'rgba(224,90,90,0.18)' : 'rgba(106,191,116,0.18)') : 'var(--surface-2, #15171a)',
+        border: `1px solid ${active ? (low ? 'rgba(224,90,90,0.5)' : 'rgba(106,191,116,0.4)') : 'var(--border, #2a2d27)'}`,
+        color: low ? '#e05a5a' : 'var(--text, #e8ead4)',
+      }}
+    >
+      {formatClock(ms)}
+    </div>
+  );
+};
+
 interface PromotionPickerProps {
   color: 'white' | 'black';
   onPick: (piece: 'q' | 'r' | 'b' | 'n') => void;
@@ -968,6 +1080,8 @@ const GameOverModal = ({
       case 'DRAW_INSUFFICIENT': return 'Material insuficiente';
       case 'DRAW_REPETITION': return 'Triple repetición';
       case 'DRAW_50MOVE': return 'Regla de 50 movimientos';
+      case 'DRAW_AGREEMENT': return 'Tablas por acuerdo';
+      case 'TIMEOUT': return 'Por tiempo';
       default: return state.endReason ?? '';
     }
   })();

@@ -269,6 +269,14 @@ export class PlayerService {
     });
   }
 
+  async timeoutLiveGame(userId: string, id: string): Promise<unknown> {
+    const { msGame } = this.http.urls;
+    const playerId = await this.resolvePlayerId(userId);
+    return this.http.post<unknown>(`${msGame}/games/live/${id}/timeout`, {
+      playerId,
+    });
+  }
+
   async rematchLiveGame(userId: string, id: string): Promise<unknown> {
     const { msGame } = this.http.urls;
     const playerId = await this.resolvePlayerId(userId);

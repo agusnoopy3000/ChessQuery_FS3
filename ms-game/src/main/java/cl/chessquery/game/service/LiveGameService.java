@@ -264,6 +264,38 @@ public class LiveGameService {
         return toResponse(s, moveRepo.findBySessionIdOrderByCreatedAtAsc(id));
     }
 
+    // ── Timeout / pérdida por tiempo (R5) ─────────────────────────────────
+
+    /**
+     * Cierra la partida cuando el reloj de un jugador llega a 0. El cliente
+     * detecta el time-out y notifica; el servidor registra al oponente como
+     * ganador con endReason TIMEOUT.
+     */
+    @Transactional
+    public LiveGameResponse timeout(Long id, ResignRequest req) {
+        LiveGameSession s = findOrThrow(id);
+        if (s.getStatus() != SessionStatus.ACTIVE) {
+            throw new ApiException(409, "SESSION_NOT_ACTIVE",
+                    "La sesión no está activa");
+        }
+        boolean whiteFlagged = req.playerId().equals(s.getWhitePlayerId());
+        boolean blackFlagged = req.playerId().equals(s.getBlackPlayerId());
+        if (!whiteFlagged && !blackFlagged) {
+            throw new ApiException(403, "NOT_A_PLAYER",
+                    "El jugador " + req.playerId() + " no participa en esta partida");
+        }
+        // El que se quedó sin tiempo pierde; el oponente gana.
+        String result = whiteFlagged ? "0-1" : "1-0";
+        Instant now = Instant.now();
+        // Forzamos el reloj a 0 para reflejar el evento.
+        if (whiteFlagged) s.setClockWhiteMs(0L);
+        else s.setClockBlackMs(0L);
+        finishSession(s, result, "TIMEOUT", now);
+        sessionRepo.save(s);
+        broadcastFinished(s);
+        return toResponse(s, moveRepo.findBySessionIdOrderByCreatedAtAsc(id));
+    }
+
     // ── Draw by agreement (R11) ───────────────────────────────────────────
 
     /**
@@ -412,6 +444,8 @@ public class LiveGameService {
             case "DRAW_INSUFFICIENT" -> "Insufficient material";
             case "DRAW_REPETITION" -> "Threefold repetition";
             case "DRAW_50MOVE" -> "Fifty-move rule";
+            case "DRAW_AGREEMENT" -> "Agreed";
+            case "TIMEOUT" -> "Time forfeit";
             default -> "Unterminated";
         };
     }
