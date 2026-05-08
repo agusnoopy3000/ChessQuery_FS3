@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Role, useAuth } from '@chessquery/shared';
 import { Button, Card, Shell, ShellNavItem } from '@chessquery/ui-lib';
+import { NotificationBell } from './components/NotificationBell';
 import { getDefaultRoute } from './portal-utils';
 import { HomePage } from './pages/Home';
 import { LoginPage } from './pages/Login';
@@ -120,6 +121,8 @@ export const App = () => {
           </Button>
           <Button onClick={() => navigate('/login')}>Iniciar sesión</Button>
         </div>
+      ) : user.role === 'PLAYER' ? (
+        <NotificationBell />
       ) : null}
 
       <Routes>

@@ -40,6 +40,8 @@ public class NotificationService {
 
         mockEmailService.sendEmail(recipientId, email, subject, body);
         saveLog(recipientId, Channel.EMAIL, "user.registered", subject, payload, NotifStatus.SENT);
+        saveLog(recipientId, Channel.IN_APP, "user.registered",
+                "¡Bienvenido a ChessQuery!", payload, NotifStatus.SENT);
     }
 
     /**
@@ -61,6 +63,9 @@ public class NotificationService {
         // Aquí usamos el recipientId como identificador del destinatario.
         mockEmailService.sendEmail(recipientId, "jugador-" + recipientId + "@chessquery.cl", subject, body);
         saveLog(recipientId, Channel.EMAIL, "player.registered", subject, payload, NotifStatus.SENT);
+        saveLog(recipientId, Channel.IN_APP, "player.registered",
+                String.format("Estás inscrito en el torneo %s", tournamentId),
+                payload, NotifStatus.SENT);
     }
 
     /**
@@ -81,6 +86,59 @@ public class NotificationService {
 
         mockEmailService.sendEmail(recipientId, "jugador-" + recipientId + "@chessquery.cl", subject, body);
         saveLog(recipientId, Channel.EMAIL, "elo.updated", subject, payload, NotifStatus.SENT);
+        saveLog(recipientId, Channel.IN_APP, "elo.updated",
+                String.format("ELO: %s → %s", oldElo, newElo),
+                payload, NotifStatus.SENT);
+    }
+
+    /**
+     * N1+N2: notificación al finalizar una partida live.
+     * Payload esperado: {whitePlayerId, blackPlayerId, result, endReason, finalizedGameId}
+     * Persiste IN_APP y dispara EMAIL para ambos jugadores.
+     */
+    @Transactional
+    public void notifyGameFinished(Map<String, Object> payload) {
+        Long whiteId = toLong(payload.get("whitePlayerId"));
+        Long blackId = toLong(payload.get("blackPlayerId"));
+        String result = String.valueOf(payload.getOrDefault("result", ""));
+        Object gameId = payload.getOrDefault("gameId", payload.get("finalizedGameId"));
+        notifyOneFinished(whiteId, blackId, "white", result, gameId, payload);
+        notifyOneFinished(blackId, whiteId, "black", result, gameId, payload);
+    }
+
+    private void notifyOneFinished(Long recipientId, Long opponentId, String myColor,
+                                   String result, Object gameId, Map<String, Object> payload) {
+        Object finalizedGameId = gameId;
+        if (recipientId == null) return;
+        String outcome = describeResult(result, myColor);
+        String subject = String.format("Partida #%s finalizada · %s", finalizedGameId, outcome);
+        String body = String.format(
+                "Tu partida contra el jugador %s terminó: %s. Resultado %s. PGN guardado como game #%s.",
+                opponentId, outcome, result, finalizedGameId);
+        mockEmailService.sendEmail(recipientId,
+                "jugador-" + recipientId + "@chessquery.cl", subject, body);
+        saveLog(recipientId, Channel.EMAIL, "game.finished", subject, payload, NotifStatus.SENT);
+        saveLog(recipientId, Channel.IN_APP, "game.finished", subject, payload, NotifStatus.SENT);
+    }
+
+    /**
+     * N1: notificación al crear torneo (visible al organizador).
+     */
+    @Transactional
+    public void notifyTournamentCreated(Map<String, Object> payload) {
+        Long organizerId = toLong(payload.get("organizerId"));
+        if (organizerId == null) return;
+        Object tournamentId = payload.get("tournamentId");
+        Object name = payload.getOrDefault("name", "Torneo " + tournamentId);
+        String subject = String.format("Torneo \"%s\" creado", name);
+        saveLog(organizerId, Channel.IN_APP, "tournament.created", subject, payload, NotifStatus.SENT);
+    }
+
+    private static String describeResult(String result, String myColor) {
+        if ("1/2-1/2".equals(result)) return "Tablas";
+        if ("1-0".equals(result)) return "white".equals(myColor) ? "Ganaste" : "Perdiste";
+        if ("0-1".equals(result)) return "black".equals(myColor) ? "Ganaste" : "Perdiste";
+        return "Finalizada";
     }
 
     /**

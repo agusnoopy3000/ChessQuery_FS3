@@ -43,6 +43,10 @@ public class NotificationLog {
     @Column(name = "sent_at")
     private Instant sentAt;
 
+    /** N1: timestamp en que el usuario marcó la notificación como leída. */
+    @Column(name = "read_at")
+    private Instant readAt;
+
     @Builder.Default
     @Column(name = "retry_count", nullable = false)
     private Short retryCount = 0;

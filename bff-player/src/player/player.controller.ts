@@ -128,6 +128,31 @@ export class PlayerController {
     return this.playerService.timeoutLiveGame(userId, id);
   }
 
+  // ── N1: inbox de notificaciones in-app ─────────────────────────────────
+
+  @Get('notifications')
+  async listNotifications(@Req() req: Request) {
+    const userId = getUserId(req);
+    return this.playerService.listNotifications(userId);
+  }
+
+  @Get('notifications/unread-count')
+  async unreadNotifCount(@Req() req: Request) {
+    const userId = getUserId(req);
+    return this.playerService.unreadNotificationCount(userId);
+  }
+
+  @Post('notifications/:id/read')
+  async markNotificationRead(@Param('id') id: string) {
+    return this.playerService.markNotificationRead(id);
+  }
+
+  @Post('notifications/read-all')
+  async markAllNotificationsRead(@Req() req: Request) {
+    const userId = getUserId(req);
+    return this.playerService.markAllNotificationsRead(userId);
+  }
+
   @Post('play/live/:id/rematch')
   async rematchLive(@Req() req: Request, @Param('id') id: string) {
     const userId = getUserId(req);

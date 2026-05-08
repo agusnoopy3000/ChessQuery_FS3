@@ -37,6 +37,16 @@ spring:
       simple:
         acknowledge-mode: manual
 
+  # ── Mail (N2) — SMTP hacia Inbucket de Supabase local (fallback a log)
+  mail:
+    host: ${SMTP_HOST:host.docker.internal}
+    port: ${SMTP_PORT:54325}
+    properties:
+      "[mail.smtp.connectiontimeout]": 2000
+      "[mail.smtp.timeout]": 2000
+      "[mail.smtp.auth]": false
+      "[mail.smtp.starttls.enable]": false
+
 # ── Servidor ────────────────────────────────────────────────────────────────
 server:
   port: ${SERVER_PORT:8085}

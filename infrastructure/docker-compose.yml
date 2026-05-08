@@ -308,6 +308,9 @@ services:
       RABBITMQ_USER: ${RABBITMQ_USER:-chessquery}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-chessquery_dev}
       SERVER_PORT: "8085"
+      # N2: SMTP a Inbucket de Supabase local (override en .env si usás Mailpit)
+      SMTP_HOST: ${SMTP_HOST:-host.docker.internal}
+      SMTP_PORT: ${SMTP_PORT:-54325}
     ports:
       - "8085:8085"
     depends_on:
@@ -388,12 +391,14 @@ services:
       MS_TOURNAMENT_URL: http://ms-tournament:8082
       MS_GAME_URL: http://ms-game:8083
       MS_ANALYTICS_URL: http://ms-analytics:8084
+      MS_NOTIFICATIONS_URL: http://ms-notifications:8085
     ports:
       - "3001:3001"
     depends_on:
       - ms-users
       - ms-game
       - ms-analytics
+      - ms-notifications
     networks:
       - chessquery-net
 

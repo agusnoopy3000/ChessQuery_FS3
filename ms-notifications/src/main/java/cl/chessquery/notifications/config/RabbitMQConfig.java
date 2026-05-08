@@ -74,6 +74,12 @@ public class RabbitMQConfig {
         return BindingBuilder.bind(notifGameEventsQueue).to(chessEventsExchange).with("elo.*");
     }
 
+    /** N1+N2: la cola dedicada de notifications también escucha game.* (game.finished). */
+    @Bean
+    public Binding notifGameEventsBindingGame(Queue notifGameEventsQueue, TopicExchange chessEventsExchange) {
+        return BindingBuilder.bind(notifGameEventsQueue).to(chessEventsExchange).with("game.*");
+    }
+
     @Bean
     public Binding etlEventsBinding(Queue etlEventsQueue, TopicExchange chessEventsExchange) {
         return BindingBuilder.bind(etlEventsQueue).to(chessEventsExchange).with("etl.*");

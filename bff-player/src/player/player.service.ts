@@ -277,6 +277,30 @@ export class PlayerService {
     });
   }
 
+  // ── N1: inbox de notificaciones ─────────────────────────────────────────
+  async listNotifications(userId: string): Promise<unknown> {
+    const { msNotifications } = this.http.urls;
+    const playerId = await this.resolvePlayerId(userId);
+    return this.http.get<unknown>(`${msNotifications}/notifications?recipientId=${playerId}&limit=20`);
+  }
+
+  async unreadNotificationCount(userId: string): Promise<unknown> {
+    const { msNotifications } = this.http.urls;
+    const playerId = await this.resolvePlayerId(userId);
+    return this.http.get<unknown>(`${msNotifications}/notifications/unread-count?recipientId=${playerId}`);
+  }
+
+  async markNotificationRead(id: string): Promise<unknown> {
+    const { msNotifications } = this.http.urls;
+    return this.http.patch<unknown>(`${msNotifications}/notifications/${id}/read`, {});
+  }
+
+  async markAllNotificationsRead(userId: string): Promise<unknown> {
+    const { msNotifications } = this.http.urls;
+    const playerId = await this.resolvePlayerId(userId);
+    return this.http.patch<unknown>(`${msNotifications}/notifications/read-all?recipientId=${playerId}`, {});
+  }
+
   async rematchLiveGame(userId: string, id: string): Promise<unknown> {
     const { msGame } = this.http.urls;
     const playerId = await this.resolvePlayerId(userId);

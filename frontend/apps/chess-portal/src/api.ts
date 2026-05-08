@@ -71,6 +71,27 @@ const normalizeWinRate = (value: unknown) => {
   return winRate > 1 ? winRate / 100 : winRate;
 };
 
+export interface NotificationItem {
+  id: number;
+  eventType: string;
+  subject: string;
+  payload: string | null;
+  createdAt: string | null;
+  readAt: string | null;
+}
+
+const normalizeNotification = (value: unknown): NotificationItem => {
+  const raw = asRecord(value);
+  return {
+    id: asNumber(raw.id) ?? 0,
+    eventType: asString(raw.eventType) ?? '',
+    subject: asString(raw.subject) ?? '',
+    payload: asString(raw.payload) ?? null,
+    createdAt: asString(raw.createdAt) ?? null,
+    readAt: asString(raw.readAt) ?? null,
+  };
+};
+
 const normalizePlayer = (value: unknown): Player => {
   const raw = asRecord(value);
   const country = asRecord(raw.country);
@@ -278,6 +299,21 @@ export const playerApi = {
 
   search: (q: string): Promise<Player[]> =>
     api.get('/api/player/search', { params: { q } }).then((r) => asArray<unknown>(r.data).map(normalizePlayer)),
+
+  // ── N1: notificaciones in-app ─────────────────────────────────────────
+  listNotifications: (): Promise<NotificationItem[]> =>
+    api.get('/api/player/notifications').then((r) =>
+      asArray<unknown>(r.data).map(normalizeNotification),
+    ),
+  unreadNotificationCount: (): Promise<number> =>
+    api.get('/api/player/notifications/unread-count').then((r) => {
+      const raw = asRecord(r.data);
+      return asNumber(raw.count) ?? 0;
+    }),
+  markNotificationRead: (id: number): Promise<void> =>
+    api.post(`/api/player/notifications/${id}/read`).then(() => undefined),
+  markAllNotificationsRead: (): Promise<void> =>
+    api.post('/api/player/notifications/read-all').then(() => undefined),
 
   rankings: (category?: string, region?: string): Promise<Player[]> =>
     api
