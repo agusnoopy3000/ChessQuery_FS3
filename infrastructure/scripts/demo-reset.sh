@@ -48,15 +48,15 @@ run_psql chessquery_user_db user_db "
 "
 
 echo "[demo-reset] 4/5 Limpiando usuarios Supabase Auth con email *@demo.cl..."
-# Supabase local expone el postgres en host:54322 dentro del contenedor supabase_db_*
-# Usamos supabase CLI si está disponible; si no, intentamos psql directo.
-if command -v supabase >/dev/null 2>&1; then
-  PGPASSWORD=postgres psql -h 127.0.0.1 -p 54322 -U postgres -d postgres \
-    -v ON_ERROR_STOP=1 \
+# El postgres de Supabase corre dentro del contenedor supabase_db_*.
+SUPA_DB=$(docker ps --format '{{.Names}}' | grep -m1 '^supabase_db_' || true)
+if [ -n "${SUPA_DB}" ]; then
+  docker exec -i -e PGPASSWORD=postgres "${SUPA_DB}" \
+    psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
     -c "DELETE FROM auth.users WHERE email LIKE '%@demo.cl';" >/dev/null \
-    || echo "[demo-reset]   WARN: no se pudo limpiar auth.users (¿supabase corriendo?)"
+    || echo "[demo-reset]   WARN: no se pudo limpiar auth.users"
 else
-  echo "[demo-reset]   skip: supabase CLI no instalado, limpia manualmente desde Studio"
+  echo "[demo-reset]   skip: contenedor supabase_db no encontrado (¿supabase corriendo?)"
 fi
 
 echo "[demo-reset] 5/5 Limpiando notification_log..."
