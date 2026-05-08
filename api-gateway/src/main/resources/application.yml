@@ -15,7 +15,14 @@ spring:
     gateway:
       httpclient:
         connect-timeout: 5000
-        response-timeout: 10s
+        response-timeout: 30s
+        # Evita "Connection refused" zombi cuando un servicio downstream
+        # se reinicia: cierra connections idle del pool cada 10s.
+        pool:
+          type: elastic
+          max-idle-time: 10s
+          max-life-time: 60s
+          eviction-interval: 5s
 
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
