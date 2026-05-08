@@ -102,6 +102,32 @@ public class TournamentController {
         return tournamentService.listRegistrations(id);
     }
 
+    @Operation(summary = "Aprobar una inscripción PENDING (organizador)")
+    @PatchMapping("/registrations/{registrationId}/approve")
+    public RegistrationResponse approveRegistration(
+            @PathVariable Long registrationId,
+            @RequestHeader(value = "X-User-Role", required = false) String userRole) {
+        if (!"ORGANIZER".equalsIgnoreCase(userRole) && !"ADMIN".equalsIgnoreCase(userRole)) {
+            throw new ApiException(403, "FORBIDDEN",
+                    "Solo los organizadores pueden aprobar inscripciones");
+        }
+        return tournamentService.approveRegistration(registrationId);
+    }
+
+    @Operation(summary = "Rechazar una inscripción PENDING (organizador)")
+    @PatchMapping("/registrations/{registrationId}/reject")
+    public RegistrationResponse rejectRegistration(
+            @PathVariable Long registrationId,
+            @RequestBody(required = false) RejectRegistrationRequest request,
+            @RequestHeader(value = "X-User-Role", required = false) String userRole) {
+        if (!"ORGANIZER".equalsIgnoreCase(userRole) && !"ADMIN".equalsIgnoreCase(userRole)) {
+            throw new ApiException(403, "FORBIDDEN",
+                    "Solo los organizadores pueden rechazar inscripciones");
+        }
+        String reason = request == null ? null : request.reason();
+        return tournamentService.rejectRegistration(registrationId, reason);
+    }
+
     // ── Rondas ────────────────────────────────────────────────────────────────
 
     @Operation(summary = "Generar una ronda del torneo con emparejamientos automáticos")

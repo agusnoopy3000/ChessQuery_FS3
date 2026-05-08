@@ -108,7 +108,10 @@ export interface Tournament {
   timeControl?: string | null;
   rounds: number;
   organizerId: number;
+  description?: string | null;
+  requiresApproval?: boolean;
   registered?: number;
+  pending?: number;
 }
 
 export interface TournamentRegistration {
@@ -117,7 +120,7 @@ export interface TournamentRegistration {
   playerId: number;
   playerName?: string;
   seedRating: number;
-  status: 'CONFIRMED' | 'WAITLISTED' | 'CANCELLED';
+  status: 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'CANCELLED';
   registeredAt: string;
 }
 

@@ -61,6 +61,15 @@ public class Tournament {
     @Column(name = "time_control", length = 50)
     private String timeControl;
 
+    /**
+     * Si es {@code true}, las inscripciones quedan en {@code PENDING} hasta que
+     * el organizador las apruebe explícitamente. Si es {@code false}, pasan
+     * directo a {@code CONFIRMED} (modo "torneo abierto sin filtro").
+     */
+    @Column(name = "requires_approval", nullable = false)
+    @Builder.Default
+    private boolean requiresApproval = true;
+
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;
 

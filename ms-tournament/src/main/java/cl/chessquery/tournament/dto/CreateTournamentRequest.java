@@ -19,5 +19,6 @@ public record CreateTournamentRequest(
         Long organizerId,
         Integer minElo,
         Integer maxElo,
-        String timeControl
+        String timeControl,
+        Boolean requiresApproval
 ) {}

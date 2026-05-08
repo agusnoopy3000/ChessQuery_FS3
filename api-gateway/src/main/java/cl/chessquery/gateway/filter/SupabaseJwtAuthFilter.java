@@ -262,7 +262,19 @@ public class SupabaseJwtAuthFilter implements GlobalFilter, Ordered {
 
             final String emailFinal = email;
             final String roleFinal = role;
-            return playerIdResolver.resolve(supabaseUuid)
+            // Pasamos claims del JWT al resolver: si el Player no existe en
+            // ms-users, el resolver auto-provisiona usando estos datos. Cubre
+            // el caso del registro reciente cuyo webhook no llegó.
+            Map<String, Object> provisionClaims = new java.util.HashMap<>();
+            provisionClaims.put("email", emailFinal);
+            Object userMetadata = claims.get("user_metadata");
+            if (userMetadata instanceof Map<?, ?> meta) {
+                provisionClaims.put("firstName", meta.get("firstName"));
+                provisionClaims.put("lastName", meta.get("lastName"));
+                provisionClaims.put("lichessUsername", meta.get("lichessUsername"));
+                provisionClaims.put("clubName", meta.get("clubName"));
+            }
+            return playerIdResolver.resolve(supabaseUuid, provisionClaims)
                     .flatMap(playerId -> {
                         ServerHttpRequest mutated = exchange.getRequest().mutate()
                                 .headers(h -> {

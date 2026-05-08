@@ -183,7 +183,10 @@ const normalizeTournament = (value: unknown): Tournament => {
     timeControl: asString(raw.timeControl) ?? null,
     rounds: asNumber(raw.rounds ?? raw.roundsTotal) ?? 0,
     organizerId: asNumber(raw.organizerId) ?? 0,
+    description: asString(raw.description) ?? null,
+    requiresApproval: typeof raw.requiresApproval === 'boolean' ? raw.requiresApproval : true,
     registered: asNumber(raw.registered ?? raw.registeredCount) ?? 0,
+    pending: asNumber(raw.pending ?? raw.pendingCount) ?? 0,
   };
 };
 
@@ -452,23 +455,55 @@ const normalizeLichess = (value: unknown): LichessProfilePayload => {
   };
 };
 
+/**
+ * MyRegistration: estado del jugador autenticado en un torneo concreto.
+ * `null` cuando no hay inscripción previa (o fue CANCELLED y se borró del cache).
+ */
+export interface MyRegistration {
+  id: number;
+  tournamentId: number;
+  playerId: number;
+  status: 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'CANCELLED';
+  seedRating: number | null;
+  registeredAt: string | null;
+}
+
+const normalizeMyRegistration = (raw: unknown): MyRegistration | null => {
+  if (raw == null) return null;
+  const r = asRecord(raw);
+  if (!r.id) return null;
+  return {
+    id: asNumber(r.id) ?? 0,
+    tournamentId: asNumber(r.tournamentId) ?? 0,
+    playerId: asNumber(r.playerId) ?? 0,
+    status: ((asString(r.status) ?? 'PENDING') as MyRegistration['status']),
+    seedRating: asNumber(r.seedRating) ?? null,
+    registeredAt: asString(r.registeredAt) ?? null,
+  };
+};
+
 export const tournamentApi = {
   list: (params?: Record<string, string | number | undefined>): Promise<Pagination<Tournament>> =>
-    api.get('/api/organizer/tournaments', { params }).then((r) => normalizePagination(r.data, normalizeTournament)),
+    api.get('/api/player/tournaments', { params }).then((r) => normalizePagination(r.data, normalizeTournament)),
 
   detail: (id: string | number): Promise<Tournament> =>
-    api.get(`/api/organizer/tournaments/${id}`).then((r) => normalizeTournament(r.data)),
+    api.get(`/api/player/tournaments/${id}`).then((r) => normalizeTournament(r.data)),
 
+  // Las rondas y emparejamientos no las consume el portal del jugador en este flujo.
+  // Se mantiene la ruta antigua para no romper imports legacy si los hubiera.
   round: (id: string | number, roundNumber: number): Promise<Round> =>
     api.get(`/api/organizer/tournaments/${id}/round/${roundNumber}`).then((r) => normalizeRound(r.data)),
 
   standings: async (id: string | number): Promise<Standing[]> => {
-    const response = await api.get(`/api/organizer/tournaments/${id}/standings`);
+    const response = await api.get(`/api/player/tournaments/${id}/standings`);
     return Promise.all(asArray<unknown>(response.data).map(normalizeStanding));
   },
 
-  join: (id: string | number, payload?: Record<string, unknown>) =>
-    api.post(`/api/organizer/tournaments/${id}/join`, payload ?? {}).then((r) => r.data),
+  myRegistration: (id: string | number): Promise<MyRegistration | null> =>
+    api.get(`/api/player/tournaments/${id}/my-registration`).then((r) => normalizeMyRegistration(r.data)),
+
+  register: (id: string | number) =>
+    api.post(`/api/player/tournaments/${id}/register`, {}).then((r) => normalizeMyRegistration(r.data)),
 };
 
 export const organizerApi = {
@@ -504,7 +539,11 @@ export interface LiveGameSummary {
 
 export const liveGameApi = {
   create: (whiteEloBefore?: number) =>
-    api.post<LiveGameSummary>('/api/player/play/live', { whiteEloBefore }).then((r) => r.data),
+    api.post<LiveGameSummary>('/api/player/play/live', {
+      whiteEloBefore,
+      timeControlInitialMs: 180_000,
+      timeControlIncrementMs: 0,
+    }).then((r) => r.data),
   get: (id: number | string) =>
     api.get<LiveGameSummary>(`/api/player/play/live/${id}`).then((r) => r.data),
   join: (id: number | string, eloBefore?: number) =>

@@ -158,4 +158,33 @@ export class PlayerController {
     const userId = getUserId(req);
     return this.playerService.rematchLiveGame(userId, id);
   }
+
+  // ── Torneos (vista de jugador) ─────────────────────────────────────────
+
+  @Get('tournaments')
+  async listTournaments(@Query() query: Record<string, string>) {
+    return this.playerService.listTournaments(query);
+  }
+
+  @Get('tournaments/:id')
+  async tournamentDetail(@Param('id') id: string) {
+    return this.playerService.getTournament(id);
+  }
+
+  @Get('tournaments/:id/standings')
+  async tournamentStandings(@Param('id') id: string) {
+    return this.playerService.getTournamentStandings(id);
+  }
+
+  @Get('tournaments/:id/my-registration')
+  async myRegistration(@Req() req: Request, @Param('id') id: string) {
+    const userId = getUserId(req);
+    return this.playerService.getMyRegistration(id, userId);
+  }
+
+  @Post('tournaments/:id/register')
+  async registerToTournament(@Req() req: Request, @Param('id') id: string) {
+    const userId = getUserId(req);
+    return this.playerService.registerToTournament(id, userId);
+  }
 }

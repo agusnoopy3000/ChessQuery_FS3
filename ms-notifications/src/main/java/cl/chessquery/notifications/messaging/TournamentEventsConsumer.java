@@ -42,9 +42,12 @@ public class TournamentEventsConsumer {
 
         try {
             switch (event.getEventType()) {
-                case "player.registered"         -> notificationService.notifyRegistration(event.getPayload());
+                case "player.registered"          -> notificationService.notifyRegistration(event.getPayload());
                 case "tournament.round.starting"  -> notificationService.notifyRoundStarting(event.getPayload());
                 case "tournament.created"         -> log.info("Torneo creado: {}", event.getPayload());
+                case "registration.pending"       -> notificationService.notifyRegistrationPending(event.getPayload());
+                case "registration.approved"      -> notificationService.notifyRegistrationApproved(event.getPayload());
+                case "registration.rejected"      -> notificationService.notifyRegistrationRejected(event.getPayload());
                 default -> log.debug("Tipo de evento ignorado en tournament.events: {}", event.getEventType());
             }
             markProcessed(event.getEventId());

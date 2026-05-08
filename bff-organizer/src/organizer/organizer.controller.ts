@@ -65,4 +65,60 @@ export class OrganizerController {
   async standings(@Param('id') id: string) {
     return this.organizerService.getStandings(id);
   }
+
+  @Get('tournaments/:id/registrations')
+  async listRegistrations(@Param('id') id: string) {
+    return this.organizerService.listRegistrations(id);
+  }
+
+  @Patch('registrations/:rid/approve')
+  async approveRegistration(@Req() req: Request, @Param('rid') rid: string) {
+    const userId = getUserId(req);
+    return this.organizerService.approveRegistration(rid, userId);
+  }
+
+  @Patch('registrations/:rid/reject')
+  async rejectRegistration(
+    @Req() req: Request,
+    @Param('rid') rid: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    const userId = getUserId(req);
+    return this.organizerService.rejectRegistration(rid, userId, body);
+  }
+
+  @Patch('tournaments/:id/status')
+  async patchStatus(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    const userId = getUserId(req);
+    return this.organizerService.patchTournamentStatus(id, userId, body);
+  }
+
+  // ── Notificaciones (mismo backend que el jugador) ────────────────────────
+
+  @Get('notifications')
+  async listNotifications(@Req() req: Request) {
+    const userId = getUserId(req);
+    return this.organizerService.listNotifications(userId);
+  }
+
+  @Get('notifications/unread-count')
+  async unreadNotificationCount(@Req() req: Request) {
+    const userId = getUserId(req);
+    return this.organizerService.unreadNotificationCount(userId);
+  }
+
+  @Post('notifications/:id/read')
+  async markNotificationRead(@Param('id') id: string) {
+    return this.organizerService.markNotificationRead(id);
+  }
+
+  @Post('notifications/read-all')
+  async markAllNotificationsRead(@Req() req: Request) {
+    const userId = getUserId(req);
+    return this.organizerService.markAllNotificationsRead(userId);
+  }
 }

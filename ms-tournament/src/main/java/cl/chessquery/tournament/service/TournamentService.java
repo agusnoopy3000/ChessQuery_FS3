@@ -49,6 +49,7 @@ public class TournamentService {
                 .minElo(req.minElo())
                 .maxElo(req.maxElo())
                 .timeControl(req.timeControl())
+                .requiresApproval(req.requiresApproval() == null ? true : req.requiresApproval())
                 .build();
 
         tournamentRepo.save(t);
@@ -117,7 +118,7 @@ public class TournamentService {
                     "El torneo no está abierto para inscripciones");
         }
 
-        // Verificar cupos
+        // Verificar cupos (sólo cuentan CONFIRMED — los PENDING aún no ocupan).
         if (t.getMaxPlayers() != null) {
             long confirmed = registrationRepo.countByTournamentIdAndStatus(tournamentId, RegistrationStatus.CONFIRMED);
             if (confirmed >= t.getMaxPlayers()) {
@@ -126,14 +127,22 @@ public class TournamentService {
             }
         }
 
-        // Verificar inscripción previa
-        registrationRepo.findByTournamentIdAndPlayerId(tournamentId, playerId)
-                .ifPresent(r -> {
-                    if (r.getStatus() == RegistrationStatus.CONFIRMED) {
-                        throw new ApiException(409, "ALREADY_REGISTERED",
-                                "El jugador ya está inscrito en este torneo");
-                    }
-                });
+        // Verificar inscripción previa: bloqueo en PENDING o CONFIRMED. Si está
+        // CANCELLED o REJECTED, permitimos re-inscripción (UPDATE in-place).
+        TournamentRegistration existing = registrationRepo
+                .findByTournamentIdAndPlayerId(tournamentId, playerId)
+                .orElse(null);
+        if (existing != null) {
+            RegistrationStatus s = existing.getStatus();
+            if (s == RegistrationStatus.CONFIRMED) {
+                throw new ApiException(409, "ALREADY_REGISTERED",
+                        "El jugador ya está inscrito y aprobado en este torneo");
+            }
+            if (s == RegistrationStatus.PENDING) {
+                throw new ApiException(409, "ALREADY_PENDING",
+                        "El jugador ya tiene una inscripción pendiente de aprobación");
+            }
+        }
 
         // Obtener ELO con circuit breaker
         int seedRating = userEloClient.getElo(playerId);
@@ -148,18 +157,92 @@ public class TournamentService {
                     "El ELO del jugador (" + seedRating + ") supera el máximo permitido (" + t.getMaxElo() + ")");
         }
 
-        TournamentRegistration reg = TournamentRegistration.builder()
-                .tournament(t)
-                .playerId(playerId)
-                .status(RegistrationStatus.CONFIRMED)
-                .registeredAt(Instant.now())
-                .seedRating(seedRating)
-                .build();
+        // Si el torneo requiere aprobación → PENDING; si no → CONFIRMED directo.
+        RegistrationStatus initialStatus = t.isRequiresApproval()
+                ? RegistrationStatus.PENDING
+                : RegistrationStatus.CONFIRMED;
 
+        TournamentRegistration reg;
+        if (existing != null) {
+            // Re-inscripción tras CANCELLED / REJECTED: mutamos el registro existente.
+            existing.setStatus(initialStatus);
+            existing.setSeedRating(seedRating);
+            existing.setRegisteredAt(Instant.now());
+            reg = registrationRepo.save(existing);
+        } else {
+            reg = TournamentRegistration.builder()
+                    .tournament(t)
+                    .playerId(playerId)
+                    .status(initialStatus)
+                    .registeredAt(Instant.now())
+                    .seedRating(seedRating)
+                    .build();
+            registrationRepo.save(reg);
+        }
+
+        // Eventos: si quedó PENDING avisamos al organizador; si quedó CONFIRMED
+        // (modo sin aprobación) ya disparamos el flujo normal de player.registered.
+        if (initialStatus == RegistrationStatus.PENDING) {
+            events.publishRegistrationPending(t.getId(), playerId, t.getOrganizerId(), t.getName());
+        } else {
+            events.publishPlayerRegistered(tournamentId, playerId, seedRating);
+        }
+        log.info("Jugador {} inscrito en torneo {} con seed={} status={}",
+                playerId, tournamentId, seedRating, initialStatus);
+
+        return toRegistrationResponse(reg);
+    }
+
+    // ── Aprobar / Rechazar inscripción ────────────────────────────────────────
+
+    @Transactional
+    public RegistrationResponse approveRegistration(Long registrationId) {
+        TournamentRegistration reg = registrationRepo.findById(registrationId)
+                .orElseThrow(() -> new ApiException(404, "REGISTRATION_NOT_FOUND",
+                        "Inscripción no encontrada: " + registrationId));
+        if (reg.getStatus() != RegistrationStatus.PENDING) {
+            throw new ApiException(409, "INVALID_REGISTRATION_STATE",
+                    "Solo se pueden aprobar inscripciones en estado PENDING (estado actual: "
+                            + reg.getStatus() + ")");
+        }
+        Tournament t = reg.getTournament();
+        // Verificar cupo justo antes de confirmar (otra inscripción podría haberse
+        // colado entre PENDING y aprobación).
+        if (t.getMaxPlayers() != null) {
+            long confirmed = registrationRepo.countByTournamentIdAndStatus(
+                    t.getId(), RegistrationStatus.CONFIRMED);
+            if (confirmed >= t.getMaxPlayers()) {
+                throw new ApiException(409, "TOURNAMENT_FULL",
+                        "El torneo está lleno; no se puede aprobar la inscripción");
+            }
+        }
+        reg.setStatus(RegistrationStatus.CONFIRMED);
         registrationRepo.save(reg);
-        events.publishPlayerRegistered(tournamentId, playerId, seedRating);
-        log.info("Jugador {} inscrito en torneo {} con seed={}", playerId, tournamentId, seedRating);
+        events.publishRegistrationApproved(t.getId(), reg.getPlayerId(), t.getName());
+        // Mantenemos el evento original player.registered para no romper consumers
+        // existentes (PLAYER_STATS_MV, etc.) — ahora se dispara al aprobar.
+        events.publishPlayerRegistered(t.getId(), reg.getPlayerId(), reg.getSeedRating());
+        log.info("Inscripción {} aprobada (torneo={} player={})",
+                reg.getId(), t.getId(), reg.getPlayerId());
+        return toRegistrationResponse(reg);
+    }
 
+    @Transactional
+    public RegistrationResponse rejectRegistration(Long registrationId, String reason) {
+        TournamentRegistration reg = registrationRepo.findById(registrationId)
+                .orElseThrow(() -> new ApiException(404, "REGISTRATION_NOT_FOUND",
+                        "Inscripción no encontrada: " + registrationId));
+        if (reg.getStatus() != RegistrationStatus.PENDING) {
+            throw new ApiException(409, "INVALID_REGISTRATION_STATE",
+                    "Solo se pueden rechazar inscripciones en estado PENDING (estado actual: "
+                            + reg.getStatus() + ")");
+        }
+        reg.setStatus(RegistrationStatus.REJECTED);
+        registrationRepo.save(reg);
+        Tournament t = reg.getTournament();
+        events.publishRegistrationRejected(t.getId(), reg.getPlayerId(), t.getName(), reason);
+        log.info("Inscripción {} rechazada (torneo={} player={} reason='{}')",
+                reg.getId(), t.getId(), reg.getPlayerId(), reason);
         return toRegistrationResponse(reg);
     }
 
@@ -458,6 +541,7 @@ public class TournamentService {
 
     private TournamentResponse toResponse(Tournament t) {
         int registered = (int) registrationRepo.countByTournamentIdAndStatus(t.getId(), RegistrationStatus.CONFIRMED);
+        int pending = (int) registrationRepo.countByTournamentIdAndStatus(t.getId(), RegistrationStatus.PENDING);
         return new TournamentResponse(
                 t.getId(),
                 t.getName(),
@@ -473,7 +557,9 @@ public class TournamentService {
                 t.getMinElo(),
                 t.getMaxElo(),
                 t.getTimeControl(),
+                t.isRequiresApproval(),
                 registered,
+                pending,
                 t.getCreatedAt()
         );
     }

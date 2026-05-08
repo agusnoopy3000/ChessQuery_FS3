@@ -6,6 +6,7 @@ import { LoginPage } from './pages/Login';
 import { OrganizerPortalPage } from './pages/OrganizerPortal';
 import { OrganizerTournamentsPage } from './pages/OrganizerTournaments';
 import { TournamentDetailPage } from './pages/TournamentDetail';
+import { NotificationBell } from './components/NotificationBell';
 
 const buildNav = (pathname: string, navigate: ReturnType<typeof useNavigate>): ShellNavItem[] => [
   { id: 'home', label: 'Inicio', icon: '♖', desc: 'Resumen del organizador', active: pathname === '/', onClick: () => navigate('/') },
@@ -50,6 +51,7 @@ export const App = () => {
       user={{ name: user.email.split('@')[0], role: user.role, email: user.email }}
       onLogout={() => logout().then(() => navigate('/login'))}
     >
+      <NotificationBell />
       <Routes>
         <Route path="/" element={<OrganizerPortalPage />} />
         <Route path="/tournaments" element={<OrganizerTournamentsPage />} />

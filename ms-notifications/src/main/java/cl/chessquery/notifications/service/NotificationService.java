@@ -69,6 +69,64 @@ public class NotificationService {
     }
 
     /**
+     * Notificación al ORGANIZADOR cuando llega una nueva inscripción que requiere
+     * aprobación. Payload: {tournamentId, tournamentName, playerId, organizerId}
+     */
+    @Transactional
+    public void notifyRegistrationPending(Map<String, Object> payload) {
+        Long organizerId = toLong(payload.get("organizerId"));
+        Object playerId  = payload.get("playerId");
+        Object tournamentName = payload.getOrDefault("tournamentName", "tu torneo");
+        if (organizerId == null) {
+            log.debug("registration.pending sin organizerId, ignorado");
+            return;
+        }
+        String msg = String.format("Nueva inscripción del jugador %s en %s — requiere tu aprobación",
+                playerId, tournamentName);
+        saveLog(organizerId, Channel.IN_APP, "registration.pending", msg, payload, NotifStatus.SENT);
+    }
+
+    /**
+     * Notificación al JUGADOR cuando su inscripción es aprobada por el organizador.
+     * Payload: {tournamentId, tournamentName, playerId}
+     */
+    @Transactional
+    public void notifyRegistrationApproved(Map<String, Object> payload) {
+        Long recipientId = toLong(payload.get("playerId"));
+        Object tournamentName = payload.getOrDefault("tournamentName", "el torneo");
+        if (recipientId == null) return;
+        String subject = "Tu inscripción fue aprobada";
+        String body    = String.format("Tu inscripción al torneo %s fue aprobada. ¡Nos vemos pronto!",
+                tournamentName);
+        mockEmailService.sendEmail(recipientId, "jugador-" + recipientId + "@chessquery.cl", subject, body);
+        saveLog(recipientId, Channel.EMAIL, "registration.approved", subject, payload, NotifStatus.SENT);
+        saveLog(recipientId, Channel.IN_APP, "registration.approved",
+                String.format("¡Aprobado! Estás dentro de %s", tournamentName),
+                payload, NotifStatus.SENT);
+    }
+
+    /**
+     * Notificación al JUGADOR cuando su inscripción es rechazada.
+     * Payload: {tournamentId, tournamentName, playerId, reason}
+     */
+    @Transactional
+    public void notifyRegistrationRejected(Map<String, Object> payload) {
+        Long recipientId = toLong(payload.get("playerId"));
+        Object tournamentName = payload.getOrDefault("tournamentName", "el torneo");
+        Object reason = payload.getOrDefault("reason", "");
+        if (recipientId == null) return;
+        String subject = "Tu inscripción fue rechazada";
+        String reasonSuffix = (reason instanceof String s && !s.isBlank()) ? " — Motivo: " + s : "";
+        String body = String.format("Tu inscripción al torneo %s fue rechazada por el organizador.%s",
+                tournamentName, reasonSuffix);
+        mockEmailService.sendEmail(recipientId, "jugador-" + recipientId + "@chessquery.cl", subject, body);
+        saveLog(recipientId, Channel.EMAIL, "registration.rejected", subject, payload, NotifStatus.SENT);
+        saveLog(recipientId, Channel.IN_APP, "registration.rejected",
+                String.format("Inscripción rechazada en %s%s", tournamentName, reasonSuffix),
+                payload, NotifStatus.SENT);
+    }
+
+    /**
      * Notificación de actualización de ELO.
      * Payload: {playerId, oldElo, newElo, delta, ratingType, gameId}
      */

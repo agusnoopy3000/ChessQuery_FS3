@@ -148,6 +148,82 @@ public class PlayerService {
         return toProfileResponse(p, title);
     }
 
+    // ─── POST /users/provision (auto-provision desde JWT) ────────────────────
+
+    /**
+     * Crea o reclama idempotentemente un Player a partir de la identidad de
+     * Supabase Auth. El API Gateway lo llama cuando un JWT válido entra y aún
+     * no existe Player asociado (típicamente registro reciente cuyo webhook
+     * no ha sido procesado, o webhook deshabilitado en local).
+     *
+     * <p>Reusa la misma lógica que {@code UserRegisteredConsumer}:
+     * <ol>
+     *   <li>Match por {@code supabaseUserId} → no-op.</li>
+     *   <li>Match por email → asocia el UUID al Player existente.</li>
+     *   <li>Si no, crea Player nuevo.</li>
+     * </ol>
+     *
+     * Es idempotente: llamar dos veces con el mismo UUID retorna el mismo Player.
+     */
+    @Transactional
+    public PlayerProfileResponse provisionBySupabaseId(ProvisionPlayerRequest req) {
+        UUID supabaseUserId = req.supabaseUserId();
+
+        // 1. Idempotencia: ya existe Player con ese UUID → return as-is.
+        Player existing = playerRepo.findBySupabaseUserId(supabaseUserId).orElse(null);
+        if (existing != null) {
+            String title = titleRepo.findByPlayerIdAndIsCurrentTrue(existing.getId())
+                    .map(t -> t.getTitle().name()).orElse(null);
+            return toProfileResponse(existing, title);
+        }
+
+        Club club = StringUtils.hasText(req.clubName())
+                ? clubRepo.findFirstByNameIgnoreCase(req.clubName().trim()).orElse(null)
+                : null;
+
+        // 2. Match por email → asociar.
+        if (StringUtils.hasText(req.email())) {
+            Player byEmail = playerRepo.findByEmail(req.email()).orElse(null);
+            if (byEmail != null) {
+                byEmail.setSupabaseUserId(supabaseUserId);
+                if (StringUtils.hasText(req.lichessUsername())
+                        && !StringUtils.hasText(byEmail.getLichessUsername())) {
+                    byEmail.setLichessUsername(req.lichessUsername().trim());
+                }
+                if (club != null && byEmail.getClub() == null) {
+                    byEmail.setClub(club);
+                }
+                playerRepo.save(byEmail);
+                log.info("provision: asociado supabaseUserId={} a Player existente id={}",
+                        supabaseUserId, byEmail.getId());
+                String title = titleRepo.findByPlayerIdAndIsCurrentTrue(byEmail.getId())
+                        .map(t -> t.getTitle().name()).orElse(null);
+                return toProfileResponse(byEmail, title);
+            }
+        }
+
+        // 3. Crear nuevo Player.
+        Instant now = Instant.now();
+        String firstName = StringUtils.hasText(req.firstName()) ? req.firstName() : "Jugador";
+        String lastName  = StringUtils.hasText(req.lastName())  ? req.lastName()
+                : supabaseUserId.toString().substring(0, 8);
+        Player p = Player.builder()
+                .firstName(firstName)
+                .lastName(lastName)
+                .email(StringUtils.hasText(req.email()) ? req.email() : null)
+                .supabaseUserId(supabaseUserId)
+                .lichessUsername(StringUtils.hasText(req.lichessUsername())
+                        ? req.lichessUsername().trim() : null)
+                .club(club)
+                .createdAt(now)
+                .updatedAt(now)
+                .build();
+        playerRepo.save(p);
+        log.info("provision: Player creado id={} supabaseUserId={} email={} club={}",
+                p.getId(), supabaseUserId, p.getEmail(), club != null ? club.getName() : "—");
+        return toProfileResponse(p, null);
+    }
+
     // ─── GET /users/by-supabase-id/{supabaseUserId} ──────────────────────────
 
     @Transactional(readOnly = true)

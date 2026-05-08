@@ -18,6 +18,8 @@ public record TournamentResponse(
         Integer minElo,
         Integer maxElo,
         String timeControl,
+        boolean requiresApproval,
         int registeredCount,
+        int pendingCount,
         Instant createdAt
 ) {}

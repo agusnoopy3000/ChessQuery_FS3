@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Card, EmptyState, ErrorAlert, Select, Skeleton, StandingsTable, Table, TableColumn } from '@chessquery/ui-lib';
 import { Pairing, Tournament } from '@chessquery/shared';
-import { organizerApi } from '../api';
-import { formatDate, tournamentStatusVariant, unwrapContent } from '../portal-utils';
+import { organizerApi, type CreateTournamentInput, type RegistrationRow } from '../api';
+import { dedupeBy, formatDate, tournamentStatusVariant, unwrapContent } from '../portal-utils';
+import { CreateTournamentModal } from '../components/CreateTournamentModal';
+import { RegistrationsPanel } from '../components/RegistrationsPanel';
 
 const RESULT_OPTIONS = [
   { value: '1-0', label: '1-0' },
@@ -22,7 +24,10 @@ export const OrganizerTournamentsPage = () => {
     queryFn: () => organizerApi.listTournaments({ size: 20 }),
   });
 
-  const tournamentRows = useMemo(() => unwrapContent<Tournament>(tournaments.data), [tournaments.data]);
+  const tournamentRows = useMemo(
+    () => dedupeBy(unwrapContent<Tournament>(tournaments.data), (t) => t.id),
+    [tournaments.data],
+  );
 
   useEffect(() => {
     if (!selectedTournamentId && tournamentRows[0]) {
@@ -74,6 +79,57 @@ export const OrganizerTournamentsPage = () => {
     },
   });
 
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
+  const createTournament = useMutation({
+    mutationFn: (input: CreateTournamentInput) => organizerApi.createTournament(input),
+    onSuccess: async (created) => {
+      await queryClient.invalidateQueries({ queryKey: ['organizer', 'tournaments', 'list'] });
+      setSelectedTournamentId(created.id);
+      setShowCreateModal(false);
+    },
+  });
+
+  const patchStatus = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: Tournament['status'] }) =>
+      organizerApi.patchTournamentStatus(id, status),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['organizer', 'tournaments', 'list'] });
+    },
+  });
+
+  const registrations = useQuery({
+    queryKey: ['organizer', 'tournaments', 'registrations', selectedTournamentId],
+    queryFn: () => organizerApi.listRegistrations(selectedTournamentId!),
+    enabled: selectedTournamentId != null,
+  });
+
+  const approveReg = useMutation({
+    mutationFn: (registrationId: number) => organizerApi.approveRegistration(registrationId),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['organizer', 'tournaments', 'registrations', selectedTournamentId] }),
+        queryClient.invalidateQueries({ queryKey: ['organizer', 'tournaments', 'list'] }),
+      ]);
+    },
+  });
+
+  const rejectReg = useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason?: string }) =>
+      organizerApi.rejectRegistration(id, reason),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['organizer', 'tournaments', 'registrations', selectedTournamentId] }),
+        queryClient.invalidateQueries({ queryKey: ['organizer', 'tournaments', 'list'] }),
+      ]);
+    },
+  });
+
+  const registrationRows: RegistrationRow[] = useMemo(
+    () => (Array.isArray(registrations.data) ? registrations.data : []),
+    [registrations.data],
+  );
+
   const kpis = useMemo(
     () => ({
       total: tournamentRows.length,
@@ -95,25 +151,42 @@ export const OrganizerTournamentsPage = () => {
             expone la ronda, puedes registrar resultados desde aquí.
           </p>
         </div>
-        <div className="metric-inline-row">
-          <div className="metric-inline-card">
-            <div className="metric-label">Total</div>
-            <div className="metric-inline-value">{kpis.total}</div>
-          </div>
-          <div className="metric-inline-card">
-            <div className="metric-label">Open</div>
-            <div className="metric-inline-value">{kpis.open}</div>
-          </div>
-          <div className="metric-inline-card">
-            <div className="metric-label">En curso</div>
-            <div className="metric-inline-value">{kpis.active}</div>
-          </div>
-          <div className="metric-inline-card">
-            <div className="metric-label">Finalizados</div>
-            <div className="metric-inline-value">{kpis.finished}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'flex-end' }}>
+          <Button onClick={() => setShowCreateModal(true)} variant="primary">
+            + Crear torneo
+          </Button>
+          <div className="metric-inline-row">
+            <div className="metric-inline-card">
+              <div className="metric-label">Total</div>
+              <div className="metric-inline-value">{kpis.total}</div>
+            </div>
+            <div className="metric-inline-card">
+              <div className="metric-label">Open</div>
+              <div className="metric-inline-value">{kpis.open}</div>
+            </div>
+            <div className="metric-inline-card">
+              <div className="metric-label">En curso</div>
+              <div className="metric-inline-value">{kpis.active}</div>
+            </div>
+            <div className="metric-inline-card">
+              <div className="metric-label">Finalizados</div>
+              <div className="metric-inline-value">{kpis.finished}</div>
+            </div>
           </div>
         </div>
       </section>
+
+      <CreateTournamentModal
+        open={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSubmit={(input) => createTournament.mutate(input)}
+        loading={createTournament.isPending}
+        error={
+          (createTournament.error as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ??
+          (createTournament.error as { message?: string })?.message ??
+          null
+        }
+      />
 
       <div className="panel-grid" style={{ gridTemplateColumns: '0.95fr 1.05fr' }}>
         <Card
@@ -133,7 +206,16 @@ export const OrganizerTournamentsPage = () => {
           ) : tournaments.isError ? (
             <ErrorAlert title="No se pudo cargar el listado" onRetry={() => tournaments.refetch()} />
           ) : tournamentRows.length === 0 ? (
-            <EmptyState title="Aún no hay torneos creados" description="Cuando el BFF filtre por organizador, este tablero mostrará únicamente tus eventos." icon="♜" />
+            <EmptyState
+              title="Aún no hay torneos creados"
+              description="Crea tu primer torneo y los jugadores podrán inscribirse desde su portal."
+              icon="♜"
+              action={
+                <Button onClick={() => setShowCreateModal(true)} variant="primary">
+                  + Crear torneo
+                </Button>
+              }
+            />
           ) : (
             <div style={{ display: 'grid', gap: 10 }}>
               {tournamentRows.map((tournament) => (
@@ -235,9 +317,68 @@ export const OrganizerTournamentsPage = () => {
                     }
                   />
                 ) : null}
+
+                {/* Acciones de transición de estado del torneo */}
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  {selectedTournament.status === 'DRAFT' && (
+                    <Button
+                      variant="primary"
+                      onClick={() => patchStatus.mutate({ id: selectedTournament.id, status: 'OPEN' })}
+                      loading={patchStatus.isPending}
+                    >
+                      Abrir inscripciones
+                    </Button>
+                  )}
+                  {selectedTournament.status === 'OPEN' && (
+                    <Button
+                      variant="primary"
+                      onClick={() => patchStatus.mutate({ id: selectedTournament.id, status: 'IN_PROGRESS' })}
+                      loading={patchStatus.isPending}
+                    >
+                      Iniciar torneo
+                    </Button>
+                  )}
+                  {selectedTournament.status === 'IN_PROGRESS' && (
+                    <Button
+                      variant="secondary"
+                      onClick={() => patchStatus.mutate({ id: selectedTournament.id, status: 'FINISHED' })}
+                      loading={patchStatus.isPending}
+                    >
+                      Finalizar torneo
+                    </Button>
+                  )}
+                </div>
+                {patchStatus.isError ? (
+                  <ErrorAlert
+                    title="No se pudo cambiar el estado"
+                    message={
+                      (patchStatus.error as { response?: { data?: { message?: string } }; message?: string })
+                        ?.response?.data?.message ??
+                      'Error desconocido al transicionar estado.'
+                    }
+                  />
+                ) : null}
               </div>
             )}
           </Card>
+
+          {/* Inscripciones (PENDING + CONFIRMED + REJECTED) */}
+          {selectedTournamentId != null && (
+            <RegistrationsPanel
+              registrations={registrationRows}
+              loading={registrations.isLoading}
+              error={registrations.isError ? 'No se pudieron cargar las inscripciones' : null}
+              onApprove={(rid) => approveReg.mutate(rid)}
+              onReject={(rid, reason) => rejectReg.mutate({ id: rid, reason })}
+              busyId={
+                approveReg.isPending
+                  ? (approveReg.variables as number)
+                  : rejectReg.isPending
+                    ? ((rejectReg.variables as { id: number } | undefined)?.id ?? null)
+                    : null
+              }
+            />
+          )}
 
           <Card header="Standings">
             {!selectedTournamentId ? (

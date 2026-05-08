@@ -7,6 +7,7 @@ import type { Key } from 'chessground/types';
 import { Chess } from 'chessops/chess';
 import { parseFen, makeFen } from 'chessops/fen';
 import { parseSquare, parseUci } from 'chessops/util';
+import { makeSan } from 'chessops/san';
 import { chessgroundDests } from 'chessops/compat';
 import { useAuth } from '@chessquery/shared';
 import type { Player } from '@chessquery/shared';
@@ -116,6 +117,16 @@ export const LiveGamePage = () => {
   const [opponentOnline, setOpponentOnline] = useState(false);
   const [rematchSessionId, setRematchSessionId] = useState<number | null>(null);
   const [rematchCreating, setRematchCreating] = useState(false);
+  const stateRef = useRef<LiveGameState | null>(null);
+  const opponentOnlineRef = useRef(false);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  useEffect(() => {
+    opponentOnlineRef.current = opponentOnline;
+  }, [opponentOnline]);
 
   // Resuelve perfiles de los jugadores (nombre + ELO + país) cuando cambian los IDs.
   useEffect(() => {
@@ -233,13 +244,15 @@ export const LiveGamePage = () => {
       },
     });
     const refreshOpponent = () => {
-      if (myPlayerId == null || !state) { setOpponentOnline(false); return; }
-      const opponentId = myPlayerId === state.whitePlayerId ? state.blackPlayerId : state.whitePlayerId;
+      const current = stateRef.current;
+      if (myPlayerId == null || !current) { setOpponentOnline(false); return; }
+      const opponentId = myPlayerId === current.whitePlayerId ? current.blackPlayerId : current.whitePlayerId;
       if (opponentId == null) { setOpponentOnline(false); return; }
       const presenceState = channel.presenceState() as Record<string, unknown>;
-      const wasOnline = opponentOnline;
+      const wasOnline = opponentOnlineRef.current;
       const nowOnline = String(opponentId) in presenceState;
       setOpponentOnline(nowOnline);
+      opponentOnlineRef.current = nowOnline;
       if (!wasOnline && nowOnline) pushToast('Rival conectado');
       else if (wasOnline && !nowOnline) pushToast('Rival desconectado');
     };
@@ -270,7 +283,7 @@ export const LiveGamePage = () => {
         }
       });
     return () => { channelRef.current = null; supabase.removeChannel(channel); };
-  }, [id, myPlayerId, state?.whitePlayerId, state?.blackPlayerId]);
+  }, [id, myPlayerId]);
 
   // Rehidratación al volver del background (visibilitychange + reconnect).
   // Resuelve "se quedó pegado" cuando el OS suspendió la pestaña.
@@ -378,8 +391,30 @@ export const LiveGamePage = () => {
       cgApi.current.set(config);
     } else {
       cgApi.current = Chessground(cgRef.current, config);
+      // Fix click-precision: chessground memoiza getBoundingClientRect() del
+      // tablero al montar. Si el layout cambia después (banner de turno, perfil
+      // del rival cargando, capturas que crecen), el caché queda stale y los
+      // clicks/drags se desfasan ~½ casilla. Invalidamos bounds en cada
+      // pointerdown en fase de captura — antes de que chessground lea coords.
+      const invalidateBounds = () => cgApi.current?.state?.dom?.bounds?.clear?.();
+      cgRef.current.addEventListener('pointerdown', invalidateBounds, { capture: true });
+      cgRef.current.addEventListener('touchstart', invalidateBounds, { capture: true, passive: true });
     }
+    // También invalidar tras cualquier cambio de layout potencial (banner,
+    // status flip, viewedFen) — el set() ya recolocó piezas pero bounds
+    // pueden seguir stale si elementos hermanos cambiaron de tamaño.
+    cgApi.current?.state?.dom?.bounds?.clear?.();
   }, [state, myColor, viewedFen, isReviewing]);
+
+  // ResizeObserver sobre el contenedor del tablero — chessground solo observa
+  // su propio wrap; si el padre cambia (window resize, rotación móvil), bounds
+  // pueden quedar mal hasta el siguiente scroll/resize global.
+  useEffect(() => {
+    if (!cgRef.current || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => cgApi.current?.state?.dom?.bounds?.clear?.());
+    ro.observe(cgRef.current);
+    return () => ro.disconnect();
+  }, []);
 
   // Cleanup chessground al desmontar
   useEffect(() => () => { cgApi.current?.destroy?.(); cgApi.current = null; }, []);
@@ -394,35 +429,77 @@ export const LiveGamePage = () => {
       return;
     }
     const uci = `${orig}${dest}`;
+    const stateBeforeMove = state;
 
-    // Optimistic UI: aplicamos la jugada localmente con chessops antes de
-    // que el backend confirme. Si rechaza, revertimos al FEN previo.
-    const fenBeforeMove = state.currentFen;
-    try {
-      const moveObj = parseUci(uci);
-      if (moveObj) {
-        const optimisticChess = chess.clone();
-        optimisticChess.play(moveObj);
-        const optimisticFen = makeFen(optimisticChess.toSetup());
-        cgApi.current?.set({
-          fen: optimisticFen,
-          turnColor: state.turn === 'w' ? 'black' : 'white',
-          movable: { color: undefined, dests: new Map() },
-        });
-      }
-    } catch { /* errores client-side los maneja el server */ }
+    // Optimistic UI completo: aplicamos la jugada localmente — tablero, FEN,
+    // turn, lista de moves y reloj — para que el reloj salte al instante al
+    // rival sin esperar el round-trip al backend (~50-200ms). Si el server
+    // rechaza, revertimos.
+    const optimistic = buildOptimisticState(state, chess, uci, clockWhiteMs, clockBlackMs);
+    if (optimistic) {
+      // Aplicamos primero al chessground (animación suave) y después al state.
+      cgApi.current?.set({
+        fen: optimistic.currentFen,
+        turnColor: optimistic.turn === 'w' ? 'white' : 'black',
+        movable: { color: undefined, dests: new Map() },
+      });
+      setState(optimistic);
+    }
 
     setBusy(true);
     try {
       const next = await dataApi.move(id, uci, clockPayload());
+      // El server es autoritativo: reconcilia FEN, clocks y moves canónicos.
       setState(next);
     } catch (e) {
       setError(message(e));
-      cgApi.current?.set({ fen: fenBeforeMove });
+      // Rollback total al estado previo.
+      setState(stateBeforeMove);
+      cgApi.current?.set({ fen: stateBeforeMove.currentFen });
     } finally {
       setBusy(false);
     }
   };
+
+  /**
+   * Construye un LiveGameState optimista tras aplicar `uci`. Devuelve null si
+   * la jugada no es legal localmente (no debería pasar en flujo normal — el
+   * usuario sólo recibe destinos legales de chessground).
+   */
+  function buildOptimisticState(
+    s: LiveGameState,
+    chess: Chess,
+    uci: string,
+    clockW: number | null,
+    clockB: number | null,
+  ): LiveGameState | null {
+    try {
+      const moveObj = parseUci(uci);
+      if (!moveObj) return null;
+      const next = chess.clone();
+      // Validamos antes de play: chessops lanza si es ilegal.
+      if (!next.isLegal(moveObj)) return null;
+      const san = makeSan(next, moveObj);
+      next.play(moveObj);
+      const newFen = makeFen(next.toSetup());
+      const newTurn: 'w' | 'b' = s.turn === 'w' ? 'b' : 'w';
+      const moveNumber = Math.floor(s.moves.length / 2) + 1;
+      // Sumar incremento al lado que acaba de mover (Fischer increment).
+      const inc = s.timeControlIncrementMs ?? 0;
+      const newClockW = s.turn === 'w' && clockW != null ? clockW + inc : clockW;
+      const newClockB = s.turn === 'b' && clockB != null ? clockB + inc : clockB;
+      return {
+        ...s,
+        currentFen: newFen,
+        turn: newTurn,
+        moves: [...s.moves, { moveNumber, color: s.turn, uci, san, fenAfter: newFen }],
+        clockWhiteMs: newClockW ?? s.clockWhiteMs,
+        clockBlackMs: newClockB ?? s.clockBlackMs,
+      };
+    } catch {
+      return null;
+    }
+  }
 
   // R5: payload de relojes que mandamos con cada move (null si sin TC).
   const clockPayload = (): { clockWhiteMs?: number; clockBlackMs?: number } | undefined => {
@@ -465,14 +542,27 @@ export const LiveGamePage = () => {
     if (!id || !state || !promotionPick) return;
     const uci = `${promotionPick.orig}${promotionPick.dest}${piece}`;
     setPromotionPick(null);
-    const fenBeforeMove = state.currentFen;
+    const stateBeforeMove = state;
+    const localChess = chessFromFen(state.currentFen);
+    if (localChess) {
+      const optimistic = buildOptimisticState(state, localChess, uci, clockWhiteMs, clockBlackMs);
+      if (optimistic) {
+        cgApi.current?.set({
+          fen: optimistic.currentFen,
+          turnColor: optimistic.turn === 'w' ? 'white' : 'black',
+          movable: { color: undefined, dests: new Map() },
+        });
+        setState(optimistic);
+      }
+    }
     setBusy(true);
     try {
       const next = await dataApi.move(id, uci, clockPayload());
       setState(next);
     } catch (e) {
       setError(message(e));
-      cgApi.current?.set({ fen: fenBeforeMove });
+      setState(stateBeforeMove);
+      cgApi.current?.set({ fen: stateBeforeMove.currentFen });
     } finally {
       setBusy(false);
     }

@@ -41,6 +41,39 @@ public class EventPublisherService {
         publish("player.registered", payload);
     }
 
+    /** Routing key: registration.pending — el organizador debe aprobar. */
+    public void publishRegistrationPending(Long tournamentId, Long playerId,
+                                            Long organizerId, String tournamentName) {
+        Map<String, Object> payload = Map.of(
+                "tournamentId",   tournamentId,
+                "tournamentName", tournamentName,
+                "playerId",       playerId,
+                "organizerId",    organizerId
+        );
+        publish("registration.pending", payload);
+    }
+
+    /** Routing key: registration.approved — notificación al jugador. */
+    public void publishRegistrationApproved(Long tournamentId, Long playerId, String tournamentName) {
+        Map<String, Object> payload = Map.of(
+                "tournamentId",   tournamentId,
+                "tournamentName", tournamentName,
+                "playerId",       playerId
+        );
+        publish("registration.approved", payload);
+    }
+
+    /** Routing key: registration.rejected — notificación al jugador. */
+    public void publishRegistrationRejected(Long tournamentId, Long playerId,
+                                             String tournamentName, String reason) {
+        java.util.Map<String, Object> payload = new java.util.HashMap<>();
+        payload.put("tournamentId", tournamentId);
+        payload.put("tournamentName", tournamentName);
+        payload.put("playerId", playerId);
+        payload.put("reason", reason == null ? "" : reason);
+        publish("registration.rejected", payload);
+    }
+
     /** Routing key: tournament.round.starting */
     public void publishRoundStarting(Long tournamentId, int roundNumber, int pairingsCount) {
         Map<String, Object> payload = Map.of(

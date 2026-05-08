@@ -161,7 +161,10 @@ const normalizeTournament = (value: unknown): Tournament => {
     timeControl: asString(raw.timeControl) ?? null,
     rounds: asNumber(raw.rounds ?? raw.roundsTotal) ?? 0,
     organizerId: asNumber(raw.organizerId) ?? 0,
+    description: asString(raw.description) ?? null,
+    requiresApproval: typeof raw.requiresApproval === 'boolean' ? raw.requiresApproval : true,
     registered: asNumber(raw.registered ?? raw.registeredCount) ?? 0,
+    pending: asNumber(raw.pending ?? raw.pendingCount) ?? 0,
   };
 };
 
@@ -434,6 +437,69 @@ export const tournamentApi = {
     api.post(`/api/organizer/tournaments/${id}/join`, payload ?? {}).then((r) => r.data),
 };
 
+export interface NotificationItem {
+  id: number;
+  eventType: string;
+  subject: string;
+  payload: string | null;
+  createdAt: string | null;
+  readAt: string | null;
+}
+
+const normalizeNotification = (value: unknown): NotificationItem => {
+  const raw = asRecord(value);
+  return {
+    id: asNumber(raw.id) ?? 0,
+    eventType: asString(raw.eventType) ?? '',
+    subject: asString(raw.subject) ?? '',
+    payload: asString(raw.payload) ?? null,
+    createdAt: asString(raw.createdAt) ?? null,
+    readAt: asString(raw.readAt) ?? null,
+  };
+};
+
+export interface CreateTournamentInput {
+  name: string;
+  description?: string;
+  format: 'SWISS' | 'ROUND_ROBIN' | 'KNOCKOUT';
+  startDate?: string;
+  endDate?: string;
+  location?: string;
+  maxPlayers?: number;
+  roundsTotal?: number;
+  minElo?: number;
+  maxElo?: number;
+  timeControl?: string;
+  requiresApproval?: boolean;
+}
+
+export interface RegistrationRow {
+  id: number;
+  tournamentId: number;
+  playerId: number;
+  playerName?: string | null;
+  playerEloFide?: number | null;
+  playerEloNational?: number | null;
+  status: 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'CANCELLED';
+  seedRating: number | null;
+  registeredAt: string | null;
+}
+
+const normalizeRegistration = (raw: unknown): RegistrationRow => {
+  const r = asRecord(raw);
+  return {
+    id: asNumber(r.id) ?? 0,
+    tournamentId: asNumber(r.tournamentId) ?? 0,
+    playerId: asNumber(r.playerId) ?? 0,
+    playerName: asString(r.playerName) ?? null,
+    playerEloFide: asNumber(r.playerEloFide) ?? null,
+    playerEloNational: asNumber(r.playerEloNational) ?? null,
+    status: ((asString(r.status) ?? 'PENDING') as RegistrationRow['status']),
+    seedRating: asNumber(r.seedRating) ?? null,
+    registeredAt: asString(r.registeredAt) ?? null,
+  };
+};
+
 export const organizerApi = {
   listTournaments: (params?: Record<string, string | number | undefined>) => tournamentApi.list(params),
   tournamentDetail: (id: string | number) => tournamentApi.detail(id),
@@ -443,6 +509,37 @@ export const organizerApi = {
     api.post(`/api/organizer/tournaments/${id}/rounds/${roundNumber}/generate`, {}).then((r) => normalizeRound(r.data)),
   patchPairingResult: (pairingId: string | number, result: string) =>
     api.patch(`/api/organizer/pairings/${pairingId}/result`, { result }).then((r) => normalizePairing(r.data)),
+  createTournament: (input: CreateTournamentInput): Promise<Tournament> =>
+    api.post('/api/organizer/tournaments', input).then((r) => normalizeTournament(r.data)),
+  patchTournamentStatus: (id: string | number, newStatus: Tournament['status']): Promise<Tournament> =>
+    api
+      .patch(`/api/organizer/tournaments/${id}/status`, { newStatus })
+      .then((r) => normalizeTournament(r.data)),
+  listRegistrations: (id: string | number): Promise<RegistrationRow[]> =>
+    api
+      .get(`/api/organizer/tournaments/${id}/registrations`)
+      .then((r) => asArray<unknown>(r.data).map(normalizeRegistration)),
+  approveRegistration: (registrationId: string | number) =>
+    api
+      .patch(`/api/organizer/registrations/${registrationId}/approve`, {})
+      .then((r) => normalizeRegistration(r.data)),
+  rejectRegistration: (registrationId: string | number, reason?: string) =>
+    api
+      .patch(`/api/organizer/registrations/${registrationId}/reject`, { reason: reason ?? '' })
+      .then((r) => normalizeRegistration(r.data)),
+
+  // Notificaciones del organizador (registration.pending y otras)
+  listNotifications: (): Promise<NotificationItem[]> =>
+    api.get('/api/organizer/notifications').then((r) =>
+      asArray<unknown>(r.data).map(normalizeNotification),
+    ),
+  unreadNotificationCount: (): Promise<number> =>
+    api.get('/api/organizer/notifications/unread-count').then((r) => {
+      const raw = asRecord(r.data);
+      return asNumber(raw.count) ?? 0;
+    }),
+  markAllNotificationsRead: (): Promise<void> =>
+    api.post('/api/organizer/notifications/read-all').then(() => undefined),
 };
 
 export const adminApi = {
@@ -467,7 +564,11 @@ export interface LiveGameSummary {
 
 export const liveGameApi = {
   create: (whiteEloBefore?: number) =>
-    api.post<LiveGameSummary>('/api/player/play/live', { whiteEloBefore }).then((r) => r.data),
+    api.post<LiveGameSummary>('/api/player/play/live', {
+      whiteEloBefore,
+      timeControlInitialMs: 180_000,
+      timeControlIncrementMs: 0,
+    }).then((r) => r.data),
   get: (id: number | string) =>
     api.get<LiveGameSummary>(`/api/player/play/live/${id}`).then((r) => r.data),
   join: (id: number | string, eloBefore?: number) =>

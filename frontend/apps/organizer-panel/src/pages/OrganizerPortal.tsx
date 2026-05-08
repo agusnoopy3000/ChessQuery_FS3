@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Badge, Button, Card, EmptyState, ErrorAlert, Skeleton } from '@chessquery/ui-lib';
 import { Tournament } from '@chessquery/shared';
 import { organizerApi } from '../api';
-import { formatDate, formatNumber, tournamentStatusVariant, unwrapContent } from '../portal-utils';
+import { dedupeBy, formatDate, formatNumber, tournamentStatusVariant, unwrapContent } from '../portal-utils';
 
 export const OrganizerPortalPage = () => {
   const navigate = useNavigate();
@@ -15,7 +15,7 @@ export const OrganizerPortalPage = () => {
   });
 
   const summary = useMemo(() => {
-    const items = unwrapContent<Tournament>(tournaments.data);
+    const items = dedupeBy(unwrapContent<Tournament>(tournaments.data), (t) => t.id);
     return {
       created: items.length,
       inProgress: items.filter((item) => item.status === 'IN_PROGRESS').length,

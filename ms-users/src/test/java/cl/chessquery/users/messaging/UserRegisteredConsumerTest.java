@@ -1,7 +1,7 @@
 package cl.chessquery.users.messaging;
 
-import cl.chessquery.users.entity.Player;
-import cl.chessquery.users.repository.PlayerRepository;
+import cl.chessquery.users.dto.ProvisionPlayerRequest;
+import cl.chessquery.users.service.PlayerService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -11,19 +11,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class UserRegisteredConsumerTest {
 
-    @Mock PlayerRepository playerRepo;
+    @Mock PlayerService playerService;
     @InjectMocks UserRegisteredConsumer consumer;
 
     private static Map<String, Object> message(String userId, String email,
@@ -42,55 +40,26 @@ class UserRegisteredConsumerTest {
     }
 
     @Test
-    void createsPlayerWithSupabaseUserId() {
+    void delegatesProvisionWithExtractedFields() {
         UUID supabaseId = UUID.randomUUID();
-        when(playerRepo.findBySupabaseUserId(supabaseId)).thenReturn(Optional.empty());
-        when(playerRepo.findByEmail("juan@demo.cl")).thenReturn(Optional.empty());
 
         consumer.onUserRegistered(message(supabaseId.toString(), "juan@demo.cl", "Juan", "Soto"));
 
-        ArgumentCaptor<Player> captor = ArgumentCaptor.forClass(Player.class);
-        verify(playerRepo).save(captor.capture());
-        Player saved = captor.getValue();
-        assertThat(saved.getSupabaseUserId()).isEqualTo(supabaseId);
-        assertThat(saved.getEmail()).isEqualTo("juan@demo.cl");
-        assertThat(saved.getFirstName()).isEqualTo("Juan");
-        assertThat(saved.getLastName()).isEqualTo("Soto");
-    }
-
-    @Test
-    void linksSupabaseIdToExistingPlayerByEmail() {
-        UUID supabaseId = UUID.randomUUID();
-        Player existing = Player.builder().id(7L).firstName("Ana").lastName("Pérez")
-                .email("ana@demo.cl").build();
-        when(playerRepo.findBySupabaseUserId(supabaseId)).thenReturn(Optional.empty());
-        when(playerRepo.findByEmail("ana@demo.cl")).thenReturn(Optional.of(existing));
-
-        consumer.onUserRegistered(message(supabaseId.toString(), "ana@demo.cl", "Ana", "Pérez"));
-
-        ArgumentCaptor<Player> captor = ArgumentCaptor.forClass(Player.class);
-        verify(playerRepo).save(captor.capture());
-        Player saved = captor.getValue();
-        assertThat(saved.getId()).isEqualTo(7L);
-        assertThat(saved.getSupabaseUserId()).isEqualTo(supabaseId);
-    }
-
-    @Test
-    void idempotentWhenSupabaseIdAlreadyExists() {
-        UUID supabaseId = UUID.randomUUID();
-        Player existing = Player.builder().id(7L).supabaseUserId(supabaseId).build();
-        when(playerRepo.findBySupabaseUserId(supabaseId)).thenReturn(Optional.of(existing));
-
-        consumer.onUserRegistered(message(supabaseId.toString(), "x@y.cl", "X", "Y"));
-
-        verify(playerRepo, never()).save(any());
+        ArgumentCaptor<ProvisionPlayerRequest> captor =
+                ArgumentCaptor.forClass(ProvisionPlayerRequest.class);
+        verify(playerService).provisionBySupabaseId(captor.capture());
+        ProvisionPlayerRequest req = captor.getValue();
+        assertThat(req.supabaseUserId()).isEqualTo(supabaseId);
+        assertThat(req.email()).isEqualTo("juan@demo.cl");
+        assertThat(req.firstName()).isEqualTo("Juan");
+        assertThat(req.lastName()).isEqualTo("Soto");
     }
 
     @Test
     void ignoresMessageWithInvalidUuid() {
         consumer.onUserRegistered(message("not-a-uuid", "x@y.cl", "X", "Y"));
 
-        verify(playerRepo, never()).save(any());
+        verify(playerService, never()).provisionBySupabaseId(any());
     }
 
     @Test
@@ -100,6 +69,18 @@ class UserRegisteredConsumerTest {
 
         consumer.onUserRegistered(msg);
 
-        verify(playerRepo, never()).save(any());
+        verify(playerService, never()).provisionBySupabaseId(any());
+    }
+
+    @Test
+    void ignoresMessageWithoutUserId() {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("email", "x@y.cl");
+        Map<String, Object> msg = new HashMap<>();
+        msg.put("payload", payload);
+
+        consumer.onUserRegistered(msg);
+
+        verify(playerService, never()).provisionBySupabaseId(any());
     }
 }

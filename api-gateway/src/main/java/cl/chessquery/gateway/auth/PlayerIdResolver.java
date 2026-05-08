@@ -5,6 +5,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import io.netty.channel.ChannelOption;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -15,6 +16,7 @@ import reactor.netty.resources.ConnectionProvider;
 import reactor.util.retry.Retry;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -62,11 +64,27 @@ public class PlayerIdResolver {
     }
 
     public Mono<Long> resolve(UUID supabaseUserId) {
+        return resolve(supabaseUserId, null);
+    }
+
+    /**
+     * Resuelve {@code supabaseUserId → playerId}. Si MS-Users responde 404 y el
+     * caller proveyó {@code claims} (email, firstName, lastName, etc. del JWT),
+     * auto-provisionamos el Player vía {@code POST /users/provision}. Esto cubre
+     * el caso en que el webhook {@code user.registered} de Supabase no llegó
+     * (deshabilitado en local, fallo de red) y el usuario recién registrado no
+     * puede operar.
+     */
+    public Mono<Long> resolve(UUID supabaseUserId, Map<String, Object> claims) {
         Long cached = cache.getIfPresent(supabaseUserId);
         if (cached != null) {
             return Mono.just(cached);
         }
         return fetchFromMsUsers(supabaseUserId)
+                .onErrorResume(WebClientResponseException.NotFound.class,
+                        e -> claims != null
+                                ? provisionFromClaims(supabaseUserId, claims)
+                                : Mono.error(e))
                 .doOnNext(id -> cache.put(supabaseUserId, id));
     }
 
@@ -76,24 +94,59 @@ public class PlayerIdResolver {
                 .retrieve()
                 .bodyToMono(Map.class)
                 .timeout(MS_USERS_TIMEOUT)
-                .map(body -> {
-                    Object id = body.get("id");
-                    if (id instanceof Number) {
-                        return ((Number) id).longValue();
-                    }
-                    throw new IllegalStateException("MS-Users response missing 'id' for " + supabaseUserId);
-                })
-                // Reintentos tolerantes:
-                //  - 404: 1 retry tras 500ms (race con webhook user.registered).
-                //  - PrematureClose / ConnectException / SocketException: 1 retry
-                //    inmediato (connection zombie en el pool tras un restart de
-                //    ms-users).
-                .retryWhen(Retry.fixedDelay(1, Duration.ofMillis(500))
-                        .filter(t -> t instanceof WebClientResponseException.NotFound
-                                || t.getClass().getSimpleName().contains("PrematureClose")
-                                || t.getClass().getSimpleName().contains("ConnectException")
-                                || t.getClass().getSimpleName().contains("SocketException")))
+                .map(this::extractId)
+                // Reintentos tolerantes a fallos transitorios (connection zombies
+                // tras restart de ms-users). 404 NO reintenta acá — se maneja
+                // arriba con auto-provisión usando los claims del JWT.
+                .retryWhen(Retry.fixedDelay(1, Duration.ofMillis(250))
+                        .filter(this::isTransientNetworkFailure))
                 .doOnError(e -> log.warn("Failed to resolve supabaseUserId={}: {}",
                         supabaseUserId, e.toString()));
     }
+
+    private Mono<Long> provisionFromClaims(UUID supabaseUserId, Map<String, Object> claims) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("supabaseUserId", supabaseUserId.toString());
+        body.put("email", claims.get("email"));
+        body.put("firstName", claims.get("firstName"));
+        body.put("lastName", claims.get("lastName"));
+        body.put("lichessUsername", claims.get("lichessUsername"));
+        body.put("clubName", claims.get("clubName"));
+        log.info("Auto-provisioning Player for supabaseUserId={} email={}",
+                supabaseUserId, claims.get("email"));
+        return webClient.post()
+                .uri("/users/provision")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(body)
+                .retrieve()
+                .bodyToMono(Map.class)
+                .timeout(MS_USERS_TIMEOUT)
+                .map(this::extractId)
+                .retryWhen(Retry.fixedDelay(1, Duration.ofMillis(250))
+                        .filter(this::isTransientNetworkFailure));
+    }
+
+    @SuppressWarnings("rawtypes")
+    private Long extractId(Map body) {
+        Object id = body.get("id");
+        if (id instanceof Number) return ((Number) id).longValue();
+        throw new IllegalStateException("MS-Users response missing 'id'");
+    }
+
+    private boolean isTransientNetworkFailure(Throwable t) {
+        Throwable current = t;
+        while (current != null) {
+            String name = current.getClass().getName();
+            if (name.contains("PrematureClose")
+                    || name.contains("ConnectException")
+                    || name.contains("SocketException")
+                    || name.contains("ReadTimeout")
+                    || name.contains("TimeoutException")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
 }

@@ -94,6 +94,23 @@ export const unwrapContent = <T,>(data: unknown): T[] => {
   return maybePage?.content ?? [];
 };
 
+/**
+ * Deduplica una lista por una clave (típicamente `id`). Sirve como defensa
+ * contra duplicaciones espurias por re-fetch concurrente, HMR o caches
+ * intermedios que entreguen el mismo registro dos veces.
+ */
+export const dedupeBy = <T, K>(items: T[], key: (item: T) => K): T[] => {
+  const seen = new Set<K>();
+  const out: T[] = [];
+  for (const it of items) {
+    const k = key(it);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(it);
+  }
+  return out;
+};
+
 export const buildLichessProfileUrl = (username?: string | null) =>
   username ? `https://lichess.org/@/${encodeURIComponent(username)}` : null;
 

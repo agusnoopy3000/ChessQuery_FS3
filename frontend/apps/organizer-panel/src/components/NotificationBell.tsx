@@ -1,16 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { playerApi, NotificationItem } from '../api';
+import { organizerApi, NotificationItem } from '../api';
 
 const POLL_MS = 8_000;
 const TOAST_DURATION_MS = 5_000;
 
 const eventIcon = (eventType: string): string => {
-  if (eventType.startsWith('game.')) return '♟';
+  if (eventType.startsWith('registration.')) return '📋';
   if (eventType.startsWith('tournament.')) return '🏆';
   if (eventType.startsWith('player.')) return '✅';
-  if (eventType.startsWith('registration.')) return '📋';
-  if (eventType === 'elo.updated') return '📈';
-  if (eventType === 'user.registered') return '👋';
+  if (eventType.startsWith('game.')) return '♟';
   return '🔔';
 };
 
@@ -32,14 +30,9 @@ interface ToastEntry {
 }
 
 /**
- * N1 + push: campana de notificaciones in-app + toasts emergentes.
- *
- * Polling cada 8s del listado. Para cada notificación con id > lastSeenId,
- * empuja un toast que se auto-dismissea en 5s. Esto da experiencia "push"
- * sin depender de Realtime ni Service Workers.
- *
- * En la primera carga se inicializa lastSeenId al max id existente para
- * no spamear toasts del histórico.
+ * Campana de notificaciones + toasts emergentes para el panel del organizador.
+ * Polling cada 8s. Detecta notificaciones nuevas (id > lastSeenId) y las
+ * empuja como toasts auto-dismiss.
  */
 export const NotificationBell = () => {
   const [open, setOpen] = useState(false);
@@ -62,32 +55,26 @@ export const NotificationBell = () => {
   const poll = useCallback(async () => {
     try {
       const [list, count] = await Promise.all([
-        playerApi.listNotifications().catch(() => [] as NotificationItem[]),
-        playerApi.unreadNotificationCount().catch(() => 0),
+        organizerApi.listNotifications().catch(() => [] as NotificationItem[]),
+        organizerApi.unreadNotificationCount().catch(() => 0),
       ]);
       setUnread(count);
       setItems(list);
 
       if (!initializedRef.current) {
-        // Primera carga: solo memorizamos el max id para no toastear histórico.
         const maxId = list.reduce((m, n) => (n.id > m ? n.id : m), 0);
         lastSeenIdRef.current = maxId;
         initializedRef.current = true;
         return;
       }
-
       const seen = lastSeenIdRef.current ?? 0;
       const fresh = list.filter((n) => n.id > seen);
       if (fresh.length > 0) {
-        // Mostrar de la más vieja a la más nueva (orden cronológico).
-        for (const n of [...fresh].reverse()) {
-          pushToast(n);
-        }
-        const newMax = fresh.reduce((m, n) => (n.id > m ? n.id : m), seen);
-        lastSeenIdRef.current = newMax;
+        for (const n of [...fresh].reverse()) pushToast(n);
+        lastSeenIdRef.current = fresh.reduce((m, n) => (n.id > m ? n.id : m), seen);
       }
     } catch {
-      // backend caído: ignorar silenciosamente
+      /* ignore */
     }
   }, [pushToast]);
 
@@ -97,7 +84,6 @@ export const NotificationBell = () => {
     return () => clearInterval(interval);
   }, [poll]);
 
-  // Cerrar dropdown al click fuera.
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
@@ -113,10 +99,10 @@ export const NotificationBell = () => {
     setOpen(true);
     setLoading(true);
     try {
-      const list = await playerApi.listNotifications();
+      const list = await organizerApi.listNotifications();
       setItems(list);
       if (list.some((n) => !n.readAt)) {
-        await playerApi.markAllNotificationsRead();
+        await organizerApi.markAllNotificationsRead();
         setUnread(0);
         setItems((prev) => prev.map((n) => ({ ...n, readAt: n.readAt ?? new Date().toISOString() })));
       }
@@ -127,18 +113,12 @@ export const NotificationBell = () => {
     }
   };
 
-  const dismissToast = (key: number) => {
+  const dismissToast = (key: number) =>
     setToasts((prev) => prev.filter((t) => t.key !== key));
-  };
 
   return (
     <>
-      <div
-        ref={wrapperRef}
-        style={{
-          position: 'fixed', top: 14, right: 18, zIndex: 900,
-        }}
-      >
+      <div ref={wrapperRef} style={{ position: 'fixed', top: 14, right: 18, zIndex: 900 }}>
         <button
           onClick={() => (open ? setOpen(false) : openDropdown())}
           title="Notificaciones"
@@ -148,8 +128,7 @@ export const NotificationBell = () => {
             border: '1px solid var(--border, #2a2d27)',
             borderRadius: '50%',
             width: 38, height: 38,
-            fontSize: 18,
-            cursor: 'pointer',
+            fontSize: 18, cursor: 'pointer',
             color: 'var(--text, #e8ead4)',
           }}
         >
@@ -220,7 +199,6 @@ export const NotificationBell = () => {
         )}
       </div>
 
-      {/* Stack de toasts emergentes (push notifications). */}
       <div
         style={{
           position: 'fixed', top: 64, right: 18, zIndex: 1100,
@@ -233,8 +211,7 @@ export const NotificationBell = () => {
             key={key}
             onClick={() => dismissToast(key)}
             style={{
-              pointerEvents: 'auto',
-              cursor: 'pointer',
+              pointerEvents: 'auto', cursor: 'pointer',
               minWidth: 280, maxWidth: 360,
               background: 'rgba(28,31,26,0.98)',
               border: '1px solid var(--border, #2a2d27)',
@@ -243,7 +220,7 @@ export const NotificationBell = () => {
               boxShadow: '0 12px 32px rgba(0,0,0,0.5)',
               padding: '12px 14px',
               display: 'flex', gap: 12, alignItems: 'flex-start',
-              animation: 'cq-toast-slide-in 220ms ease-out',
+              animation: 'cq-org-toast-slide-in 220ms ease-out',
             }}
           >
             <span style={{ fontSize: 20, flexShrink: 0 }}>{eventIcon(n.eventType)}</span>
@@ -259,8 +236,7 @@ export const NotificationBell = () => {
               onClick={(e) => { e.stopPropagation(); dismissToast(key); }}
               style={{
                 background: 'transparent', border: 'none', color: 'var(--text-muted)',
-                cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 2,
-                flexShrink: 0,
+                cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 2, flexShrink: 0,
               }}
               aria-label="Cerrar"
             >
@@ -269,7 +245,7 @@ export const NotificationBell = () => {
           </div>
         ))}
         <style>{`
-          @keyframes cq-toast-slide-in {
+          @keyframes cq-org-toast-slide-in {
             from { opacity: 0; transform: translateX(20px); }
             to { opacity: 1; transform: translateX(0); }
           }

@@ -70,6 +70,12 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    public Binding tournamentEventsBindingRegistration(Queue tournamentEventsQueue,
+                                                        TopicExchange chessEventsExchange) {
+        return BindingBuilder.bind(tournamentEventsQueue).to(chessEventsExchange).with("registration.*");
+    }
+
+    @Bean
     public Binding notifGameEventsBinding(Queue notifGameEventsQueue, TopicExchange chessEventsExchange) {
         return BindingBuilder.bind(notifGameEventsQueue).to(chessEventsExchange).with("elo.*");
     }

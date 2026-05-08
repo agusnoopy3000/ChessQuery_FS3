@@ -141,4 +141,102 @@ export class OrganizerService {
     const { msTournament } = this.http.urls;
     return this.http.get<unknown>(`${msTournament}/tournaments/${tournamentId}/standings`);
   }
+
+  async listRegistrations(tournamentId: string) {
+    const { msTournament, msUsers } = this.http.urls;
+    const regs = await this.http.get<Array<Record<string, unknown>>>(
+      `${msTournament}/tournaments/${tournamentId}/registrations`,
+    );
+    if (!Array.isArray(regs)) return regs;
+
+    const playerIds = new Set<number>();
+    for (const r of regs) {
+      if (r.playerId != null) playerIds.add(Number(r.playerId));
+    }
+    const profiles = await Promise.all(
+      Array.from(playerIds).map((id) =>
+        this.http
+          .get<PlayerProfile>(`${msUsers}/users/${id}/profile`)
+          .catch(() => ({ id } as PlayerProfile)),
+      ),
+    );
+    const byId = new Map<number, PlayerProfile>();
+    for (const p of profiles) byId.set(p.id, p);
+
+    return regs.map((r) => {
+      const playerId = Number(r.playerId);
+      const p = byId.get(playerId);
+      const playerName = p
+        ? `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim() || undefined
+        : undefined;
+      return { ...r, playerName, playerEloFide: p?.eloFideStandard, playerEloNational: p?.eloNational };
+    });
+  }
+
+  async approveRegistration(registrationId: string, organizerId: string) {
+    const { msTournament } = this.http.urls;
+    return this.http.patch<unknown>(
+      `${msTournament}/tournaments/registrations/${registrationId}/approve`,
+      {},
+      { headers: { 'X-User-Role': 'ORGANIZER', 'X-User-Id': organizerId } },
+    );
+  }
+
+  async rejectRegistration(
+    registrationId: string,
+    organizerId: string,
+    body: Record<string, unknown>,
+  ) {
+    const { msTournament } = this.http.urls;
+    return this.http.patch<unknown>(
+      `${msTournament}/tournaments/registrations/${registrationId}/reject`,
+      body,
+      { headers: { 'X-User-Role': 'ORGANIZER', 'X-User-Id': organizerId } },
+    );
+  }
+
+  async patchTournamentStatus(
+    tournamentId: string,
+    organizerId: string,
+    body: Record<string, unknown>,
+  ) {
+    const { msTournament } = this.http.urls;
+    return this.http.patch<unknown>(
+      `${msTournament}/tournaments/${tournamentId}/status`,
+      body,
+      { headers: { 'X-User-Role': 'ORGANIZER', 'X-User-Id': organizerId } },
+    );
+  }
+
+  // ── Notificaciones (proxy a ms-notifications) ────────────────────────────
+
+  async listNotifications(userId: string) {
+    const { msNotifications } = this.http.urls;
+    return this.http.get<unknown>(
+      `${msNotifications}/notifications?recipientId=${userId}&limit=20`,
+    );
+  }
+
+  async unreadNotificationCount(userId: string) {
+    const { msNotifications } = this.http.urls;
+    return this.http.get<unknown>(
+      `${msNotifications}/notifications/unread-count?recipientId=${userId}`,
+    );
+  }
+
+  async markNotificationRead(notificationId: string) {
+    const { msNotifications } = this.http.urls;
+    return this.http.patch<unknown>(
+      `${msNotifications}/notifications/${notificationId}/read`,
+      {},
+    );
+  }
+
+  async markAllNotificationsRead(userId: string) {
+    const { msNotifications } = this.http.urls;
+    return this.http.patch<unknown>(
+      `${msNotifications}/notifications/read-all?recipientId=${userId}`,
+      {},
+    );
+  }
 }

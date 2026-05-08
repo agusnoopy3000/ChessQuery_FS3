@@ -336,4 +336,45 @@ export class PlayerService {
       return { username, user: null, games: [], error: msg };
     }
   }
+
+  // ── Torneos (vista de jugador) ─────────────────────────────────────────
+
+  async listTournaments(query: Record<string, string | undefined>): Promise<unknown> {
+    const { msTournament } = this.http.urls;
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(query)) {
+      if (v !== undefined && v !== null && v !== '') params.set(k, String(v));
+    }
+    const qs = params.toString();
+    return this.http.get<unknown>(
+      `${msTournament}/tournaments${qs ? '?' + qs : ''}`,
+    );
+  }
+
+  async getTournament(tournamentId: string): Promise<unknown> {
+    const { msTournament } = this.http.urls;
+    return this.http.get<unknown>(`${msTournament}/tournaments/${tournamentId}`);
+  }
+
+  async getTournamentStandings(tournamentId: string): Promise<unknown> {
+    const { msTournament } = this.http.urls;
+    return this.http.get<unknown>(`${msTournament}/tournaments/${tournamentId}/standings`);
+  }
+
+  async getMyRegistration(tournamentId: string, userId: string): Promise<unknown> {
+    const { msTournament } = this.http.urls;
+    const all = await this.http.get<Array<Record<string, unknown>>>(
+      `${msTournament}/tournaments/${tournamentId}/registrations`,
+    );
+    if (!Array.isArray(all)) return null;
+    return all.find((r) => Number(r.playerId) === Number(userId)) ?? null;
+  }
+
+  async registerToTournament(tournamentId: string, userId: string): Promise<unknown> {
+    const { msTournament } = this.http.urls;
+    return this.http.post<unknown>(
+      `${msTournament}/tournaments/${tournamentId}/registrations`,
+      { playerId: Number(userId) },
+    );
+  }
 }

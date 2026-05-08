@@ -68,6 +68,15 @@ public class UserController {
         return playerService.getProfileBySupabaseId(supabaseUserId);
     }
 
+    @Operation(summary = "Auto-provisionar Player desde JWT de Supabase (idempotente)",
+               description = "Llamado por el API Gateway cuando un JWT válido entra pero el "
+                       + "Player aún no existe (registro reciente, webhook caído).")
+    @PostMapping("/provision")
+    @ResponseStatus(HttpStatus.OK)
+    public PlayerProfileResponse provision(@Valid @RequestBody ProvisionPlayerRequest request) {
+        return playerService.provisionBySupabaseId(request);
+    }
+
     @Operation(summary = "Actualizar datos de perfil (firstName, lastName, clubId, region)")
     @PutMapping("/{id}/profile")
     public PlayerProfileResponse updateProfile(

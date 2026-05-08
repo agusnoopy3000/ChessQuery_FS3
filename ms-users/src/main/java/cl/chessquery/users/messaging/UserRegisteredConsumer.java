@@ -1,18 +1,14 @@
 package cl.chessquery.users.messaging;
 
 import cl.chessquery.users.config.RabbitMQConfig;
-import cl.chessquery.users.entity.Club;
-import cl.chessquery.users.entity.Player;
-import cl.chessquery.users.repository.ClubRepository;
-import cl.chessquery.users.repository.PlayerRepository;
+import cl.chessquery.users.dto.ProvisionPlayerRequest;
+import cl.chessquery.users.service.PlayerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 
@@ -20,34 +16,18 @@ import java.util.UUID;
  * Consumidor del evento user.registered publicado por el API Gateway tras
  * el webhook de Supabase Auth (auth.users.created).
  *
- * Payload esperado (formato CONTEXT.md):
- * {
- *   "eventId":   "uuid-v4",
- *   "eventType": "user.registered",
- *   "timestamp": "ISO-8601",
- *   "payload": {
- *     "userId":    "<supabase-uuid>",
- *     "email":     "user@example.com",
- *     "role":      "PLAYER" | "ORGANIZER" | "ADMIN",
- *     "firstName": "...",
- *     "lastName":  "..."
- *   }
- * }
- *
- * Acción: si ya existe un Player con ese supabaseUserId → idempotente (no-op).
- * Si no existe pero hay match por email → asocia supabaseUserId al Player
- * existente. Si no, crea un nuevo Player.
+ * Delega la lógica de creación/asociación a {@link PlayerService#provisionBySupabaseId}
+ * para mantener single source of truth con el endpoint {@code POST /users/provision}
+ * (que se invoca cuando el webhook no llegó o un JWT entra antes que el evento Rabbit).
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class UserRegisteredConsumer {
 
-    private final PlayerRepository playerRepo;
-    private final ClubRepository clubRepo;
+    private final PlayerService playerService;
 
     @RabbitListener(queues = RabbitMQConfig.USERS_REGISTRATION_QUEUE)
-    @Transactional
     public void onUserRegistered(Map<String, Object> message) {
         @SuppressWarnings("unchecked")
         Map<String, Object> payload = (Map<String, Object>) message.get("payload");
@@ -70,58 +50,14 @@ public class UserRegisteredConsumer {
             return;
         }
 
-        String email           = (String) payload.get("email");
-        String firstName       = (String) payload.getOrDefault("firstName", null);
-        String lastName        = (String) payload.getOrDefault("lastName", null);
-        String lichessUsername = (String) payload.getOrDefault("lichessUsername", null);
-        String clubName        = (String) payload.getOrDefault("clubName", null);
-
-        Club club = StringUtils.hasText(clubName)
-                ? clubRepo.findFirstByNameIgnoreCase(clubName.trim()).orElse(null)
-                : null;
-        if (StringUtils.hasText(clubName) && club == null) {
-            log.info("user.registered: club '{}' no existe, se ignora (player queda sin club)", clubName);
-        }
-
-        // 1. Idempotencia: si ya existe Player con este supabaseUserId, no-op.
-        if (playerRepo.findBySupabaseUserId(supabaseUserId).isPresent()) {
-            log.debug("user.registered ignorado (Player ya existe para supabaseUserId={})",
-                    supabaseUserId);
-            return;
-        }
-
-        // 2. Match por email: asociar supabaseUserId a Player existente.
-        if (StringUtils.hasText(email)) {
-            Player existing = playerRepo.findByEmail(email).orElse(null);
-            if (existing != null) {
-                existing.setSupabaseUserId(supabaseUserId);
-                if (StringUtils.hasText(lichessUsername) && !StringUtils.hasText(existing.getLichessUsername())) {
-                    existing.setLichessUsername(lichessUsername.trim());
-                }
-                if (club != null && existing.getClub() == null) {
-                    existing.setClub(club);
-                }
-                playerRepo.save(existing);
-                log.info("user.registered: asociado supabaseUserId={} a Player existente id={}",
-                        supabaseUserId, existing.getId());
-                return;
-            }
-        }
-
-        // 3. Crear nuevo Player.
-        Instant now = Instant.now();
-        Player p = Player.builder()
-                .firstName(StringUtils.hasText(firstName) ? firstName : "Jugador")
-                .lastName(StringUtils.hasText(lastName)  ? lastName  : userIdStr.substring(0, 8))
-                .email(email)
-                .supabaseUserId(supabaseUserId)
-                .lichessUsername(StringUtils.hasText(lichessUsername) ? lichessUsername.trim() : null)
-                .club(club)
-                .createdAt(now)
-                .updatedAt(now)
-                .build();
-        playerRepo.save(p);
-        log.info("user.registered: Player creado id={} supabaseUserId={} email={} club={}",
-                p.getId(), supabaseUserId, email, club != null ? club.getName() : "—");
+        ProvisionPlayerRequest req = new ProvisionPlayerRequest(
+                supabaseUserId,
+                (String) payload.get("email"),
+                (String) payload.getOrDefault("firstName", null),
+                (String) payload.getOrDefault("lastName", null),
+                (String) payload.getOrDefault("lichessUsername", null),
+                (String) payload.getOrDefault("clubName", null)
+        );
+        playerService.provisionBySupabaseId(req);
     }
 }

@@ -48,7 +48,19 @@ export const TournamentsPage = () => {
     queryFn: () => tournamentApi.list(),
   });
 
-  const all = unwrap<Tournament>(data);
+  // Defensa contra duplicaciones espurias por re-fetch concurrente / HMR:
+  // dedup por id antes de filtrar.
+  const all = useMemo(() => {
+    const list = unwrap<Tournament>(data);
+    const seen = new Set<number>();
+    const out: Tournament[] = [];
+    for (const t of list) {
+      if (seen.has(t.id)) continue;
+      seen.add(t.id);
+      out.push(t);
+    }
+    return out;
+  }, [data]);
   const filtered = useMemo(
     () =>
       all.filter(
