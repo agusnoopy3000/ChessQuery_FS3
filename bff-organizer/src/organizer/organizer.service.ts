@@ -195,6 +195,14 @@ export class OrganizerService {
     );
   }
 
+  async deleteTournament(tournamentId: string, organizerId: string) {
+    const { msTournament } = this.http.urls;
+    return this.http.delete<unknown>(
+      `${msTournament}/tournaments/${tournamentId}`,
+      { headers: { 'X-User-Role': 'ORGANIZER', 'X-User-Id': organizerId } },
+    );
+  }
+
   async patchTournamentStatus(
     tournamentId: string,
     organizerId: string,

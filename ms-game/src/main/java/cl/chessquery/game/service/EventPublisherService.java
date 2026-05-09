@@ -37,6 +37,18 @@ public class EventPublisherService {
         publish("game.finished", payload);
     }
 
+    /** Routing key: game.invitation — push in-app al jugador invitado. */
+    public void publishGameInvitation(Long gameId, Long invitedPlayerId, Long inviterPlayerId,
+                                       String inviterName, String gameUrl) {
+        java.util.Map<String, Object> payload = new java.util.HashMap<>();
+        payload.put("gameId", gameId);
+        payload.put("playerId", invitedPlayerId);
+        payload.put("inviterId", inviterPlayerId == null ? 0L : inviterPlayerId);
+        payload.put("inviterName", inviterName == null ? "" : inviterName);
+        payload.put("gameUrl", gameUrl == null ? "" : gameUrl);
+        publish("game.invitation", payload);
+    }
+
     /** Routing key: elo.updated (uno por jugador) */
     public void publishEloUpdated(Long playerId, int oldElo, int newElo, Long gameId, String ratingType) {
         Map<String, Object> payload = Map.of(

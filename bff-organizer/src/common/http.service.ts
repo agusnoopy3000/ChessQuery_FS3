@@ -73,6 +73,15 @@ export class UpstreamHttpService {
     }
   }
 
+  async delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+    try {
+      const res = await firstValueFrom(this.http.delete<T>(url, { timeout: 5000, ...config }));
+      return res.data;
+    } catch (err) {
+      this.rethrow(err as AxiosError, 'DELETE', url);
+    }
+  }
+
   private rethrow(err: AxiosError, method: string, url: string): never {
     if (err.response) {
       const status = err.response.status;

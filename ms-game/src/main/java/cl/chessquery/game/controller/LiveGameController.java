@@ -66,4 +66,13 @@ public class LiveGameController {
     public LiveGameResponse rematch(@PathVariable Long id, @Valid @RequestBody RematchRequest req) {
         return live.rematch(id, req);
     }
+
+    @Operation(summary = "Invitar a otro jugador por email — si tiene cuenta, recibe push in-app además del email")
+    @PostMapping("/{id}/invite")
+    public java.util.Map<String, Object> invite(
+            @PathVariable Long id,
+            @Valid @RequestBody InviteRequest req,
+            @RequestHeader(value = "X-User-Id", required = false) Long inviterId) {
+        return live.invitePlayer(id, req.email(), req.gameUrl(), inviterId);
+    }
 }

@@ -68,6 +68,12 @@ public class UserController {
         return playerService.getProfileBySupabaseId(supabaseUserId);
     }
 
+    @Operation(summary = "Resolver Player por email (usado por ms-game para invitaciones in-app)")
+    @GetMapping("/by-email")
+    public PlayerProfileResponse getByEmail(@RequestParam String email) {
+        return playerService.getProfileByEmail(email);
+    }
+
     @Operation(summary = "Auto-provisionar Player desde JWT de Supabase (idempotente)",
                description = "Llamado por el API Gateway cuando un JWT válido entra pero el "
                        + "Player aún no existe (registro reciente, webhook caído).")

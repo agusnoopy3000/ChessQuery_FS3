@@ -127,6 +127,30 @@ public class NotificationService {
     }
 
     /**
+     * Notificación de invitación a partida (push in-app + email vía Supabase OTP).
+     * Payload: {gameId, playerId, inviterId, inviterName, gameUrl}
+     *
+     * El email magic link lo manda el frontend directamente vía Supabase Auth.
+     * Acá solo creamos la notificación in-app para que la campana del usuario
+     * invitado emita el toast emergente automáticamente (polling 8s).
+     */
+    @Transactional
+    public void notifyGameInvitation(Map<String, Object> payload) {
+        Long recipientId = toLong(payload.get("playerId"));
+        Object gameId = payload.get("gameId");
+        Object inviterName = payload.getOrDefault("inviterName", "tu rival");
+        if (recipientId == null) {
+            log.debug("game.invitation sin playerId, ignorado");
+            return;
+        }
+        String subject = "Te invitan a una partida";
+        String body = String.format("%s te invitó a jugar (partida #%s).", inviterName, gameId);
+        saveLog(recipientId, Channel.IN_APP, "game.invitation", body, payload, NotifStatus.SENT);
+        log.info("game.invitation: notificación in-app creada para player {} (game {})",
+                recipientId, gameId);
+    }
+
+    /**
      * Notificación de actualización de ELO.
      * Payload: {playerId, oldElo, newElo, delta, ratingType, gameId}
      */

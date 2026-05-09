@@ -47,6 +47,7 @@ public class GameEventsConsumer {
             switch (event.getEventType()) {
                 case "elo.updated" -> notificationService.notifyEloUpdated(event.getPayload());
                 case "game.finished" -> notificationService.notifyGameFinished(event.getPayload());
+                case "game.invitation" -> notificationService.notifyGameInvitation(event.getPayload());
                 default -> log.debug("Tipo de evento ignorado en notifications.game.events: {}", event.getEventType());
             }
             markProcessed(event.getEventId());

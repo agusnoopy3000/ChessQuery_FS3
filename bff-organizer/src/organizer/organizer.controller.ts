@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   Param,
   Patch,
   Post,
@@ -85,6 +87,13 @@ export class OrganizerController {
   ) {
     const userId = getUserId(req);
     return this.organizerService.rejectRegistration(rid, userId, body);
+  }
+
+  @Delete('tournaments/:id')
+  @HttpCode(204)
+  async deleteTournament(@Req() req: Request, @Param('id') id: string) {
+    const userId = getUserId(req);
+    return this.organizerService.deleteTournament(id, userId);
   }
 
   @Patch('tournaments/:id/status')

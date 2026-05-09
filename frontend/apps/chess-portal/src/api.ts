@@ -548,6 +548,13 @@ export const liveGameApi = {
     api.get<LiveGameSummary>(`/api/player/play/live/${id}`).then((r) => r.data),
   join: (id: number | string, eloBefore?: number) =>
     api.post<LiveGameSummary>(`/api/player/play/live/${id}/join`, { eloBefore }).then((r) => r.data),
+  invite: (id: number | string, email: string, gameUrl: string) =>
+    api
+      .post<{ matched: boolean; playerId?: number }>(
+        `/api/player/play/live/${id}/invite`,
+        { email, gameUrl },
+      )
+      .then((r) => r.data),
 };
 
 export const gameApi = {

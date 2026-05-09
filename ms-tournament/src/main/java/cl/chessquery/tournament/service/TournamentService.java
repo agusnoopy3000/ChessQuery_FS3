@@ -60,6 +60,54 @@ public class TournamentService {
 
     // ── Transición de estado ─────────────────────────────────────────────────
 
+    // ── Eliminar torneo ──────────────────────────────────────────────────────
+
+    /**
+     * Elimina un torneo de forma segura. Solo se permite si:
+     * <ul>
+     *   <li>El usuario es ADMIN, o es el organizerId dueño del torneo.</li>
+     *   <li>El torneo está en {@code DRAFT} o {@code OPEN} (sin partidas en curso).</li>
+     *   <li>No tiene rondas generadas.</li>
+     * </ul>
+     * Cascada: las inscripciones se eliminan vía FK ON DELETE CASCADE.
+     * Si el torneo está IN_PROGRESS o FINISHED, se rechaza para preservar
+     * histórico (en un caso extremo, un ADMIN puede saltarse ese check).
+     */
+    @Transactional
+    public void deleteTournament(Long tournamentId, Long requesterId, boolean isAdmin) {
+        Tournament t = findOrThrow(tournamentId);
+
+        if (!isAdmin && (requesterId == null || !requesterId.equals(t.getOrganizerId()))) {
+            throw new ApiException(403, "FORBIDDEN",
+                    "Solo el organizador dueño del torneo puede eliminarlo");
+        }
+
+        if (!isAdmin && (t.getStatus() == TournamentStatus.IN_PROGRESS
+                      || t.getStatus() == TournamentStatus.FINISHED)) {
+            throw new ApiException(409, "CANNOT_DELETE",
+                    "No se puede eliminar un torneo " + t.getStatus()
+                            + ". Solo torneos en DRAFT o OPEN pueden eliminarse.");
+        }
+
+        long rounds = roundRepo.findByTournamentIdOrderByRoundNumberAsc(tournamentId).size();
+        if (rounds > 0 && !isAdmin) {
+            throw new ApiException(409, "CANNOT_DELETE",
+                    "El torneo tiene rondas generadas. Elimínalas primero o contacta a un admin.");
+        }
+
+        // Borrar dependencias en orden (rondas → registros → torneo).
+        // pairings deben borrarse antes que rounds por FK
+        for (TournamentRound r : roundRepo.findByTournamentIdOrderByRoundNumberAsc(tournamentId)) {
+            pairingRepo.deleteAll(pairingRepo.findByRoundId(r.getId()));
+        }
+        roundRepo.deleteAll(roundRepo.findByTournamentIdOrderByRoundNumberAsc(tournamentId));
+        registrationRepo.deleteAll(registrationRepo.findByTournamentId(tournamentId));
+        tournamentRepo.delete(t);
+
+        log.info("Torneo {} ('{}') eliminado por {}", tournamentId, t.getName(),
+                isAdmin ? "ADMIN" : "organizer=" + requesterId);
+    }
+
     @Transactional
     public TournamentResponse transitionStatus(Long id, TournamentStatus newStatus) {
         Tournament t = findOrThrow(id);

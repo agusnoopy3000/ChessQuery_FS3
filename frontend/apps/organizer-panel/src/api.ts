@@ -527,6 +527,8 @@ export const organizerApi = {
     api
       .patch(`/api/organizer/registrations/${registrationId}/reject`, { reason: reason ?? '' })
       .then((r) => normalizeRegistration(r.data)),
+  deleteTournament: (id: string | number): Promise<void> =>
+    api.delete(`/api/organizer/tournaments/${id}`).then(() => undefined),
 
   // Notificaciones del organizador (registration.pending y otras)
   listNotifications: (): Promise<NotificationItem[]> =>

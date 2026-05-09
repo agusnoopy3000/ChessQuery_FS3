@@ -68,6 +68,23 @@ public class TournamentController {
         return tournamentService.getTournament(id);
     }
 
+    @Operation(summary = "Eliminar torneo (solo organizador dueño o admin). " +
+            "Bloqueado si el torneo está IN_PROGRESS o ya tiene rondas/partidas asociadas.")
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteTournament(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-User-Role", required = false) String userRole,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+
+        if (!"ORGANIZER".equalsIgnoreCase(userRole) && !"ADMIN".equalsIgnoreCase(userRole)) {
+            throw new ApiException(403, "FORBIDDEN",
+                    "Solo los organizadores pueden eliminar torneos");
+        }
+        boolean isAdmin = "ADMIN".equalsIgnoreCase(userRole);
+        tournamentService.deleteTournament(id, userId, isAdmin);
+    }
+
     // ── Transición de estado ──────────────────────────────────────────────────
 
     @Operation(summary = "Cambiar el estado del torneo (DRAFT→OPEN→IN_PROGRESS→FINISHED)")

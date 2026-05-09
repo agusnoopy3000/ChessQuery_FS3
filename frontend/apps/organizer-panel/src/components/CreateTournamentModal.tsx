@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { Button } from '@chessquery/ui-lib';
 import type { CreateTournamentInput } from '../api';
 
@@ -31,6 +31,35 @@ export const CreateTournamentModal = ({ open, onClose, onSubmit, loading, error 
   const [timeControl, setTimeControl] = useState('');
   const [requiresApproval, setRequiresApproval] = useState(true);
   const [validation, setValidation] = useState<string | null>(null);
+
+  // Cuando se abre el modal: scroll a top + lock del body para que el usuario
+  // no necesite mover la página detrás. Al cerrar: restauramos.
+  useEffect(() => {
+    if (!open) return;
+    const prevScrollY = window.scrollY;
+    const prevOverflow = document.body.style.overflow;
+    const prevPaddingRight = document.body.style.paddingRight;
+    // Compensar el ancho del scrollbar para evitar reflow lateral.
+    const sbw = window.innerWidth - document.documentElement.clientWidth;
+    if (sbw > 0) document.body.style.paddingRight = `${sbw}px`;
+    document.body.style.overflow = 'hidden';
+    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.style.paddingRight = prevPaddingRight;
+      window.scrollTo({ top: prevScrollY, behavior: 'instant' as ScrollBehavior });
+    };
+  }, [open]);
+
+  // Cerrar con Escape.
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [open, onClose]);
 
   if (!open) return null;
 
@@ -77,21 +106,80 @@ export const CreateTournamentModal = ({ open, onClose, onSubmit, loading, error 
     <div
       onClick={onClose}
       style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000,
-        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+        position: 'fixed', inset: 0,
+        background: 'rgba(0,0,0,0.85)',
+        backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
+        zIndex: 1000,
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        padding: '0',
+        overflowY: 'auto',
+        animation: 'cq-modal-fade 180ms ease-out',
       }}
     >
+      <style>{`
+        @keyframes cq-modal-fade { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes cq-modal-slide { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
+      `}</style>
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: 'var(--surface, #1a1c19)',
-          border: '1px solid var(--border, #2a2d27)',
-          borderRadius: 12, padding: 24, width: '100%', maxWidth: 560,
-          maxHeight: '90vh', overflowY: 'auto',
+          background: 'var(--cq-surface-r, #141614)',
+          border: '1px solid var(--cq-border, #2a2d27)',
+          borderRadius: 14,
+          padding: '32px 36px',
+          width: '100%',
+          maxWidth: 720,
+          minHeight: '100vh',
+          margin: '0 auto',
+          fontFamily: "'Space Grotesk', system-ui, sans-serif",
+          color: 'var(--cq-text, #e8ead4)',
+          animation: 'cq-modal-slide 220ms ease-out',
+          position: 'relative',
         }}
       >
-        <h2 style={{ margin: 0, marginBottom: 4, fontSize: 22 }}>Nuevo torneo</h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 0, marginBottom: 18 }}>
+        {/* Botón cerrar X arriba a la derecha */}
+        <button
+          onClick={onClose}
+          aria-label="Cerrar"
+          style={{
+            position: 'absolute', top: 18, right: 18,
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid var(--cq-border, #2a2d27)',
+            borderRadius: 999,
+            width: 36, height: 36,
+            color: 'var(--cq-text-dim, #7a7d6e)',
+            cursor: 'pointer',
+            fontSize: 18,
+            lineHeight: 1,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'background 0.15s, color 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(224,90,90,0.1)';
+            e.currentTarget.style.color = '#e05a5a';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
+            e.currentTarget.style.color = 'var(--cq-text-dim, #7a7d6e)';
+          }}
+        >
+          ×
+        </button>
+
+        <div
+          style={{
+            fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase',
+            color: 'var(--cq-text-muted, #4a4d40)',
+            fontFamily: 'Space Mono, monospace', marginBottom: 6,
+          }}
+        >
+          Nuevo torneo
+        </div>
+        <h2 style={{ margin: 0, marginBottom: 6, fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em' }}>
+          Configurar torneo
+        </h2>
+        <p style={{ color: 'var(--cq-text-dim, #7a7d6e)', fontSize: 13, marginTop: 0, marginBottom: 26 }}>
           Los jugadores podrán inscribirse desde su portal cuando el torneo pase a "Inscripciones abiertas".
         </p>
 

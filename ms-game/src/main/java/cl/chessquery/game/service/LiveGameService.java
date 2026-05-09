@@ -34,9 +34,73 @@ public class LiveGameService {
 
     private final LiveGameSessionRepository sessionRepo;
     private final LiveGameMoveRepository    moveRepo;
-    private final GameService                gameService;
+    private final LiveGameFinalizer          finalizer;
     private final LiveGameBroadcaster        broadcaster;
     private final OpeningDetector            openingDetector;
+    private final EventPublisherService      events;
+    private final org.springframework.web.client.RestTemplate restTemplate;
+    @org.springframework.beans.factory.annotation.Value("${gateway.ms-users.url:http://ms-users:8081}")
+    private String msUsersUrl;
+
+    // ── Invitar a otro jugador a una partida ──────────────────────────────
+
+    /**
+     * Invita por email a un jugador a unirse a la partida. Si el email matchea
+     * un Player registrado, publica un evento {@code game.invitation} para que
+     * ms-notifications cree una notificación in-app (toast push). El email
+     * propiamente dicho lo manda el frontend vía Supabase magic link.
+     *
+     * Devuelve {@code { matched: boolean, playerId?: number }} para que el
+     * frontend pueda saber si el destinatario tendrá feedback in-app o solo
+     * el correo.
+     */
+    public java.util.Map<String, Object> invitePlayer(Long sessionId, String email,
+                                                       String gameUrl, Long inviterId) {
+        LiveGameSession s = findOrThrow(sessionId);
+        java.util.Map<String, Object> result = new java.util.HashMap<>();
+        result.put("matched", false);
+
+        if (email == null || email.isBlank()) {
+            return result;
+        }
+
+        Long invitedPlayerId = null;
+        String invitedName = null;
+        try {
+            String url = msUsersUrl + "/users/by-email?email="
+                    + java.net.URLEncoder.encode(email.trim(), java.nio.charset.StandardCharsets.UTF_8);
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, Object> body = restTemplate.getForObject(url, java.util.Map.class);
+            if (body != null && body.get("id") instanceof Number) {
+                invitedPlayerId = ((Number) body.get("id")).longValue();
+                invitedName = (body.get("firstName") + " " + body.get("lastName")).trim();
+            }
+        } catch (org.springframework.web.client.HttpClientErrorException.NotFound nf) {
+            log.debug("invite: email {} no tiene Player registrado, solo se enviará magic link", email);
+        } catch (Exception ex) {
+            log.warn("invite: lookup ms-users falló para email={}: {}", email, ex.getMessage());
+        }
+
+        if (invitedPlayerId == null) {
+            return result;
+        }
+        if (invitedPlayerId.equals(inviterId)) {
+            log.debug("invite: el invitado es el propio creador, no notifico");
+            return result;
+        }
+
+        String inviterName = "tu rival";
+        if (inviterId != null && inviterId.equals(s.getWhitePlayerId())) {
+            inviterName = "el creador de la partida";
+        }
+        events.publishGameInvitation(sessionId, invitedPlayerId, inviterId, inviterName, gameUrl);
+        log.info("invite: game.invitation publicado game={} → player={} ({})",
+                sessionId, invitedPlayerId, invitedName);
+
+        result.put("matched", true);
+        result.put("playerId", invitedPlayerId);
+        return result;
+    }
 
     // ── Crear sesión (creator = white) ─────────────────────────────────────
 
@@ -74,6 +138,9 @@ public class LiveGameService {
     public LiveGameResponse join(Long id, JoinLiveGameRequest req) {
         LiveGameSession s = findOrThrow(id);
         if (s.getStatus() != SessionStatus.WAITING) {
+            if (s.getStatus() == SessionStatus.ACTIVE && req.playerId().equals(s.getBlackPlayerId())) {
+                return toResponse(s, moveRepo.findBySessionIdOrderByCreatedAtAsc(id));
+            }
             throw new ApiException(409, "SESSION_NOT_WAITING",
                     "La sesión no está en estado WAITING");
         }
@@ -102,6 +169,10 @@ public class LiveGameService {
     @Transactional
     public LiveGameResponse move(Long id, MoveRequest req) {
         LiveGameSession s = findOrThrow(id);
+        LiveGameResponse idempotentRetry = idempotentMoveRetry(s, req);
+        if (idempotentRetry != null) {
+            return idempotentRetry;
+        }
         if (s.getStatus() != SessionStatus.ACTIVE) {
             throw new ApiException(409, "SESSION_NOT_ACTIVE",
                     "La sesión no está activa (estado=" + s.getStatus() + ")");
@@ -246,6 +317,10 @@ public class LiveGameService {
     @Transactional
     public LiveGameResponse resign(Long id, ResignRequest req) {
         LiveGameSession s = findOrThrow(id);
+        LiveGameResponse idempotentRetry = idempotentFinishedRetry(s, req.playerId(), "RESIGN");
+        if (idempotentRetry != null) {
+            return idempotentRetry;
+        }
         if (s.getStatus() != SessionStatus.ACTIVE) {
             throw new ApiException(409, "SESSION_NOT_ACTIVE",
                     "La sesión no está activa");
@@ -274,6 +349,10 @@ public class LiveGameService {
     @Transactional
     public LiveGameResponse timeout(Long id, ResignRequest req) {
         LiveGameSession s = findOrThrow(id);
+        LiveGameResponse idempotentRetry = idempotentFinishedRetry(s, req.playerId(), "TIMEOUT");
+        if (idempotentRetry != null) {
+            return idempotentRetry;
+        }
         if (s.getStatus() != SessionStatus.ACTIVE) {
             throw new ApiException(409, "SESSION_NOT_ACTIVE",
                     "La sesión no está activa");
@@ -306,6 +385,10 @@ public class LiveGameService {
     @Transactional
     public LiveGameResponse drawAgreement(Long id, ResignRequest req) {
         LiveGameSession s = findOrThrow(id);
+        LiveGameResponse idempotentRetry = idempotentFinishedRetry(s, req.playerId(), "DRAW_AGREEMENT");
+        if (idempotentRetry != null) {
+            return idempotentRetry;
+        }
         if (s.getStatus() != SessionStatus.ACTIVE) {
             throw new ApiException(409, "SESSION_NOT_ACTIVE",
                     "La sesión no está activa");
@@ -330,7 +413,27 @@ public class LiveGameService {
                         "Sesión live " + id + " no encontrada"));
     }
 
-    /** Dispara el flujo final: marca FINISHED, construye PGN, persiste en `game`. */
+    private LiveGameResponse idempotentMoveRetry(LiveGameSession s, MoveRequest req) {
+        return moveRepo.findTopBySessionIdOrderByCreatedAtDesc(s.getId())
+                .filter(last -> req.playerId().equals(last.getPlayerId()))
+                .filter(last -> req.uci().equals(last.getUci()))
+                .filter(last -> last.getFenAfter().equals(s.getCurrentFen()))
+                .map(last -> toResponse(s, moveRepo.findBySessionIdOrderByCreatedAtAsc(s.getId())))
+                .orElse(null);
+    }
+
+    private LiveGameResponse idempotentFinishedRetry(LiveGameSession s, Long playerId, String reason) {
+        if (s.getStatus() != SessionStatus.FINISHED || !reason.equals(s.getEndReason())) {
+            return null;
+        }
+        boolean participant = playerId.equals(s.getWhitePlayerId()) || playerId.equals(s.getBlackPlayerId());
+        if (!participant) {
+            return null;
+        }
+        return toResponse(s, moveRepo.findBySessionIdOrderByCreatedAtAsc(s.getId()));
+    }
+
+    /** Marca FINISHED y agenda la materialización async en `game` con PGN. */
     private void finishSession(LiveGameSession s, String result, String reason, Instant now) {
         s.setStatus(SessionStatus.FINISHED);
         s.setResult(result);
@@ -346,30 +449,24 @@ public class LiveGameService {
         List<LiveGameMove> moves = moveRepo.findBySessionIdOrderByCreatedAtAsc(s.getId());
         String pgn = buildPgn(s, moves, result);
 
-        try {
-            int duration = s.getStartedAt() != null
-                    ? (int) Math.max(0, java.time.Duration.between(s.getStartedAt(), now).toSeconds())
-                    : 0;
-            var registered = gameService.registerGame(new RegisterGameRequest(
-                    s.getWhitePlayerId(),
-                    s.getBlackPlayerId(),
-                    result,
-                    GameType.CASUAL,
-                    s.getWhiteEloBefore(),
-                    s.getBlackEloBefore(),
-                    moves.size(),
-                    null,
-                    duration,
-                    s.getStartedAt() != null ? s.getStartedAt() : now,
-                    pgn
-            ));
-            s.setFinalizedGameId(registered.id());
-            log.info("LiveGame {} materializada como game {} (result={} reason={})",
-                    s.getId(), registered.id(), result, reason);
-        } catch (Exception e) {
-            log.error("LiveGame {} no se pudo materializar en `game`: {}", s.getId(), e.getMessage());
-            // La sesión queda finalizada igualmente; reintentar con un job manual.
-        }
+        int duration = s.getStartedAt() != null
+                ? (int) Math.max(0, java.time.Duration.between(s.getStartedAt(), now).toSeconds())
+                : 0;
+        finalizer.scheduleAfterCommit(s.getId(), new RegisterGameRequest(
+                s.getWhitePlayerId(),
+                s.getBlackPlayerId(),
+                result,
+                GameType.CASUAL,
+                s.getWhiteEloBefore(),
+                s.getBlackEloBefore(),
+                moves.size(),
+                null,
+                duration,
+                s.getStartedAt() != null ? s.getStartedAt() : now,
+                pgn
+        ));
+        log.info("LiveGame {} finalizada (result={} reason={}); materialización PGN programada",
+                s.getId(), result, reason);
     }
 
     private void broadcastFinished(LiveGameSession s) {

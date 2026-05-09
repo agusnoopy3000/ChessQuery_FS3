@@ -159,6 +159,16 @@ export class PlayerController {
     return this.playerService.rematchLiveGame(userId, id);
   }
 
+  @Post('play/live/:id/invite')
+  async inviteToLiveGame(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() body: { email?: string; gameUrl?: string },
+  ) {
+    const userId = getUserId(req);
+    return this.playerService.inviteToLiveGame(userId, id, body);
+  }
+
   // ── Torneos (vista de jugador) ─────────────────────────────────────────
 
   @Get('tournaments')

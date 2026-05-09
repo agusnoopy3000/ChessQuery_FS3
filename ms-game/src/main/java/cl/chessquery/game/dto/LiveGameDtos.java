@@ -41,6 +41,13 @@ public final class LiveGameDtos {
     /** POST /games/live/{id}/rematch — clicker initia revancha con colores invertidos. */
     public record RematchRequest(@NotNull Long playerId) {}
 
+    /** POST /games/live/{id}/invite — invitar a un email. Si el email matchea
+     *  un Player existente, recibe push in-app además del email magic link. */
+    public record InviteRequest(
+            @NotBlank String email,
+            String gameUrl
+    ) {}
+
     public record LiveMoveResponse(
             Integer moveNumber,
             String color,

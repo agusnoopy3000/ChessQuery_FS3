@@ -227,6 +227,19 @@ public class PlayerService {
     // ─── GET /users/by-supabase-id/{supabaseUserId} ──────────────────────────
 
     @Transactional(readOnly = true)
+    public PlayerProfileResponse getProfileByEmail(String email) {
+        if (!StringUtils.hasText(email)) {
+            throw new ApiException(400, "INVALID_EMAIL", "El parámetro 'email' es obligatorio");
+        }
+        Player p = playerRepo.findByEmail(email.trim().toLowerCase())
+                .orElseThrow(() -> new ApiException(404, "PLAYER_NOT_FOUND",
+                        "Jugador con email " + email + " no encontrado"));
+        String title = titleRepo.findByPlayerIdAndIsCurrentTrue(p.getId())
+                .map(t -> t.getTitle().name()).orElse(null);
+        return toProfileResponse(p, title);
+    }
+
+    @Transactional(readOnly = true)
     public PlayerProfileResponse getProfileBySupabaseId(UUID supabaseUserId) {
         Player p = playerRepo.findBySupabaseUserId(supabaseUserId)
                 .orElseThrow(() -> new ApiException(404, "PLAYER_NOT_FOUND",

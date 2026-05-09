@@ -125,6 +125,37 @@ export const OrganizerTournamentsPage = () => {
     },
   });
 
+  const deleteTournament = useMutation({
+    mutationFn: (id: number) => organizerApi.deleteTournament(id),
+    onSuccess: async (_data, deletedId) => {
+      // Si se borró el torneo seleccionado, limpiamos la selección.
+      if (selectedTournamentId === deletedId) {
+        setSelectedTournamentId(null);
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['organizer', 'tournaments', 'list'] }),
+        queryClient.invalidateQueries({ queryKey: ['organizer', 'portal', 'tournaments'] }),
+      ]);
+    },
+  });
+
+  const handleDelete = (t: Tournament) => {
+    const ok = window.confirm(
+      `¿Eliminar el torneo "${t.name}"?\n\nEsta acción es irreversible. Solo se permite eliminar torneos en DRAFT u OPEN sin rondas generadas.`,
+    );
+    if (!ok) return;
+    deleteTournament.mutate(t.id);
+  };
+
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['organizer', 'tournaments', 'list'] });
+    if (selectedTournamentId != null) {
+      queryClient.invalidateQueries({ queryKey: ['organizer', 'tournaments', 'registrations', selectedTournamentId] });
+      queryClient.invalidateQueries({ queryKey: ['organizer', 'tournaments', 'standings', selectedTournamentId] });
+      queryClient.invalidateQueries({ queryKey: ['organizer', 'tournaments', 'round', selectedTournamentId, selectedRound] });
+    }
+  };
+
   const registrationRows: RegistrationRow[] = useMemo(
     () => (Array.isArray(registrations.data) ? registrations.data : []),
     [registrations.data],
@@ -142,6 +173,19 @@ export const OrganizerTournamentsPage = () => {
 
   return (
     <div style={{ padding: 28, display: 'grid', gap: 20 }}>
+      <style>{`
+        @keyframes cq-spin { to { transform: rotate(360deg); } }
+      `}</style>
+      {deleteTournament.isError && (
+        <ErrorAlert
+          title="No se pudo eliminar el torneo"
+          message={
+            (deleteTournament.error as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ??
+            (deleteTournament.error as { message?: string })?.message ??
+            'Error desconocido al eliminar.'
+          }
+        />
+      )}
       <section className="page-header">
         <div>
           <div className="eyebrow">Gestión de torneos</div>
@@ -193,7 +237,46 @@ export const OrganizerTournamentsPage = () => {
           header={
             <div className="card-header-row">
               <span>Mis torneos</span>
-              <Badge variant="info">{tournamentRows.length} registrados</Badge>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Badge variant="info">{tournamentRows.length} registrados</Badge>
+                <button
+                  type="button"
+                  onClick={handleRefresh}
+                  title="Actualizar lista"
+                  aria-label="Actualizar lista"
+                  disabled={tournaments.isFetching}
+                  style={{
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid var(--border, #2a2d27)',
+                    borderRadius: 8,
+                    width: 30, height: 30,
+                    color: 'var(--text-muted, #7a7d6e)',
+                    cursor: tournaments.isFetching ? 'wait' : 'pointer',
+                    fontSize: 14,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'border-color 0.15s, color 0.15s',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!tournaments.isFetching) {
+                      e.currentTarget.style.borderColor = 'rgba(106,191,116,0.4)';
+                      e.currentTarget.style.color = '#6abf74';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--border, #2a2d27)';
+                    e.currentTarget.style.color = 'var(--text-muted, #7a7d6e)';
+                  }}
+                >
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      animation: tournaments.isFetching ? 'cq-spin 0.8s linear infinite' : 'none',
+                    }}
+                  >
+                    ↻
+                  </span>
+                </button>
+              </div>
             </div>
           }
         >
@@ -218,36 +301,89 @@ export const OrganizerTournamentsPage = () => {
             />
           ) : (
             <div style={{ display: 'grid', gap: 10 }}>
-              {tournamentRows.map((tournament) => (
-                <button
-                  key={tournament.id}
-                  type="button"
-                  className="surface-button"
-                  data-active={selectedTournamentId === tournament.id}
-                  onClick={() => setSelectedTournamentId(tournament.id)}
-                >
-                  <div style={{ display: 'grid', gap: 8 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
-                      <div style={{ textAlign: 'left' }}>
-                        <div style={{ fontWeight: 700 }}>{tournament.name}</div>
+              {tournamentRows.map((tournament) => {
+                const canDelete =
+                  tournament.status === 'DRAFT' || tournament.status === 'OPEN';
+                const isDeleting =
+                  deleteTournament.isPending && deleteTournament.variables === tournament.id;
+                return (
+                  <div
+                    key={tournament.id}
+                    style={{ position: 'relative' }}
+                  >
+                    <button
+                      type="button"
+                      className="surface-button"
+                      data-active={selectedTournamentId === tournament.id}
+                      onClick={() => setSelectedTournamentId(tournament.id)}
+                      style={{ paddingRight: canDelete ? 48 : undefined }}
+                    >
+                      <div style={{ display: 'grid', gap: 8 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+                          <div style={{ textAlign: 'left' }}>
+                            <div style={{ fontWeight: 700 }}>{tournament.name}</div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                              {tournament.format} · {formatDate(tournament.startDate)}
+                            </div>
+                          </div>
+                          <Badge variant={tournamentStatusVariant(tournament.status)}>{tournament.status}</Badge>
+                        </div>
+                        <div className="tournament-track">
+                          <div className="track-segment" data-active={tournament.status === 'DRAFT'} />
+                          <div className="track-segment" data-active={tournament.status === 'OPEN'} />
+                          <div className="track-segment" data-active={tournament.status === 'IN_PROGRESS'} />
+                          <div className="track-segment" data-active={tournament.status === 'FINISHED'} />
+                        </div>
                         <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-                          {tournament.format} · {formatDate(tournament.startDate)}
+                          {tournament.registered}/{tournament.maxPlayers} jugadores · {tournament.rounds} rondas
                         </div>
                       </div>
-                      <Badge variant={tournamentStatusVariant(tournament.status)}>{tournament.status}</Badge>
-                    </div>
-                    <div className="tournament-track">
-                      <div className="track-segment" data-active={tournament.status === 'DRAFT'} />
-                      <div className="track-segment" data-active={tournament.status === 'OPEN'} />
-                      <div className="track-segment" data-active={tournament.status === 'IN_PROGRESS'} />
-                      <div className="track-segment" data-active={tournament.status === 'FINISHED'} />
-                    </div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-                      {tournament.registered}/{tournament.maxPlayers} jugadores · {tournament.rounds} rondas
-                    </div>
+                    </button>
+                    {canDelete && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(tournament);
+                        }}
+                        disabled={isDeleting}
+                        title={`Eliminar "${tournament.name}"`}
+                        aria-label="Eliminar torneo"
+                        style={{
+                          position: 'absolute',
+                          top: 12,
+                          right: 12,
+                          width: 28,
+                          height: 28,
+                          background: 'rgba(224,90,90,0.08)',
+                          border: '1px solid rgba(224,90,90,0.3)',
+                          borderRadius: 6,
+                          color: '#e05a5a',
+                          cursor: isDeleting ? 'wait' : 'pointer',
+                          fontSize: 13,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          opacity: isDeleting ? 0.6 : 1,
+                          transition: 'background 0.15s, transform 0.1s',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isDeleting) {
+                            e.currentTarget.style.background = 'rgba(224,90,90,0.18)';
+                            e.currentTarget.style.transform = 'scale(1.05)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'rgba(224,90,90,0.08)';
+                          e.currentTarget.style.transform = 'scale(1)';
+                        }}
+                      >
+                        🗑
+                      </button>
+                    )}
                   </div>
-                </button>
-              ))}
+                );
+              })}
             </div>
           )}
         </Card>

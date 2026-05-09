@@ -12,7 +12,7 @@ import { chessgroundDests } from 'chessops/compat';
 import { useAuth } from '@chessquery/shared';
 import type { Player } from '@chessquery/shared';
 import { Button, Card } from '@chessquery/ui-lib';
-import { api, playerApi } from '../api';
+import { api, liveGameApi, playerApi } from '../api';
 import { supabase } from '../lib/supabase';
 import { useMyPlayerId } from '../hooks/useMyPlayerId';
 import { computeMaterialBalance, flagFromIsoCode } from '../lib/chessHelpers';
@@ -112,6 +112,7 @@ export const LiveGamePage = () => {
   const prevStatusRef = useRef<string | null>(null);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteSent, setInviteSent] = useState(false);
+  const [inviteMatched, setInviteMatched] = useState<boolean | null>(null);
   const [inviteSending, setInviteSending] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [opponentOnline, setOpponentOnline] = useState(false);
@@ -819,17 +820,32 @@ export const LiveGamePage = () => {
                 size="sm"
                 onClick={async () => {
                   setInviteError(null);
+                  setInviteMatched(null);
                   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteEmail)) {
                     setInviteError('Email inválido');
                     return;
                   }
+                  if (!id) return;
                   setInviteSending(true);
                   try {
+                    // 1) Magic link por email (todos los casos: con o sin cuenta).
                     const { error: otpErr } = await supabase.auth.signInWithOtp({
                       email: inviteEmail,
                       options: { emailRedirectTo: shareUrl },
                     });
                     if (otpErr) throw otpErr;
+
+                    // 2) Push in-app: si el email tiene un Player asociado, el
+                    //    backend publica game.invitation y ms-notifications crea
+                    //    una notificación que el bell del invitado va a mostrar
+                    //    como toast emergente automáticamente (polling 8s).
+                    try {
+                      const r = await liveGameApi.invite(id, inviteEmail.trim(), shareUrl);
+                      setInviteMatched(!!r.matched);
+                    } catch {
+                      // No bloqueamos el flujo: el email igual se envió.
+                      setInviteMatched(false);
+                    }
                     setInviteSent(true);
                   } catch (e) {
                     setInviteError(message(e));
@@ -844,6 +860,16 @@ export const LiveGamePage = () => {
             </div>
             {inviteError && (
               <p style={{ margin: '0 0 8px', color: 'crimson', fontSize: 12 }}>{inviteError}</p>
+            )}
+            {inviteSent && inviteMatched != null && (
+              <p style={{
+                margin: '0 0 8px', fontSize: 12,
+                color: inviteMatched ? 'var(--accent, #6abf74)' : 'var(--text-muted, #7a7d6e)',
+              }}>
+                {inviteMatched
+                  ? '🔔 Notificación in-app enviada — verá un toast emergente al instante.'
+                  : 'ℹ El email se envió. El destinatario no tiene cuenta aún; recibirá solo el magic link.'}
+              </p>
             )}
             <p style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--text-muted)' }}>
               O compartí el link directo:

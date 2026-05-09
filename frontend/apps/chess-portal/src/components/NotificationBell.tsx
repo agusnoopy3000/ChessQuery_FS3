@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { playerApi, NotificationItem } from '../api';
 
 const POLL_MS = 8_000;
 const TOAST_DURATION_MS = 5_000;
 
 const eventIcon = (eventType: string): string => {
+  if (eventType === 'game.invitation') return '⚔️';
   if (eventType.startsWith('game.')) return '♟';
   if (eventType.startsWith('tournament.')) return '🏆';
   if (eventType.startsWith('player.')) return '✅';
@@ -12,6 +14,24 @@ const eventIcon = (eventType: string): string => {
   if (eventType === 'elo.updated') return '📈';
   if (eventType === 'user.registered') return '👋';
   return '🔔';
+};
+
+/** Si la notificación es accionable (lleva a una pantalla concreta), devuelve
+ *  la ruta. Sino, null. */
+const notificationLink = (n: NotificationItem): string | null => {
+  if (n.eventType === 'game.invitation' && n.payload) {
+    try {
+      const p = JSON.parse(n.payload) as { gameId?: number | string };
+      if (p.gameId != null) return `/play/${p.gameId}`;
+    } catch { /* ignore */ }
+  }
+  if (n.eventType === 'registration.approved' && n.payload) {
+    try {
+      const p = JSON.parse(n.payload) as { tournamentId?: number };
+      if (p.tournamentId != null) return `/tournaments/${p.tournamentId}`;
+    } catch { /* ignore */ }
+  }
+  return null;
 };
 
 const formatRelative = (iso: string | null): string => {
@@ -42,6 +62,7 @@ interface ToastEntry {
  * no spamear toasts del histórico.
  */
 export const NotificationBell = () => {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unread, setUnread] = useState(0);
@@ -228,46 +249,71 @@ export const NotificationBell = () => {
           pointerEvents: 'none',
         }}
       >
-        {toasts.map(({ key, notification: n }) => (
-          <div
-            key={key}
-            onClick={() => dismissToast(key)}
-            style={{
-              pointerEvents: 'auto',
-              cursor: 'pointer',
-              minWidth: 280, maxWidth: 360,
-              background: 'rgba(28,31,26,0.98)',
-              border: '1px solid var(--border, #2a2d27)',
-              borderLeft: '3px solid #6abf74',
-              borderRadius: 10,
-              boxShadow: '0 12px 32px rgba(0,0,0,0.5)',
-              padding: '12px 14px',
-              display: 'flex', gap: 12, alignItems: 'flex-start',
-              animation: 'cq-toast-slide-in 220ms ease-out',
-            }}
-          >
-            <span style={{ fontSize: 20, flexShrink: 0 }}>{eventIcon(n.eventType)}</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text, #e8ead4)' }}>
-                {n.subject || n.eventType}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
-                {n.eventType}
-              </div>
-            </div>
-            <button
-              onClick={(e) => { e.stopPropagation(); dismissToast(key); }}
-              style={{
-                background: 'transparent', border: 'none', color: 'var(--text-muted)',
-                cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 2,
-                flexShrink: 0,
+        {toasts.map(({ key, notification: n }) => {
+          const link = notificationLink(n);
+          const isInvitation = n.eventType === 'game.invitation';
+          return (
+            <div
+              key={key}
+              onClick={() => {
+                if (link) navigate(link);
+                dismissToast(key);
               }}
-              aria-label="Cerrar"
+              style={{
+                pointerEvents: 'auto',
+                cursor: 'pointer',
+                minWidth: 300, maxWidth: 380,
+                background: isInvitation ? 'rgba(35,28,22,0.98)' : 'rgba(28,31,26,0.98)',
+                border: '1px solid var(--border, #2a2d27)',
+                borderLeft: `3px solid ${isInvitation ? '#f0b94e' : '#6abf74'}`,
+                borderRadius: 10,
+                boxShadow: '0 12px 32px rgba(0,0,0,0.5)',
+                padding: '12px 14px',
+                display: 'flex', gap: 12, alignItems: 'flex-start',
+                animation: 'cq-toast-slide-in 220ms ease-out',
+              }}
             >
-              ×
-            </button>
-          </div>
-        ))}
+              <span style={{ fontSize: 22, flexShrink: 0 }}>{eventIcon(n.eventType)}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text, #e8ead4)', lineHeight: 1.3 }}>
+                  {n.subject || n.eventType}
+                </div>
+                {link && (
+                  <div
+                    style={{
+                      marginTop: 6,
+                      fontSize: 12,
+                      color: isInvitation ? '#f0b94e' : '#6abf74',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    {isInvitation ? '⚡ Aceptar y entrar a la partida' : 'Ver detalle'}
+                    <span>→</span>
+                  </div>
+                )}
+                {!link && (
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
+                    {n.eventType}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); dismissToast(key); }}
+                style={{
+                  background: 'transparent', border: 'none', color: 'var(--text-muted)',
+                  cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 2,
+                  flexShrink: 0,
+                }}
+                aria-label="Cerrar"
+              >
+                ×
+              </button>
+            </div>
+          );
+        })}
         <style>{`
           @keyframes cq-toast-slide-in {
             from { opacity: 0; transform: translateX(20px); }

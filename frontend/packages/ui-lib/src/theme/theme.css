@@ -21,6 +21,26 @@
   --accent-outline: oklch(74% 0.16 145 / 0.34);
   --accent-glow: oklch(74% 0.16 145 / 0.42);
 
+  /* === Subtema "cq" usado por las vistas refinadas (Login, Portal, etc.) ===
+     Paleta hex consistente para que los components nuevos referencien por nombre
+     en lugar de hardcodear. Equivalentes visuales a los oklch de arriba pero
+     en hex puros para legibilidad y compat máxima. */
+  --cq-bg: #111210;
+  --cq-surface-l: #181a17;
+  --cq-surface-r: #141614;
+  --cq-input-bg: #0e100d;
+  --cq-text: #e8ead4;
+  --cq-text-dim: #7a7d6e;
+  --cq-text-muted: #4a4d40;
+  --cq-border: #2a2d27;
+  --cq-border-focus: #4a7c59;
+  --cq-accent: #6abf74;
+  --cq-accent-hi: #7ece86;
+  --cq-accent-dark: #3d8a4a;
+  --cq-error: #e05a5a;
+  --cq-board-light: #3a3d33;
+  --cq-board-dark: #1f221c;
+
   --board-light: oklch(85% 0.07 82);
   --board-dark: oklch(58% 0.09 72);
   --blue: oklch(70% 0.16 245);

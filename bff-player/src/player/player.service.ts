@@ -309,6 +309,20 @@ export class PlayerService {
     });
   }
 
+  async inviteToLiveGame(
+    userId: string,
+    id: string,
+    body: { email?: string; gameUrl?: string },
+  ): Promise<unknown> {
+    const { msGame } = this.http.urls;
+    const playerId = await this.resolvePlayerId(userId);
+    return this.http.post<unknown>(
+      `${msGame}/games/live/${id}/invite`,
+      { email: body.email ?? '', gameUrl: body.gameUrl ?? '' },
+      { headers: { 'X-User-Id': String(playerId) } },
+    );
+  }
+
   async getLichessProfile(playerId: string): Promise<{
     username: string | null;
     user: unknown | null;
