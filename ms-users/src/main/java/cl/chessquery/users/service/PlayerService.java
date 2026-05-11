@@ -164,8 +164,10 @@ public class PlayerService {
      * </ol>
      *
      * Es idempotente: llamar dos veces con el mismo UUID retorna el mismo Player.
+     * Robusto a concurrencia: si dos requests llegan simultáneas, el segundo
+     * captura la unique violation y devuelve el Player creado por el primero.
      */
-    @Transactional
+    @Transactional(noRollbackFor = org.springframework.dao.DataIntegrityViolationException.class)
     public PlayerProfileResponse provisionBySupabaseId(ProvisionPlayerRequest req) {
         UUID supabaseUserId = req.supabaseUserId();
 
@@ -202,7 +204,12 @@ public class PlayerService {
             }
         }
 
-        // 3. Crear nuevo Player.
+        // 3. Crear nuevo Player. Bajo concurrencia (varias llamadas al
+        //    mismo tiempo para el mismo supabaseUserId, típico cuando el
+        //    frontend dispara N requests en paralelo apenas hay sesión)
+        //    el primer INSERT gana y los demás chocan con la unique de
+        //    supabase_user_id o email. Capturamos y re-leemos para
+        //    devolver el Player ya creado por el ganador.
         Instant now = Instant.now();
         String firstName = StringUtils.hasText(req.firstName()) ? req.firstName() : "Jugador";
         String lastName  = StringUtils.hasText(req.lastName())  ? req.lastName()
@@ -218,7 +225,21 @@ public class PlayerService {
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
-        playerRepo.save(p);
+        try {
+            playerRepo.saveAndFlush(p);
+        } catch (org.springframework.dao.DataIntegrityViolationException dup) {
+            log.info("provision: race detectada para supabaseUserId={}, re-leyendo Player ganador",
+                    supabaseUserId);
+            em.clear();
+            Player winner = playerRepo.findBySupabaseUserId(supabaseUserId)
+                    .or(() -> StringUtils.hasText(req.email())
+                            ? playerRepo.findByEmail(req.email())
+                            : java.util.Optional.empty())
+                    .orElseThrow(() -> dup);
+            String wTitle = titleRepo.findByPlayerIdAndIsCurrentTrue(winner.getId())
+                    .map(t -> t.getTitle().name()).orElse(null);
+            return toProfileResponse(winner, wTitle);
+        }
         log.info("provision: Player creado id={} supabaseUserId={} email={} club={}",
                 p.getId(), supabaseUserId, p.getEmail(), club != null ? club.getName() : "—");
         return toProfileResponse(p, null);
