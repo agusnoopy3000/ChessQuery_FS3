@@ -54,13 +54,13 @@ const ChessBackdrop = () => {
     return () => clearInterval(id);
   }, []);
 
-  const cellSize = 38;
+  const cellSize = 30;
   return (
     <div style={{ position: 'relative', width: cellSize * 8, height: cellSize * 8, margin: '0 auto' }}>
       <div
         style={{
           position: 'absolute',
-          inset: -30,
+          inset: -20,
           borderRadius: 20,
           background: 'radial-gradient(circle, rgba(106,191,116,0.08), transparent 70%)',
           pointerEvents: 'none',
@@ -119,10 +119,10 @@ const ChessBackdrop = () => {
       <div
         style={{
           position: 'absolute',
-          left: highlight ? `${highlight.to[1] * cellSize + cellSize / 2 - 16}px` : '50%',
-          top: highlight ? `${highlight.to[0] * cellSize + cellSize / 2 - 22}px` : '50%',
-          width: 32,
-          height: 44,
+          left: highlight ? `${highlight.to[1] * cellSize + cellSize / 2 - 14}px` : '50%',
+          top: highlight ? `${highlight.to[0] * cellSize + cellSize / 2 - 20}px` : '50%',
+          width: 28,
+          height: 38,
           color: '#6abf74',
           filter: 'drop-shadow(0 4px 12px rgba(106,191,116,0.5))',
           transition: 'left 0.6s cubic-bezier(0.4, 0.0, 0.2, 1), top 0.6s cubic-bezier(0.4, 0.0, 0.2, 1)',
@@ -325,7 +325,8 @@ export const LoginPage = () => {
     <div
       style={{
         display: 'flex',
-        minHeight: '100vh',
+        height: '100vh',
+        overflow: 'hidden',
         background: '#111210',
         color: '#e8ead4',
         fontFamily: fontStack,
@@ -348,10 +349,10 @@ export const LoginPage = () => {
           flex: '0 0 480px',
           background: '#181a17',
           borderRight: '1px solid #2a2d27',
-          padding: '48px 40px',
+          padding: '32px 40px',
           display: 'flex',
           flexDirection: 'column',
-          gap: 40,
+          gap: 24,
           overflowY: 'auto',
         }}
       >
@@ -377,7 +378,7 @@ export const LoginPage = () => {
           >
             ACCESO A LA PLATAFORMA
           </p>
-          <h1 style={{ fontSize: 40, fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.02em', margin: 0 }}>
+          <h1 style={{ fontSize: 36, fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.02em', margin: 0 }}>
             Vuelve al
             <br />
             tablero,
@@ -386,7 +387,7 @@ export const LoginPage = () => {
             <br />
             te espera.
           </h1>
-          <p style={{ marginTop: 20, fontSize: 14, color: '#7a7d6e', lineHeight: 1.6 }}>
+          <p style={{ marginTop: 12, fontSize: 13, color: '#7a7d6e', lineHeight: 1.6 }}>
             Tu dashboard, rankings, torneos y análisis siguen donde los dejaste.
           </p>
         </div>
@@ -429,7 +430,7 @@ export const LoginPage = () => {
         style={{
           flex: 1,
           background: '#141614',
-          padding: '48px 52px',
+          padding: '32px 52px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
@@ -452,19 +453,19 @@ export const LoginPage = () => {
               textTransform: 'uppercase',
               color: '#4a4d40',
               fontFamily: 'Space Mono, monospace',
-              marginBottom: 10,
+              marginBottom: 8,
             }}
           >
             INICIAR SESIÓN
           </p>
-          <h2 style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-0.02em', marginBottom: 6 }}>
+          <h2 style={{ fontSize: 30, fontWeight: 700, letterSpacing: '-0.02em', marginBottom: 4 }}>
             Ingresa a tu cuenta
           </h2>
-          <p style={{ fontSize: 13, color: '#7a7d6e', marginBottom: 28 }}>
+          <p style={{ fontSize: 13, color: '#7a7d6e', marginBottom: 20 }}>
             Continúa con tu progreso, rankings y torneos en ChessQuery.
           </p>
 
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <Field
               label="Email"
               type="email"

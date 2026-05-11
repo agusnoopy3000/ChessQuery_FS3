@@ -208,7 +208,7 @@ const Field = ({ label, type = 'text', placeholder = '', hint = '', error = '', 
             background: '#0e100d',
             border: `1px solid ${error ? '#e05a5a' : focused ? '#4a7c59' : '#2a2d27'}`,
             borderRadius: 8,
-            padding: isPass ? '10px 42px 10px 14px' : '10px 14px',
+            padding: isPass ? '8px 42px 8px 12px' : '8px 12px',
             color: '#e8ead4',
             fontSize: 14,
             fontFamily: 'inherit',
@@ -369,7 +369,8 @@ export const RegisterPage = () => {
     <div
       style={{
         display: 'flex',
-        minHeight: '100vh',
+        height: '100vh',
+        overflow: 'hidden',
         background: '#111210',
         color: '#e8ead4',
         fontFamily: fontStack,
@@ -381,10 +382,10 @@ export const RegisterPage = () => {
           flex: '0 0 480px',
           background: '#181a17',
           borderRight: '1px solid #2a2d27',
-          padding: '48px 40px',
+          padding: '32px 40px',
           display: 'flex',
           flexDirection: 'column',
-          gap: 32,
+          gap: 20,
           overflowY: 'auto',
         }}
       >
@@ -410,7 +411,7 @@ export const RegisterPage = () => {
           >
             REGISTRO POR ROL
           </p>
-          <h1 style={{ fontSize: 40, fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.02em', margin: 0 }}>
+          <h1 style={{ fontSize: 34, fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.02em', margin: 0 }}>
             Elige cómo
             <br />
             entrar al
@@ -419,12 +420,12 @@ export const RegisterPage = () => {
             <br />
             <span style={{ color: '#6abf74' }}>ChessQuery.</span>
           </h1>
-          <p style={{ marginTop: 20, fontSize: 14, color: '#7a7d6e', lineHeight: 1.6 }}>
+          <p style={{ marginTop: 12, fontSize: 13, color: '#7a7d6e', lineHeight: 1.6 }}>
             El rol que elijas define tu dashboard, permisos y cómo interactuás con la comunidad.
           </p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <RoleCard
             selected={role === 'PLAYER'}
             title="Jugador"
@@ -462,7 +463,7 @@ export const RegisterPage = () => {
         style={{
           flex: 1,
           background: '#141614',
-          padding: '48px 52px',
+          padding: '24px 52px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
@@ -477,21 +478,21 @@ export const RegisterPage = () => {
               textTransform: 'uppercase',
               color: '#4a4d40',
               fontFamily: 'Space Mono, monospace',
-              marginBottom: 10,
+              marginBottom: 8,
             }}
           >
             NUEVO ACCESO
           </p>
-          <h2 style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-0.02em', marginBottom: 6 }}>Crear cuenta</h2>
-          <p style={{ fontSize: 13, color: '#7a7d6e', marginBottom: 30 }}>
+          <h2 style={{ fontSize: 30, fontWeight: 700, letterSpacing: '-0.02em', marginBottom: 4 }}>Crear cuenta</h2>
+          <p style={{ fontSize: 13, color: '#7a7d6e', marginBottom: 16 }}>
             <span style={{ color: '#6abf74', fontWeight: 600 }}>{role === 'PLAYER' ? 'Jugador' : 'Organizador'}</span>
             {role === 'PLAYER'
               ? ' · Compite, consulta rankings y juega desde tu portal.'
               : ' · Gestiona torneos, clubes y perfiles de jugadores.'}
           </p>
 
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <Field label="Nombre" name="nombre" value={form.nombre} onChange={handleChange} error={errors.nombre} half />
               <Field label="Apellido" name="apellido" value={form.apellido} onChange={handleChange} error={errors.apellido} half />
             </div>
@@ -608,13 +609,13 @@ const RoleCard = ({ selected, title, description, badge, iconSvg, visual, onClic
       borderRadius: 14,
       border: `1.5px solid ${selected ? '#4a7c59' : '#252820'}`,
       background: selected ? '#1e2b1f' : '#191c18',
-      padding: 18,
+      padding: 14,
       cursor: 'pointer',
       transition: 'all 0.25s',
       boxShadow: selected ? '0 0 0 1px rgba(106,191,116,0.1), inset 0 1px 0 rgba(106,191,116,0.07)' : 'none',
     }}
   >
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
       <div
         style={{
           width: 38,

@@ -51,14 +51,14 @@ class NotificationServiceTest {
                 eq(12L), eq("cristobal@email.com"),
                 eq("¡Bienvenido a ChessQuery!"), anyString());
 
-        // Assert — se guarda el log con status SENT
+        // Assert — se guardan los logs con status SENT (EMAIL y IN_APP)
         ArgumentCaptor<NotificationLog> captor = ArgumentCaptor.forClass(NotificationLog.class);
-        verify(notificationLogRepo, times(1)).save(captor.capture());
-        NotificationLog saved = captor.getValue();
-        assertThat(saved.getStatus()).isEqualTo(NotifStatus.SENT);
-        assertThat(saved.getEventType()).isEqualTo("user.registered");
-        assertThat(saved.getRecipientId()).isEqualTo(12L);
-        assertThat(saved.getSentAt()).isNotNull();
+        verify(notificationLogRepo, times(2)).save(captor.capture());
+        NotificationLog savedEmail = captor.getAllValues().get(0);
+        assertThat(savedEmail.getStatus()).isEqualTo(NotifStatus.SENT);
+        assertThat(savedEmail.getEventType()).isEqualTo("user.registered");
+        assertThat(savedEmail.getRecipientId()).isEqualTo(12L);
+        assertThat(savedEmail.getSentAt()).isNotNull();
     }
 
     @Test
@@ -79,8 +79,8 @@ class NotificationServiceTest {
 
         // Assert
         ArgumentCaptor<NotificationLog> captor = ArgumentCaptor.forClass(NotificationLog.class);
-        verify(notificationLogRepo, times(1)).save(captor.capture());
-        NotificationLog saved = captor.getValue();
+        verify(notificationLogRepo, times(2)).save(captor.capture());
+        NotificationLog saved = captor.getAllValues().get(0);
         assertThat(saved.getStatus()).isEqualTo(NotifStatus.SENT);
         assertThat(saved.getEventType()).isEqualTo("elo.updated");
         assertThat(saved.getRecipientId()).isEqualTo(12L);
