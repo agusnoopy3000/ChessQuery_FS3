@@ -29,6 +29,7 @@ public class SupabaseStorageService implements StorageService {
 
     private final RestTemplate restTemplate;
     private final String supabaseUrl;
+    private final String publicSupabaseUrl;
     private final String serviceKey;
     private final String bucket;
     private final ObjectMapper mapper = new ObjectMapper();
@@ -70,8 +71,9 @@ public class SupabaseStorageService implements StorageService {
             if (signedUrl.isBlank()) {
                 throw new StorageException("Supabase no retornó signedURL", null);
             }
-            // signedURL viene como /object/sign/{bucket}/{key}?token=... — prefijar host.
-            return supabaseUrl + "/storage/v1" + signedUrl;
+            // signedURL viene como /object/sign/{bucket}/{key}?token=...
+            // Prefijamos la URL pública para que el navegador no reciba host.docker.internal.
+            return publicSupabaseUrl + "/storage/v1" + signedUrl;
         } catch (HttpStatusCodeException e) {
             log.error("Fallo presign en Supabase Storage: bucket={} key={} status={}",
                     bucket, key, e.getStatusCode());

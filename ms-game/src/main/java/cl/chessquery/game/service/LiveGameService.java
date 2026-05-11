@@ -67,10 +67,9 @@ public class LiveGameService {
         Long invitedPlayerId = null;
         String invitedName = null;
         try {
-            String url = msUsersUrl + "/users/by-email?email="
-                    + java.net.URLEncoder.encode(email.trim(), java.nio.charset.StandardCharsets.UTF_8);
+            String url = msUsersUrl + "/users/by-email?email={email}";
             @SuppressWarnings("unchecked")
-            java.util.Map<String, Object> body = restTemplate.getForObject(url, java.util.Map.class);
+            java.util.Map<String, Object> body = restTemplate.getForObject(url, java.util.Map.class, email.trim());
             if (body != null && body.get("id") instanceof Number) {
                 invitedPlayerId = ((Number) body.get("id")).longValue();
                 invitedName = (body.get("firstName") + " " + body.get("lastName")).trim();

@@ -78,23 +78,24 @@ export const createSupabaseApiClient = ({
     return config;
   });
 
-  // Retry automático en errores de red transitorios. Caso típico: el
-  // gateway o un BFF se reinicia y mata las connections en vuelo. En vez
-  // de mostrar ERR_CONNECTION_RESET / ERR_NETWORK al usuario, esperamos
-  // 250ms y reintentamos UNA vez. Si la 2da también falla, propagamos.
-  // No reintentamos POSTs que NO sean idempotentes para evitar duplicar
-  // moves/resigns; solo GET y los endpoints de juego que el backend
-  // protege con su propio guard de turno (move ilegal → 400).
+  // Retry automático en errores de red transitorios. Por defecto sólo métodos
+  // seguros; las mutaciones live incluidas acá son idempotentes en ms-game.
   const RETRYABLE_CODES = new Set(['ECONNRESET', 'ERR_NETWORK', 'ECONNABORTED']);
+  const RETRYABLE_METHODS = new Set(['get', 'head', 'options']);
+  const RETRYABLE_LIVE_MUTATION = /^\/api\/player\/play\/live\/[^/]+\/(join|move|resign|draw|timeout)$/;
   client.interceptors.response.use(
     (r) => r,
     async (error) => {
       const cfg = error.config;
+      const method = String(cfg?.method ?? 'get').toLowerCase();
+      const url = String(cfg?.url ?? '');
+      const canRetry = RETRYABLE_METHODS.has(method)
+        || (method === 'post' && RETRYABLE_LIVE_MUTATION.test(url));
       const isNetworkError = !error.response && (
         RETRYABLE_CODES.has(error.code) ||
         /Network Error|reset|socket hang up/i.test(error.message ?? '')
       );
-      if (isNetworkError && cfg && !cfg._cqRetried) {
+      if (isNetworkError && cfg && canRetry && !cfg._cqRetried) {
         cfg._cqRetried = true;
         await new Promise((r) => setTimeout(r, 250));
         return client(cfg);

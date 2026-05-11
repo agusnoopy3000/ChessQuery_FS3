@@ -25,7 +25,12 @@ class SupabaseStorageServiceTest {
 
     private final RestTemplate rest = mock(RestTemplate.class);
     private final SupabaseStorageService svc =
-            new SupabaseStorageService(rest, "http://localhost:54321", "svc-key", "chessquery-pgn");
+            new SupabaseStorageService(
+                    rest,
+                    "http://host.docker.internal:54321",
+                    "http://localhost:54321",
+                    "svc-key",
+                    "chessquery-pgn");
 
     @Test
     void uploadPgn_callsCorrectEndpointWithBearer() {
@@ -37,7 +42,7 @@ class SupabaseStorageServiceTest {
 
         assertThat(returned).isEqualTo(key);
         verify(rest, times(1)).exchange(
-                eq("http://localhost:54321/storage/v1/object/chessquery-pgn/games/2026/05/42.pgn"),
+                eq("http://host.docker.internal:54321/storage/v1/object/chessquery-pgn/games/2026/05/42.pgn"),
                 eq(HttpMethod.PUT),
                 any(HttpEntity.class),
                 eq(String.class));
@@ -54,7 +59,7 @@ class SupabaseStorageServiceTest {
     }
 
     @Test
-    void generatePresignedUrl_returnsFullUrl() {
+    void generatePresignedUrl_returnsPublicFullUrl() {
         when(rest.exchange(any(String.class), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
                 .thenReturn(new ResponseEntity<>(
                         "{\"signedURL\":\"/object/sign/chessquery-pgn/games/x.pgn?token=abc\"}", OK));

@@ -23,9 +23,10 @@ public class StorageConfig {
     public StorageService supabaseStorageService(
             RestTemplate restTemplate,
             @Value("${supabase.url}") String supabaseUrl,
+            @Value("${supabase.public-url:${supabase.url}}") String publicSupabaseUrl,
             @Value("${supabase.service-key}") String serviceKey,
             @Value("${s3.bucket:chessquery-pgn}") String bucket) {
-        return new SupabaseStorageService(restTemplate, supabaseUrl, serviceKey, bucket);
+        return new SupabaseStorageService(restTemplate, supabaseUrl, publicSupabaseUrl, serviceKey, bucket);
     }
 
     @Bean

@@ -1,6 +1,5 @@
 package cl.chessquery.game.service;
 
-import cl.chessquery.game.dto.GameResponse;
 import cl.chessquery.game.dto.LiveGameDtos.*;
 import cl.chessquery.game.dto.RegisterGameRequest;
 import cl.chessquery.game.entity.LiveGameMove;
@@ -14,6 +13,7 @@ import cl.chessquery.game.repository.LiveGameSessionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -40,9 +40,11 @@ class LiveGameServiceTest {
 
     private LiveGameSessionRepository sessionRepo;
     private LiveGameMoveRepository moveRepo;
-    private GameService gameService;
+    private LiveGameFinalizer finalizer;
     private LiveGameBroadcaster broadcaster;
     private OpeningDetector openingDetector;
+    private EventPublisherService events;
+    private RestTemplate restTemplate;
     private LiveGameService live;
 
     private final AtomicLong sessionIdSeq = new AtomicLong(0);
@@ -54,10 +56,12 @@ class LiveGameServiceTest {
     void setUp() {
         sessionRepo = mock(LiveGameSessionRepository.class);
         moveRepo = mock(LiveGameMoveRepository.class);
-        gameService = mock(GameService.class);
+        finalizer = mock(LiveGameFinalizer.class);
         broadcaster = mock(LiveGameBroadcaster.class);
         openingDetector = mock(OpeningDetector.class);
-        live = new LiveGameService(sessionRepo, moveRepo, gameService, broadcaster, openingDetector);
+        events = mock(EventPublisherService.class);
+        restTemplate = mock(RestTemplate.class);
+        live = new LiveGameService(sessionRepo, moveRepo, finalizer, broadcaster, openingDetector, events, restTemplate);
 
         // sessionRepo.save() → asigna id incremental y guarda última versión.
         when(sessionRepo.save(any(LiveGameSession.class))).thenAnswer(inv -> {
@@ -77,14 +81,12 @@ class LiveGameServiceTest {
         });
         when(moveRepo.findBySessionIdOrderByCreatedAtAsc(any()))
                 .thenAnswer(inv -> new ArrayList<>(persistedMoves));
+        when(moveRepo.findTopBySessionIdOrderByCreatedAtDesc(any()))
+                .thenAnswer(inv -> persistedMoves.isEmpty()
+                        ? Optional.empty()
+                        : Optional.of(persistedMoves.get(persistedMoves.size() - 1)));
         when(moveRepo.countBySessionId(any()))
                 .thenAnswer(inv -> (long) persistedMoves.size());
-
-        when(gameService.registerGame(any(RegisterGameRequest.class)))
-                .thenReturn(new GameResponse(
-                        999L, 1L, 2L, "1-0", "CASUAL",
-                        1500, 1500, 1500, 1500, 5,
-                        null, null, null, null, 60, Instant.now(), Instant.now()));
     }
 
     @Test
@@ -111,7 +113,7 @@ class LiveGameServiceTest {
         live.resign(1L, new ResignRequest(2L));
 
         ArgumentCaptor<RegisterGameRequest> captor = ArgumentCaptor.forClass(RegisterGameRequest.class);
-        verify(gameService).registerGame(captor.capture());
+        verify(finalizer).scheduleAfterCommit(eq(1L), captor.capture());
         String pgn = captor.getValue().pgnContent();
 
         // PGN bien formado: Seven Tag Roster + jugadas en SAN + resultado.
@@ -153,6 +155,19 @@ class LiveGameServiceTest {
         assertThatThrownBy(() -> live.move(1L, new MoveRequest(2L, "e7e5", null, null)))
                 .isInstanceOf(ApiException.class)
                 .matches(e -> ((ApiException) e).getStatus() == 403);
+    }
+
+    @Test
+    void duplicateMoveRetry_returnsCurrentStateWithoutCreatingAnotherMove() {
+        live.create(new CreateLiveGameRequest(1L, 1500, null, null));
+        live.join(1L, new JoinLiveGameRequest(2L, 1500));
+
+        live.move(1L, new MoveRequest(1L, "e2e4", null, null));
+        LiveGameResponse retry = live.move(1L, new MoveRequest(1L, "e2e4", null, null));
+
+        assertThat(retry.moves()).hasSize(1);
+        assertThat(persistedMoves).hasSize(1);
+        assertThat(retry.turn()).isEqualTo("b");
     }
 
     private void play(Long sessionId, String uci, Long playerId) {

@@ -245,6 +245,7 @@ services:
       SERVER_PORT: "8083"
       # Supabase Storage — almacenamiento PGN (default)
       SUPABASE_URL: ${SUPABASE_URL:-http://host.docker.internal:54321}
+      SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL:-http://127.0.0.1:54321}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:-}
       STORAGE_PROVIDER: ${STORAGE_PROVIDER:-supabase}
     ports:
