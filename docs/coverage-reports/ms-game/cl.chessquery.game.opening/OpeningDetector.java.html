@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OpeningDetector.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ms-game</a> &gt; <a href="index.source.html" class="el_package">cl.chessquery.game.opening</a> &gt; <span class="el_source">OpeningDetector.java</span></div><h1>OpeningDetector.java</h1><pre class="source lang-java linenums">package cl.chessquery.game.opening;
+
+import cl.chessquery.game.entity.Opening;
+import cl.chessquery.game.repository.OpeningRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.util.Arrays;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+/**
+ * Detecta la apertura a partir del PGN.
+ * Extrae los primeros 10 movimientos (ignorando las cabeceras del PGN)
+ * y busca en la base de datos la coincidencia más larga.
+ */
+<span class="fc" id="L20">@Slf4j</span>
+@Service
+<span class="nc" id="L22">@RequiredArgsConstructor</span>
+public class OpeningDetector {
+
+<span class="fc" id="L25">    private static final Pattern MOVE_NUMBER_PATTERN = Pattern.compile(&quot;\\d+\\.&quot;);</span>
+<span class="fc" id="L26">    private static final Pattern PGN_HEADER_PATTERN  = Pattern.compile(&quot;\\[.*?\\]&quot;, Pattern.DOTALL);</span>
+
+    private final OpeningRepository openingRepo;
+
+    /**
+     * Detecta la apertura del PGN dado.
+     * Retorna Optional.empty() si no hay coincidencia.
+     */
+    public Optional&lt;Opening&gt; detectOpening(String pgn) {
+<span class="nc bnc" id="L35" title="All 4 branches missed.">        if (pgn == null || pgn.isBlank()) {</span>
+<span class="nc" id="L36">            return Optional.empty();</span>
+        }
+<span class="nc" id="L38">        String moves = extractMoves(pgn, 10);</span>
+<span class="nc bnc" id="L39" title="All 2 branches missed.">        if (moves.isBlank()) {</span>
+<span class="nc" id="L40">            return Optional.empty();</span>
+        }
+        try {
+<span class="nc" id="L43">            return openingRepo.findBestMatch(moves);</span>
+<span class="nc" id="L44">        } catch (Exception e) {</span>
+<span class="nc" id="L45">            log.warn(&quot;Error al detectar apertura: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L46">            return Optional.empty();</span>
+        }
+    }
+
+    /**
+     * Extrae los primeros {@code maxMoves} movimientos del PGN.
+     * El formato PGN tiene cabeceras entre corchetes [Event ...] y luego los movimientos.
+     * Ejemplo de movimientos: &quot;1. e4 e5 2. Nf3 Nc6 3. Bb5&quot;
+     */
+    private String extractMoves(String pgn, int maxMoves) {
+        // Eliminar cabeceras PGN (líneas con [Tag &quot;Value&quot;])
+<span class="nc" id="L57">        String noHeaders = PGN_HEADER_PATTERN.matcher(pgn).replaceAll(&quot;&quot;).trim();</span>
+
+        // Dividir por números de turno (&quot;1.&quot;, &quot;2.&quot;, etc.) y tomar los primeros maxMoves pares
+        // Primero eliminamos los comentarios { ... }
+<span class="nc" id="L61">        String noComments = noHeaders.replaceAll(&quot;\\{[^}]*\\}&quot;, &quot;&quot;).trim();</span>
+
+        // Dividir tokens
+<span class="nc" id="L64">        String[] tokens = noComments.split(&quot;\\s+&quot;);</span>
+
+        // Filtrar tokens de resultado final (1-0, 0-1, 1/2-1/2, *)
+<span class="nc" id="L67">        java.util.List&lt;String&gt; moveTokens = new java.util.ArrayList&lt;&gt;();</span>
+<span class="nc" id="L68">        int moveCount = 0;</span>
+
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        for (String token : tokens) {</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">            if (token.isEmpty()) continue;</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">            if (token.matches(&quot;(1-0|0-1|1/2-1/2|\\*)&quot;)) break;</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">            if (MOVE_NUMBER_PATTERN.matcher(token).matches()) continue; // saltar &quot;1.&quot;, &quot;2.&quot;</span>
+            // Es un movimiento
+<span class="nc" id="L75">            moveTokens.add(token);</span>
+<span class="nc" id="L76">            moveCount++;</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">            if (moveCount &gt;= maxMoves * 2) break; // maxMoves pares = maxMoves * 2 movimientos individuales</span>
+        }
+
+<span class="nc" id="L80">        return String.join(&quot; &quot;, moveTokens);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

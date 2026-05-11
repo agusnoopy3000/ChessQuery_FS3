@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EventPublisherService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ms-game</a> &gt; <a href="index.source.html" class="el_package">cl.chessquery.game.service</a> &gt; <span class="el_source">EventPublisherService.java</span></div><h1>EventPublisherService.java</h1><pre class="source lang-java linenums">package cl.chessquery.game.service;
+
+import cl.chessquery.game.config.RabbitMQConfig;
+import cl.chessquery.game.entity.Game;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+import java.util.Map;
+import java.util.UUID;
+
+/**
+ * Publica eventos al exchange ChessEvents vía RabbitMQ.
+ */
+<span class="fc" id="L17">@Slf4j</span>
+@Service
+<span class="nc" id="L19">@RequiredArgsConstructor</span>
+public class EventPublisherService {
+
+    private final RabbitTemplate rabbitTemplate;
+
+    /** Routing key: game.finished */
+    public void publishGameFinished(Game game) {
+<span class="nc" id="L26">        Map&lt;String, Object&gt; payload = Map.of(</span>
+<span class="nc" id="L27">                &quot;gameId&quot;,          game.getId(),</span>
+<span class="nc" id="L28">                &quot;whitePlayerId&quot;,   game.getWhitePlayerId(),</span>
+<span class="nc" id="L29">                &quot;blackPlayerId&quot;,   game.getBlackPlayerId(),</span>
+<span class="nc" id="L30">                &quot;result&quot;,          game.getResult(),</span>
+<span class="nc" id="L31">                &quot;gameType&quot;,        game.getGameType().name(),</span>
+<span class="nc bnc" id="L32" title="All 2 branches missed.">                &quot;whiteEloBefore&quot;,  game.getWhiteEloBefore() != null ? game.getWhiteEloBefore() : 0,</span>
+<span class="nc bnc" id="L33" title="All 2 branches missed.">                &quot;blackEloBefore&quot;,  game.getBlackEloBefore() != null ? game.getBlackEloBefore() : 0,</span>
+<span class="nc bnc" id="L34" title="All 2 branches missed.">                &quot;whiteEloAfter&quot;,   game.getWhiteEloAfter()  != null ? game.getWhiteEloAfter()  : 0,</span>
+<span class="nc bnc" id="L35" title="All 2 branches missed.">                &quot;blackEloAfter&quot;,   game.getBlackEloAfter()  != null ? game.getBlackEloAfter()  : 0</span>
+        );
+<span class="nc" id="L37">        publish(&quot;game.finished&quot;, payload);</span>
+<span class="nc" id="L38">    }</span>
+
+    /** Routing key: game.invitation — push in-app al jugador invitado. */
+    public void publishGameInvitation(Long gameId, Long invitedPlayerId, Long inviterPlayerId,
+                                       String inviterName, String gameUrl) {
+<span class="nc" id="L43">        java.util.Map&lt;String, Object&gt; payload = new java.util.HashMap&lt;&gt;();</span>
+<span class="nc" id="L44">        payload.put(&quot;gameId&quot;, gameId);</span>
+<span class="nc" id="L45">        payload.put(&quot;playerId&quot;, invitedPlayerId);</span>
+<span class="nc bnc" id="L46" title="All 2 branches missed.">        payload.put(&quot;inviterId&quot;, inviterPlayerId == null ? 0L : inviterPlayerId);</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        payload.put(&quot;inviterName&quot;, inviterName == null ? &quot;&quot; : inviterName);</span>
+<span class="nc bnc" id="L48" title="All 2 branches missed.">        payload.put(&quot;gameUrl&quot;, gameUrl == null ? &quot;&quot; : gameUrl);</span>
+<span class="nc" id="L49">        publish(&quot;game.invitation&quot;, payload);</span>
+<span class="nc" id="L50">    }</span>
+
+    /** Routing key: elo.updated (uno por jugador) */
+    public void publishEloUpdated(Long playerId, int oldElo, int newElo, Long gameId, String ratingType) {
+<span class="nc" id="L54">        Map&lt;String, Object&gt; payload = Map.of(</span>
+                &quot;playerId&quot;,   playerId,
+<span class="nc" id="L56">                &quot;oldElo&quot;,     oldElo,</span>
+<span class="nc" id="L57">                &quot;newElo&quot;,     newElo,</span>
+<span class="nc" id="L58">                &quot;delta&quot;,      newElo - oldElo,</span>
+                &quot;ratingType&quot;, ratingType,
+<span class="nc bnc" id="L60" title="All 2 branches missed.">                &quot;gameId&quot;,     gameId != null ? gameId : &quot;&quot;</span>
+        );
+<span class="nc" id="L62">        publish(&quot;elo.updated&quot;, payload);</span>
+<span class="nc" id="L63">    }</span>
+
+    private void publish(String routingKey, Map&lt;String, Object&gt; payload) {
+<span class="nc" id="L66">        Map&lt;String, Object&gt; event = Map.of(</span>
+<span class="nc" id="L67">                &quot;eventId&quot;,   UUID.randomUUID().toString(),</span>
+                &quot;eventType&quot;, routingKey,
+<span class="nc" id="L69">                &quot;timestamp&quot;, Instant.now().toString(),</span>
+                &quot;payload&quot;,   payload
+        );
+        try {
+<span class="nc" id="L73">            rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE, routingKey, event);</span>
+<span class="nc" id="L74">            log.debug(&quot;Evento publicado: {} → {}&quot;, routingKey, event.get(&quot;eventId&quot;));</span>
+<span class="nc" id="L75">        } catch (Exception e) {</span>
+<span class="nc" id="L76">            log.error(&quot;Error publicando evento {}: {}&quot;, routingKey, e.getMessage());</span>
+<span class="nc" id="L77">        }</span>
+<span class="nc" id="L78">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

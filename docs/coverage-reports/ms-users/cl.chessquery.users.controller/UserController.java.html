@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UserController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ms-users</a> &gt; <a href="index.source.html" class="el_package">cl.chessquery.users.controller</a> &gt; <span class="el_source">UserController.java</span></div><h1>UserController.java</h1><pre class="source lang-java linenums">package cl.chessquery.users.controller;
+
+import cl.chessquery.users.dto.*;
+import cl.chessquery.users.entity.RatingType;
+import cl.chessquery.users.repository.PlayerRepository;
+import cl.chessquery.users.service.PlayerService;
+import cl.chessquery.users.service.RankingService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+@RestController
+@RequestMapping(&quot;/users&quot;)
+<span class="fc" id="L23">@RequiredArgsConstructor</span>
+@Tag(name = &quot;Users&quot;, description = &quot;Perfiles de jugadores, búsqueda y rankings&quot;)
+public class UserController {
+
+    private final PlayerService  playerService;
+    private final RankingService rankingService;
+    private final PlayerRepository playerRepository;
+
+    // ── Listado paginado ──────────────────────────────────────────────────────
+
+    @Operation(summary = &quot;Conteo y listado liviano de jugadores (uso del dashboard admin)&quot;)
+    @GetMapping
+    public Map&lt;String, Object&gt; list(
+            @RequestParam(defaultValue = &quot;0&quot;) int page,
+            @RequestParam(defaultValue = &quot;20&quot;) int size) {
+<span class="nc" id="L38">        long total = playerRepository.count();</span>
+<span class="nc" id="L39">        return Map.of(</span>
+<span class="nc" id="L40">                &quot;content&quot;, List.of(),</span>
+<span class="nc" id="L41">                &quot;page&quot;, page,</span>
+<span class="nc" id="L42">                &quot;size&quot;, size,</span>
+<span class="nc" id="L43">                &quot;totalElements&quot;, total,</span>
+<span class="nc bnc" id="L44" title="All 2 branches missed.">                &quot;totalPages&quot;, size == 0 ? 0 : (int) Math.ceil((double) total / size)</span>
+        );
+    }
+
+    // ── Sincronización post-registro ─────────────────────────────────────────
+
+    @Operation(summary = &quot;Crea o actualiza el Player con id = auth_user.id tras /auth/register&quot;)
+    @PostMapping(&quot;/sync&quot;)
+    @ResponseStatus(HttpStatus.OK)
+    public PlayerProfileResponse syncFromAuth(@Valid @RequestBody AuthSyncRequest request) {
+<span class="nc" id="L54">        return playerService.syncFromAuth(request);</span>
+    }
+
+    // ── Perfil completo ───────────────────────────────────────────────────────
+
+    @Operation(summary = &quot;Obtener perfil completo del jugador (country y club resueltos)&quot;)
+    @GetMapping(&quot;/{id}/profile&quot;)
+    public PlayerProfileResponse getProfile(@PathVariable Long id) {
+<span class="fc" id="L62">        return playerService.getProfile(id);</span>
+    }
+
+    @Operation(summary = &quot;Resolver Player por UUID de Supabase Auth (usado por API Gateway / BFFs)&quot;)
+    @GetMapping(&quot;/by-supabase-id/{supabaseUserId}&quot;)
+    public PlayerProfileResponse getBySupabaseId(@PathVariable UUID supabaseUserId) {
+<span class="fc" id="L68">        return playerService.getProfileBySupabaseId(supabaseUserId);</span>
+    }
+
+    @Operation(summary = &quot;Resolver Player por email (usado por ms-game para invitaciones in-app)&quot;)
+    @GetMapping(&quot;/by-email&quot;)
+    public PlayerProfileResponse getByEmail(@RequestParam String email) {
+<span class="nc" id="L74">        return playerService.getProfileByEmail(email);</span>
+    }
+
+    @Operation(summary = &quot;Auto-provisionar Player desde JWT de Supabase (idempotente)&quot;,
+               description = &quot;Llamado por el API Gateway cuando un JWT válido entra pero el &quot;
+                       + &quot;Player aún no existe (registro reciente, webhook caído).&quot;)
+    @PostMapping(&quot;/provision&quot;)
+    @ResponseStatus(HttpStatus.OK)
+    public PlayerProfileResponse provision(@Valid @RequestBody ProvisionPlayerRequest request) {
+<span class="nc" id="L83">        return playerService.provisionBySupabaseId(request);</span>
+    }
+
+    @Operation(summary = &quot;Actualizar datos de perfil (firstName, lastName, clubId, region)&quot;)
+    @PutMapping(&quot;/{id}/profile&quot;)
+    public PlayerProfileResponse updateProfile(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateProfileRequest request) {
+<span class="fc" id="L91">        return playerService.updateProfile(id, request);</span>
+    }
+
+    // ── Búsqueda fuzzy ────────────────────────────────────────────────────────
+
+    @Operation(summary = &quot;Búsqueda por nombre (fuzzy), RUT o FIDE ID&quot;)
+    @GetMapping(&quot;/search&quot;)
+    public List&lt;PlayerSearchResponse&gt; search(
+            @RequestParam String q,
+            @RequestParam(defaultValue = &quot;20&quot;) int limit) {
+<span class="fc" id="L101">        return playerService.search(q, limit);</span>
+    }
+
+    // ── Historial de ratings ──────────────────────────────────────────────────
+
+    @Operation(summary = &quot;Historial de ELO por tipo, ordenado por fecha (para gráficos)&quot;)
+    @GetMapping(&quot;/{id}/rating-history&quot;)
+    public List&lt;RatingHistoryResponse&gt; ratingHistory(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = &quot;NATIONAL&quot;) RatingType type) {
+<span class="nc" id="L111">        return playerService.getRatingHistory(id, type);</span>
+    }
+
+    // ── Ranking nacional ──────────────────────────────────────────────────────
+
+    @Operation(summary = &quot;Ranking nacional filtrado por categoría de edad y región&quot;)
+    @GetMapping(&quot;/ranking&quot;)
+    public List&lt;RankingEntryResponse&gt; ranking(
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String region,
+            @RequestParam(defaultValue = &quot;50&quot;) int limit) {
+<span class="fc" id="L122">        return rankingService.getRanking(category, region, limit);</span>
+    }
+
+    // ── Endpoint interno: actualizar ELO ─────────────────────────────────────
+    // Nota: Nginx NO expone esta ruta al exterior (/users/{id}/elo no tiene
+    // mapping en nginx.conf). Solo es accesible dentro de la red Docker.
+
+    @Operation(summary = &quot;[INTERNO] Actualizar ELO de un jugador (usado por MS-ETL y MS-Game vía REST)&quot;)
+    @PutMapping(&quot;/{id}/elo&quot;)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updateElo(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateEloRequest request) {
+<span class="fc" id="L135">        playerService.updateElo(id, request);</span>
+<span class="fc" id="L136">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

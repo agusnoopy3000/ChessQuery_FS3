@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PlayerTitleHistory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ms-users</a> &gt; <a href="index.source.html" class="el_package">cl.chessquery.users.entity</a> &gt; <span class="el_source">PlayerTitleHistory.java</span></div><h1>PlayerTitleHistory.java</h1><pre class="source lang-java linenums">package cl.chessquery.users.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.time.LocalDate;
+
+@Entity
+@Table(name = &quot;player_title_history&quot;)
+<span class="nc" id="L10">@Getter @Setter</span>
+<span class="pc" id="L11">@Builder</span>
+<span class="pc" id="L12">@NoArgsConstructor @AllArgsConstructor</span>
+public class PlayerTitleHistory {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+<span class="nc" id="L17">    private Long id;</span>
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;player_id&quot;, nullable = false)
+<span class="nc" id="L21">    private Player player;</span>
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10)
+<span class="fc" id="L25">    private ChessTitle title;</span>
+
+    @Column(name = &quot;title_date&quot;, nullable = false)
+<span class="nc" id="L28">    private LocalDate titleDate;</span>
+
+    @Column(name = &quot;is_current&quot;, nullable = false)
+<span class="nc" id="L31">    private boolean isCurrent;</span>
+
+    @Column(length = 50)
+<span class="nc" id="L34">    private String source;</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

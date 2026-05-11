@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RatingUpdatedConsumer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ms-users</a> &gt; <a href="index.source.html" class="el_package">cl.chessquery.users.messaging</a> &gt; <span class="el_source">RatingUpdatedConsumer.java</span></div><h1>RatingUpdatedConsumer.java</h1><pre class="source lang-java linenums">package cl.chessquery.users.messaging;
+
+import cl.chessquery.users.config.RabbitMQConfig;
+import cl.chessquery.users.entity.Club;
+import cl.chessquery.users.entity.Player;
+import cl.chessquery.users.entity.ProcessedEvent;
+import cl.chessquery.users.repository.ClubRepository;
+import cl.chessquery.users.repository.PlayerRepository;
+import cl.chessquery.users.repository.ProcessedEventRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+
+/**
+ * Consumidor del evento rating.updated publicado por MS-ETL tras cada
+ * sincronización con AJEFECH / FIDE / Lichess.
+ *
+ * Payload esperado:
+ * {
+ *   &quot;source&quot;:           &quot;AJEFECH&quot;,
+ *   &quot;ratingType&quot;:       &quot;NATIONAL&quot;,
+ *   &quot;syncId&quot;:           42,
+ *   &quot;playersUpdated&quot;:   189,
+ *   &quot;players&quot;: [
+ *     {
+ *       &quot;firstName&quot;:        &quot;Jorge Moises&quot;,
+ *       &quot;lastName&quot;:         &quot;Sepulveda Rojas&quot;,
+ *       &quot;birthDate&quot;:        &quot;1981-03-24&quot;,
+ *       &quot;clubName&quot;:         &quot;Club Deportivo Chess Viña del Mar&quot;,
+ *       &quot;fideId&quot;:           &quot;3404803&quot;,
+ *       &quot;federationId&quot;:     &quot;738&quot;,
+ *       &quot;rut&quot;:              &quot;9914860-8&quot;,
+ *       &quot;eloFideStandard&quot;:  2159,
+ *       &quot;eloNational&quot;:      2053,
+ *       &quot;source&quot;:           &quot;AJEFECH&quot;,
+ *       &quot;sourceUrl&quot;:        &quot;https://...&quot;
+ *     }, ...
+ *   ]
+ * }
+ *
+ * Estrategia de matching (en orden):
+ *   1. federation_id exacto
+ *   2. fide_id exacto
+ *   3. rut exacto
+ *   4. nombre completo case-insensitive
+ *   5. INSERT nuevo player con enrichment_source
+ *
+ * Idempotencia: descarta eventId ya procesado.
+ */
+<span class="fc" id="L59">@Slf4j</span>
+@Component
+<span class="fc" id="L61">@RequiredArgsConstructor</span>
+public class RatingUpdatedConsumer {
+
+    private final PlayerRepository playerRepo;
+    private final ProcessedEventRepository processedRepo;
+    private final ClubRepository clubRepo;
+
+    @RabbitListener(queues = RabbitMQConfig.USERS_RATING_QUEUE)
+    @Transactional
+    public void onRatingUpdated(ChessEvent event) {
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (!&quot;rating.updated&quot;.equals(event.getEventType())) {</span>
+<span class="fc" id="L72">            log.debug(&quot;Evento ignorado en users.rating.queue: {}&quot;, event.getEventType());</span>
+<span class="fc" id="L73">            return;</span>
+        }
+
+<span class="fc" id="L76">        UUID eventId = parseUuid(event.getEventId());</span>
+<span class="pc bpc" id="L77" title="1 of 4 branches missed.">        if (eventId != null &amp;&amp; processedRepo.existsById(eventId)) {</span>
+<span class="fc" id="L78">            log.debug(&quot;rating.updated {} ya procesado, descartado&quot;, eventId);</span>
+<span class="fc" id="L79">            return;</span>
+        }
+
+<span class="fc" id="L82">        Map&lt;String, Object&gt; payload = event.getPayload();</span>
+<span class="fc" id="L83">        String source = (String) payload.getOrDefault(&quot;source&quot;, &quot;UNKNOWN&quot;);</span>
+<span class="fc" id="L84">        Object playersRaw = payload.get(&quot;players&quot;);</span>
+<span class="pc bpc" id="L85" title="2 of 4 branches missed.">        if (!(playersRaw instanceof List&lt;?&gt; players) || players.isEmpty()) {</span>
+<span class="nc" id="L86">            log.info(&quot;rating.updated source={} sin players[], nada que procesar&quot;, source);</span>
+<span class="nc" id="L87">            persistProcessed(eventId, event.getEventType());</span>
+<span class="nc" id="L88">            return;</span>
+        }
+
+<span class="fc" id="L91">        int updated = 0;</span>
+<span class="fc" id="L92">        int created = 0;</span>
+<span class="fc" id="L93">        int skipped = 0;</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        for (Object item : players) {</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">            if (!(item instanceof Map&lt;?, ?&gt; raw)) continue;</span>
+            @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L97">            Map&lt;String, Object&gt; p = (Map&lt;String, Object&gt;) raw;</span>
+            try {
+<span class="fc" id="L99">                Result r = applyOne(p, source);</span>
+<span class="pc bpc" id="L100" title="2 of 4 branches missed.">                switch (r) {</span>
+<span class="fc" id="L101">                    case UPDATED -&gt; updated++;</span>
+<span class="fc" id="L102">                    case CREATED -&gt; created++;</span>
+<span class="nc" id="L103">                    case SKIPPED -&gt; skipped++;</span>
+                }
+<span class="nc" id="L105">            } catch (Exception e) {</span>
+<span class="nc" id="L106">                log.warn(&quot;rating.updated: error procesando jugador {}: {}&quot;,</span>
+<span class="nc" id="L107">                        p.get(&quot;federationId&quot;), e.getMessage());</span>
+<span class="nc" id="L108">                skipped++;</span>
+<span class="fc" id="L109">            }</span>
+<span class="fc" id="L110">        }</span>
+
+<span class="fc" id="L112">        log.info(&quot;rating.updated source={} updated={} created={} skipped={}&quot;,</span>
+<span class="fc" id="L113">                source, updated, created, skipped);</span>
+<span class="fc" id="L114">        persistProcessed(eventId, event.getEventType());</span>
+<span class="fc" id="L115">    }</span>
+
+<span class="fc" id="L117">    private enum Result { UPDATED, CREATED, SKIPPED }</span>
+
+    private Result applyOne(Map&lt;String, Object&gt; p, String source) {
+<span class="fc" id="L120">        String federationId = asString(p.get(&quot;federationId&quot;));</span>
+<span class="fc" id="L121">        String fideId = asString(p.get(&quot;fideId&quot;));</span>
+<span class="fc" id="L122">        String rut = asString(p.get(&quot;rut&quot;));</span>
+<span class="fc" id="L123">        String firstName = asString(p.get(&quot;firstName&quot;));</span>
+<span class="fc" id="L124">        String lastName = asString(p.get(&quot;lastName&quot;));</span>
+
+<span class="pc bpc" id="L126" title="2 of 4 branches missed.">        if (firstName == null || lastName == null) return Result.SKIPPED;</span>
+
+<span class="fc" id="L128">        Optional&lt;Player&gt; match = lookup(federationId, fideId, rut, firstName, lastName);</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        if (match.isPresent()) {</span>
+<span class="fc" id="L130">            applyEnrichment(match.get(), p, source);</span>
+<span class="fc" id="L131">            playerRepo.save(match.get());</span>
+<span class="fc" id="L132">            return Result.UPDATED;</span>
+        }
+
+<span class="fc" id="L135">        Player created = newPlayerFromPayload(p, source);</span>
+        try {
+<span class="fc" id="L137">            playerRepo.save(created);</span>
+<span class="fc" id="L138">            return Result.CREATED;</span>
+<span class="nc" id="L139">        } catch (org.springframework.dao.DataIntegrityViolationException e) {</span>
+            // Carrera por unique constraint (rut/fide_id/federation_id) — ignorar.
+<span class="nc" id="L141">            log.debug(&quot;INSERT colision para fed={} fide={} rut={}&quot;, federationId, fideId, rut);</span>
+<span class="nc" id="L142">            return Result.SKIPPED;</span>
+        }
+    }
+
+    private Optional&lt;Player&gt; lookup(
+            String federationId, String fideId, String rut,
+            String firstName, String lastName
+    ) {
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (federationId != null) {</span>
+<span class="fc" id="L151">            Optional&lt;Player&gt; byFed = playerRepo.findByFederationId(federationId);</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">            if (byFed.isPresent()) return byFed;</span>
+        }
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        if (fideId != null) {</span>
+<span class="fc" id="L155">            Optional&lt;Player&gt; byFide = playerRepo.findByFideId(fideId);</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">            if (byFide.isPresent()) return byFide;</span>
+        }
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (rut != null) {</span>
+<span class="fc" id="L159">            Optional&lt;Player&gt; byRut = playerRepo.findByRut(rut);</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">            if (byRut.isPresent()) return byRut;</span>
+        }
+<span class="fc" id="L162">        return playerRepo.findByFullNameIgnoreCase(firstName, lastName);</span>
+    }
+
+    private void applyEnrichment(Player player, Map&lt;String, Object&gt; p, String source) {
+        // Solo sobreescribimos campos null/0 — no pisamos datos curados manualmente.
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (player.getFederationId() == null) {</span>
+<span class="fc" id="L168">            player.setFederationId(asString(p.get(&quot;federationId&quot;)));</span>
+        }
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (player.getFideId() == null) {</span>
+<span class="fc" id="L171">            player.setFideId(asString(p.get(&quot;fideId&quot;)));</span>
+        }
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (player.getRut() == null) {</span>
+<span class="fc" id="L174">            player.setRut(asString(p.get(&quot;rut&quot;)));</span>
+        }
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">        if (player.getBirthDate() == null) {</span>
+<span class="fc" id="L177">            player.setBirthDate(asLocalDate(p.get(&quot;birthDate&quot;)));</span>
+        }
+        // Resolver club por nombre (find-or-create) si AJEFECH lo proveyó
+<span class="fc" id="L180">        String clubName = asString(p.get(&quot;clubName&quot;));</span>
+<span class="pc bpc" id="L181" title="3 of 4 branches missed.">        if (clubName != null &amp;&amp; player.getClub() == null) {</span>
+<span class="nc" id="L182">            player.setClub(findOrCreateClub(clubName));</span>
+        }
+        // ELOs: siempre actualiza si hay valor nuevo &gt; 0
+<span class="fc" id="L185">        Integer eloNat = asInt(p.get(&quot;eloNational&quot;));</span>
+<span class="pc bpc" id="L186" title="2 of 4 branches missed.">        if (eloNat != null &amp;&amp; eloNat &gt; 0) player.setEloNational(eloNat);</span>
+<span class="fc" id="L187">        Integer eloFide = asInt(p.get(&quot;eloFideStandard&quot;));</span>
+<span class="pc bpc" id="L188" title="1 of 4 branches missed.">        if (eloFide != null &amp;&amp; eloFide &gt; 0) player.setEloFideStandard(eloFide);</span>
+
+<span class="fc" id="L190">        player.setEnrichmentSource(source);</span>
+<span class="fc" id="L191">        player.setEnrichedAt(Instant.now());</span>
+<span class="fc" id="L192">    }</span>
+
+    private Player newPlayerFromPayload(Map&lt;String, Object&gt; p, String source) {
+<span class="fc" id="L195">        Integer eloNat = asInt(p.get(&quot;eloNational&quot;));</span>
+<span class="fc" id="L196">        Integer eloFide = asInt(p.get(&quot;eloFideStandard&quot;));</span>
+<span class="fc" id="L197">        String clubName = asString(p.get(&quot;clubName&quot;));</span>
+<span class="fc" id="L198">        return Player.builder()</span>
+<span class="fc" id="L199">                .firstName(asString(p.get(&quot;firstName&quot;)))</span>
+<span class="fc" id="L200">                .lastName(asString(p.get(&quot;lastName&quot;)))</span>
+<span class="fc" id="L201">                .rut(asString(p.get(&quot;rut&quot;)))</span>
+<span class="fc" id="L202">                .fideId(asString(p.get(&quot;fideId&quot;)))</span>
+<span class="fc" id="L203">                .federationId(asString(p.get(&quot;federationId&quot;)))</span>
+<span class="fc" id="L204">                .birthDate(asLocalDate(p.get(&quot;birthDate&quot;)))</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">                .club(clubName != null ? findOrCreateClub(clubName) : null)</span>
+<span class="pc bpc" id="L206" title="2 of 4 branches missed.">                .eloNational(eloNat != null &amp;&amp; eloNat &gt; 0 ? eloNat : null)</span>
+<span class="pc bpc" id="L207" title="2 of 4 branches missed.">                .eloFideStandard(eloFide != null &amp;&amp; eloFide &gt; 0 ? eloFide : null)</span>
+<span class="fc" id="L208">                .enrichmentSource(source)</span>
+<span class="fc" id="L209">                .enrichedAt(Instant.now())</span>
+<span class="fc" id="L210">                .build();</span>
+    }
+
+    private Club findOrCreateClub(String name) {
+<span class="nc" id="L214">        return clubRepo.findFirstByNameIgnoreCase(name)</span>
+<span class="nc" id="L215">                .orElseGet(() -&gt; clubRepo.save(Club.builder().name(name).build()));</span>
+    }
+
+    private void persistProcessed(UUID eventId, String eventType) {
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">        if (eventId == null) return;</span>
+        try {
+<span class="fc" id="L221">            processedRepo.save(ProcessedEvent.builder()</span>
+<span class="fc" id="L222">                    .eventId(eventId)</span>
+<span class="fc" id="L223">                    .eventType(eventType)</span>
+<span class="fc" id="L224">                    .processedAt(Instant.now())</span>
+<span class="fc" id="L225">                    .build());</span>
+<span class="nc" id="L226">        } catch (Exception ignored) {</span>
+            // Otra réplica ya lo persistió — ok.
+<span class="fc" id="L228">        }</span>
+<span class="fc" id="L229">    }</span>
+
+    private static UUID parseUuid(String s) {
+<span class="pc bpc" id="L232" title="2 of 4 branches missed.">        if (s == null || s.isBlank()) return null;</span>
+<span class="pc" id="L233">        try { return UUID.fromString(s); } catch (IllegalArgumentException e) { return null; }</span>
+    }
+
+    private static String asString(Object v) {
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        if (v == null) return null;</span>
+<span class="fc" id="L238">        String s = v.toString().trim();</span>
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">        return s.isEmpty() ? null : s;</span>
+    }
+
+    private static Integer asInt(Object v) {
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        if (v instanceof Number n) return n.intValue();</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">        if (v == null) return null;</span>
+<span class="nc" id="L245">        try { return Integer.parseInt(v.toString().trim()); }</span>
+<span class="nc" id="L246">        catch (NumberFormatException e) { return null; }</span>
+    }
+
+    private static LocalDate asLocalDate(Object v) {
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">        if (v == null) return null;</span>
+<span class="nc" id="L251">        try { return LocalDate.parse(v.toString()); }</span>
+<span class="nc" id="L252">        catch (Exception e) { return null; }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

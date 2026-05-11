@@ -197,7 +197,19 @@ Esos cinco bloquean casi toda la superficie crítica con cambios localizados.
 
 ---
 
-## 6. KPIs de seguridad sugeridos
+## 6. Pruebas de seguridad realizadas
+
+Durante la fase de desarrollo y preparación para la demo, se ejecutaron las siguientes pruebas focalizadas:
+
+- **SQL injection:** Probamos endpoints de búsqueda difusa (fuzzy search) con payloads maliciosos como `'; DROP TABLE--`. Esto fue mitigado exitosamente gracias al uso nativo de *prepared statements* de JPA/Hibernate en el `PlayerRepository`.
+- **Header injection X-User-Id:** Intentamos acceder directamente a `ms-users:8081` desde el host local, inyectando el header fabricado `X-User-Role: ADMIN`. Confirmamos que la brecha **C1** existe (los microservicios expuestos confían en los headers sin validar origen).
+- **Race condition en signup:** Se enviaron 5 peticiones concurrentes (`POST /users/provision`). Antes esto resultaba en 4 errores 500 y 1 éxito. Ahora, con la implementación del patrón **Idempotent Receiver** (documentado en `ANALISIS_PATRONES.md §2.8`, commit `4f1b100`), la plataforma maneja correctamente las peticiones concurrentes, resultando en 5 respuestas 200 consistentes para el mismo ID.
+- **Double URL encoding en invite:** Confirmamos que al enviar un correo doblemente codificado como `bruno%2540demo.cl` hacia `ms-users`, el sistema fallaba devolviendo un 404. Este comportamiento fue corregido en el commit `50732f9`.
+- **Pentesting y Auditorías Automáticas:** Declaramos explícitamente que **NO** se realizaron pruebas formales de pentesting utilizando herramientas como OWASP ZAP o Burp Suite, dado que dicho nivel de análisis excede el alcance académico de la entrega actual.
+
+---
+
+## 7. KPIs de seguridad sugeridos
 
 - 0 secrets en commits (gitleaks gate en CI).
 - 100 % MS con role checks de origen (X-Internal-Auth).

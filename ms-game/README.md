@@ -1,11 +1,13 @@
 # ms-game — Servicio de Partidas
 
-Registra partidas, calcula ELO (FIDE), detecta apertura por PGN, sube PGN a MinIO/S3.
+Registra partidas (casuales y de torneo + live games), calcula ELO (FIDE),
+detecta apertura por PGN, persiste PGN en Supabase Storage.
 
 - **Puerto:** 8083
 - **DB:** `game_db` (PostgreSQL :5435)
 - **Paquete:** `cl.chessquery.game`
-- **Storage:** MinIO bucket `chessquery-pgn`
+- **Storage:** Supabase Storage bucket `chessquery-pgn` (legacy MinIO
+  disponible vía `storage.provider=minio`)
 
 ## Lógica clave
 
@@ -14,8 +16,12 @@ Registra partidas, calcula ELO (FIDE), detecta apertura por PGN, sube PGN a MinI
   pendiente).
 - **Opening Detector:** extrae primeros 10 movimientos del PGN y busca
   match por prefijo más largo en tabla `opening` (90+ aperturas ECO).
-- **PGN Storage:** AWS SDK v2 con `path-style-access` para MinIO local.
-  Key: `games/{year}/{month}/{gameId}.pgn`. URL presignada 1h.
+- **PGN Storage:** Cliente Supabase Storage REST. Key:
+  `games/{year}/{month}/{gameId}.pgn`. URL presignada 1h.
+- **Live Games:** sesiones WAITING → ACTIVE → FINISHED, validación de
+  jugadas server-side, broadcasting via Supabase Realtime.
+- **Invitaciones:** lookup de email vía ms-users + publica
+  `game.invitation` para notif in-app.
 
 ## Endpoints
 

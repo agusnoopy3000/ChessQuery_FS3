@@ -1,0 +1,92 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -----------------------< cl.chessquery:ms-game >------------------------
+[INFO] Building ms-game 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.3.2:clean (default-clean) @ ms-game ---
+[INFO] Deleting /Users/agustingarridosnoopy/ChessQuery_FS3/ms-game/target
+[INFO] 
+[INFO] --- jacoco:0.8.11:prepare-agent (default) @ ms-game ---
+[INFO] argLine set to -javaagent:/Users/agustingarridosnoopy/.m2/repository/org/jacoco/org.jacoco.agent/0.8.11/org.jacoco.agent-0.8.11-runtime.jar=destfile=/Users/agustingarridosnoopy/ChessQuery_FS3/ms-game/target/jacoco.exec
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ ms-game ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 4 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ ms-game ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 36 source files with javac [debug release 17] to target/classes
+[INFO] Annotation processing is enabled because one or more processors were found
+  on the class path. A future release of javac may disable annotation processing
+  unless at least one processor is specified by name (-processor), or a search
+  path is specified (--processor-path, --processor-module-path), or annotation
+  processing is enabled explicitly (-proc:only, -proc:full).
+  Use -Xlint:-options to suppress this message.
+  Use -proc:none to disable annotation processing.
+[INFO] /Users/agustingarridosnoopy/ChessQuery_FS3/ms-game/src/main/java/cl/chessquery/game/storage/StorageConfig.java: /Users/agustingarridosnoopy/ChessQuery_FS3/ms-game/src/main/java/cl/chessquery/game/storage/StorageConfig.java uses or overrides a deprecated API.
+[INFO] /Users/agustingarridosnoopy/ChessQuery_FS3/ms-game/src/main/java/cl/chessquery/game/storage/StorageConfig.java: Recompile with -Xlint:deprecation for details.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ ms-game ---
+[INFO] Copying 1 resource from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ ms-game ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 3 source files with javac [debug release 17] to target/test-classes
+[INFO] Annotation processing is enabled because one or more processors were found
+  on the class path. A future release of javac may disable annotation processing
+  unless at least one processor is specified by name (-processor), or a search
+  path is specified (--processor-path, --processor-module-path), or annotation
+  processing is enabled explicitly (-proc:only, -proc:full).
+  Use -Xlint:-options to suppress this message.
+  Use -proc:none to disable annotation processing.
+[INFO] 
+[INFO] --- surefire:3.1.2:test (default-test) @ ms-game ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running cl.chessquery.game.storage.SupabaseStorageServiceTest
+WARNING: A Java agent has been loaded dynamically (/Users/agustingarridosnoopy/.m2/repository/net/bytebuddy/byte-buddy-agent/1.14.12/byte-buddy-agent-1.14.12.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+18:03:34.534 [main] ERROR cl.chessquery.game.storage.SupabaseStorageService -- Fallo upload PGN a Supabase Storage: bucket=chessquery-pgn key=games/x.pgn status=400 BAD_REQUEST
+18:03:34.586 [main] ERROR cl.chessquery.game.storage.SupabaseStorageService -- Fallo presign en Supabase Storage: bucket=chessquery-pgn key=games/x.pgn status=400 BAD_REQUEST
+18:03:34.657 [main] INFO cl.chessquery.game.storage.SupabaseStorageService -- PGN subido a Supabase Storage: bucket=chessquery-pgn key=games/2026/05/42.pgn size=17
+18:03:34.679 [main] INFO cl.chessquery.game.storage.SupabaseStorageService -- PGN subido a Supabase Storage: bucket=chessquery-pgn key=k size=3
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.445 s -- in cl.chessquery.game.storage.SupabaseStorageServiceTest
+[INFO] Running cl.chessquery.game.service.LiveGameServiceTest
+18:03:35.002 [main] INFO cl.chessquery.game.service.LiveGameService -- LiveGame creada id=1 white=1
+18:03:35.009 [main] INFO cl.chessquery.game.service.LiveGameService -- LiveGame 1 joined: black=2
+18:03:35.022 [main] INFO cl.chessquery.game.service.LiveGameService -- LiveGame creada id=1 white=1
+18:03:35.023 [main] INFO cl.chessquery.game.service.LiveGameService -- LiveGame 1 joined: black=2
+18:03:35.086 [main] INFO cl.chessquery.game.service.LiveGameService -- LiveGame creada id=1 white=1
+18:03:35.086 [main] INFO cl.chessquery.game.service.LiveGameService -- LiveGame 1 joined: black=2
+18:03:35.124 [main] INFO cl.chessquery.game.service.LiveGameService -- LiveGame creada id=1 white=1
+18:03:35.126 [main] INFO cl.chessquery.game.service.LiveGameService -- LiveGame 1 joined: black=2
+18:03:35.134 [main] INFO cl.chessquery.game.service.LiveGameService -- LiveGame 1 finalizada (result=1-0 reason=RESIGN); materialización PGN programada
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.428 s -- in cl.chessquery.game.service.LiveGameServiceTest
+[INFO] Running cl.chessquery.game.elo.EloCalculatorTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.010 s -- in cl.chessquery.game.elo.EloCalculatorTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 13, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] 
+[INFO] --- jacoco:0.8.11:report (report) @ ms-game ---
+[INFO] Loading execution data file /Users/agustingarridosnoopy/ChessQuery_FS3/ms-game/target/jacoco.exec
+[INFO] Analyzed bundle 'ms-game' with 45 classes
+[INFO] 
+[INFO] --- jacoco:0.8.11:report (default-cli) @ ms-game ---
+[INFO] Loading execution data file /Users/agustingarridosnoopy/ChessQuery_FS3/ms-game/target/jacoco.exec
+[INFO] Analyzed bundle 'ms-game' with 45 classes
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  5.461 s
+[INFO] Finished at: 2026-05-11T18:03:35-04:00
+[INFO] ------------------------------------------------------------------------

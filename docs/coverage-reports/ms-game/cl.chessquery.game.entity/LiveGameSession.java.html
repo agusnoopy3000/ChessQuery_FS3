@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LiveGameSession.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ms-game</a> &gt; <a href="index.source.html" class="el_package">cl.chessquery.game.entity</a> &gt; <span class="el_source">LiveGameSession.java</span></div><h1>LiveGameSession.java</h1><pre class="source lang-java linenums">package cl.chessquery.game.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.time.Instant;
+
+@Entity
+@Table(name = &quot;live_game_session&quot;)
+<span class="pc" id="L10">@Getter @Setter</span>
+<span class="pc" id="L11">@NoArgsConstructor @AllArgsConstructor @Builder</span>
+public class LiveGameSession {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+<span class="fc" id="L16">    private Long id;</span>
+
+    @Column(name = &quot;white_player_id&quot;, nullable = false)
+<span class="fc" id="L19">    private Long whitePlayerId;</span>
+
+    @Column(name = &quot;black_player_id&quot;)
+<span class="fc" id="L22">    private Long blackPlayerId;</span>
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+<span class="fc" id="L26">    private SessionStatus status;</span>
+
+    @Column(name = &quot;initial_fen&quot;, nullable = false, length = 120)
+<span class="nc" id="L29">    private String initialFen;</span>
+
+    @Column(name = &quot;current_fen&quot;, nullable = false, length = 120)
+<span class="fc" id="L32">    private String currentFen;</span>
+
+    @Column(nullable = false, length = 1)
+<span class="fc" id="L35">    private String turn;</span>
+
+    @Column(length = 10)
+<span class="fc" id="L38">    private String result;</span>
+
+    @Column(name = &quot;end_reason&quot;, length = 30)
+<span class="fc" id="L41">    private String endReason;</span>
+
+    @Column(name = &quot;time_control_initial_ms&quot;)
+<span class="fc" id="L44">    private Long timeControlInitialMs;</span>
+
+    @Column(name = &quot;time_control_increment_ms&quot;)
+<span class="fc" id="L47">    private Long timeControlIncrementMs;</span>
+
+    @Column(name = &quot;clock_white_ms&quot;)
+<span class="fc" id="L50">    private Long clockWhiteMs;</span>
+
+    @Column(name = &quot;clock_black_ms&quot;)
+<span class="fc" id="L53">    private Long clockBlackMs;</span>
+
+    @Column(name = &quot;white_elo_before&quot;)
+<span class="fc" id="L56">    private Integer whiteEloBefore;</span>
+
+    @Column(name = &quot;black_elo_before&quot;)
+<span class="fc" id="L59">    private Integer blackEloBefore;</span>
+
+    @Column(name = &quot;finalized_game_id&quot;)
+<span class="fc" id="L62">    private Long finalizedGameId;</span>
+
+    @Column(name = &quot;started_at&quot;)
+<span class="fc" id="L65">    private Instant startedAt;</span>
+
+    @Column(name = &quot;finished_at&quot;)
+<span class="fc" id="L68">    private Instant finishedAt;</span>
+
+    @Column(name = &quot;last_move_at&quot;)
+<span class="fc" id="L71">    private Instant lastMoveAt;</span>
+
+    @Column(name = &quot;created_at&quot;, nullable = false, updatable = false)
+<span class="nc" id="L74">    private Instant createdAt;</span>
+
+    @PrePersist
+    void onCreate() {
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        if (createdAt == null) createdAt = Instant.now();</span>
+<span class="nc" id="L79">    }</span>
+
+<span class="fc" id="L81">    public enum SessionStatus { WAITING, ACTIVE, FINISHED, ABANDONED }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,455 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PlayerService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ms-users</a> &gt; <a href="index.source.html" class="el_package">cl.chessquery.users.service</a> &gt; <span class="el_source">PlayerService.java</span></div><h1>PlayerService.java</h1><pre class="source lang-java linenums">package cl.chessquery.users.service;
+
+import cl.chessquery.users.dto.*;
+import cl.chessquery.users.entity.*;
+import cl.chessquery.users.exception.ApiException;
+import cl.chessquery.users.repository.*;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+<span class="fc" id="L19">@Slf4j</span>
+@Service
+<span class="fc" id="L21">@RequiredArgsConstructor</span>
+public class PlayerService {
+
+    private final PlayerRepository            playerRepo;
+    private final ClubRepository              clubRepo;
+    private final RatingHistoryRepository     historyRepo;
+    private final PlayerTitleHistoryRepository titleRepo;
+    private final EventPublisherService       events;
+
+    @PersistenceContext
+    private EntityManager em;
+
+    // ─── POST /users/sync (upsert post-registro) ─────────────────────────────
+
+    /**
+     * Crea, reclama o actualiza el Player con id=auth.userId. Flujo:
+     * &lt;ol&gt;
+     *   &lt;li&gt;Si ya existe Player con id=auth.userId → UPDATE de los campos
+     *       no nulos del request (idempotente).&lt;/li&gt;
+     *   &lt;li&gt;Si no, busca un Player &lt;em&gt;federado-solamente&lt;/em&gt; (email NULL)
+     *       cuyo nombre coincida con el del request. Si encuentra match,
+     *       lo &quot;reclama&quot;: re-asigna su id a auth.userId (cascada vía FK
+     *       ON UPDATE) y rellena email/lichessUsername aportados por el
+     *       registro. Esto evita duplicar perfiles cuando AJEFECH ya
+     *       había scrapeado al jugador.&lt;/li&gt;
+     *   &lt;li&gt;Si tampoco hay match federado → INSERT nuevo con el id explícito.&lt;/li&gt;
+     * &lt;/ol&gt;
+     */
+    @Transactional
+    public PlayerProfileResponse syncFromAuth(AuthSyncRequest req) {
+        // 1. Player ya existe con ese authId → UPDATE
+<span class="nc" id="L52">        Player existing = playerRepo.findById(req.id()).orElse(null);</span>
+<span class="nc bnc" id="L53" title="All 2 branches missed.">        if (existing != null) {</span>
+<span class="nc" id="L54">            applyAuthFields(existing, req);</span>
+<span class="nc" id="L55">            playerRepo.save(existing);</span>
+        } else {
+            // 2. Intentar reclamar Player federado-solo por nombre
+<span class="nc" id="L58">            Player claimed = tryClaimFederated(req);</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">            if (claimed != null) {</span>
+<span class="nc" id="L60">                applyAuthFields(claimed, req);</span>
+<span class="nc" id="L61">                playerRepo.save(claimed);</span>
+<span class="nc" id="L62">                log.info(&quot;Player federado reclamado: id {} → {} (auth_user)&quot;,</span>
+<span class="nc" id="L63">                        req.id(), claimed.getId());</span>
+            } else {
+                // 3. INSERT nativo con id explícito desde auth_user
+<span class="nc" id="L66">                Instant now = Instant.now();</span>
+<span class="nc" id="L67">                em.createNativeQuery(&quot;&quot;&quot;</span>
+                        INSERT INTO player (id, first_name, last_name, email, lichess_username, created_at, updated_at)
+                        OVERRIDING SYSTEM VALUE
+                        VALUES (:id, :fn, :ln, :em, :lu, :ts, :ts)
+                        ON CONFLICT (id) DO NOTHING
+                        &quot;&quot;&quot;)
+<span class="nc" id="L73">                        .setParameter(&quot;id&quot;, req.id())</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">                        .setParameter(&quot;fn&quot;, StringUtils.hasText(req.firstName()) ? req.firstName() : &quot;Jugador&quot;)</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">                        .setParameter(&quot;ln&quot;, StringUtils.hasText(req.lastName())  ? req.lastName()  : String.valueOf(req.id()))</span>
+<span class="nc" id="L76">                        .setParameter(&quot;em&quot;, req.email())</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">                        .setParameter(&quot;lu&quot;, StringUtils.hasText(req.lichessUsername()) ? req.lichessUsername().trim() : null)</span>
+<span class="nc" id="L78">                        .setParameter(&quot;ts&quot;, now)</span>
+<span class="nc" id="L79">                        .executeUpdate();</span>
+<span class="nc" id="L80">                em.clear();</span>
+            }
+        }
+
+<span class="nc" id="L84">        Player p = playerRepo.findById(req.id())</span>
+<span class="nc" id="L85">                .orElseThrow(() -&gt; new ApiException(500, &quot;SYNC_FAILED&quot;, &quot;No se pudo sincronizar el Player&quot;));</span>
+<span class="nc" id="L86">        String title = titleRepo.findByPlayerIdAndIsCurrentTrue(p.getId())</span>
+<span class="nc" id="L87">                .map(t -&gt; t.getTitle().name()).orElse(null);</span>
+<span class="nc" id="L88">        return toProfileResponse(p, title);</span>
+    }
+
+    /**
+     * Busca un Player federado-solamente (sin email) cuyo nombre coincida
+     * con el del request y re-asigna su id a auth.userId. Devuelve el
+     * Player ya con el nuevo id, listo para que el caller aplique los
+     * campos de auth (email, lichess) sin pisar los datos federados.
+     * &lt;p&gt;
+     * Si {@code req.id()} ya está ocupado por otro Player (carrera) o si
+     * no hay nombre en el request, retorna {@code null}.
+     */
+    private Player tryClaimFederated(AuthSyncRequest req) {
+<span class="nc bnc" id="L101" title="All 4 branches missed.">        if (!StringUtils.hasText(req.firstName()) || !StringUtils.hasText(req.lastName())) {</span>
+<span class="nc" id="L102">            return null;</span>
+        }
+<span class="nc" id="L104">        Player federated = playerRepo</span>
+<span class="nc" id="L105">                .findFederatedByFullName(req.firstName().trim(), req.lastName().trim())</span>
+<span class="nc" id="L106">                .orElse(null);</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        if (federated == null) return null;</span>
+
+<span class="nc" id="L109">        Long oldId = federated.getId();</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        if (oldId.equals(req.id())) return federated;</span>
+
+        // Re-asignar el id. Las FKs en rating_history y player_title_history
+        // tienen ON UPDATE CASCADE (V8) — la actualización se propaga.
+<span class="nc" id="L114">        int rows = em.createNativeQuery(&quot;UPDATE player SET id = :newId WHERE id = :oldId&quot;)</span>
+<span class="nc" id="L115">                .setParameter(&quot;newId&quot;, req.id())</span>
+<span class="nc" id="L116">                .setParameter(&quot;oldId&quot;, oldId)</span>
+<span class="nc" id="L117">                .executeUpdate();</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        if (rows == 0) {</span>
+<span class="nc" id="L119">            log.warn(&quot;Reclamo abortado: no se actualizó player id {} → {}&quot;, oldId, req.id());</span>
+<span class="nc" id="L120">            return null;</span>
+        }
+<span class="nc" id="L122">        em.clear();</span>
+<span class="nc" id="L123">        return playerRepo.findById(req.id()).orElse(null);</span>
+    }
+
+    /**
+     * Aplica los campos provenientes de auth (firstName, lastName, email,
+     * lichessUsername) sin pisar datos federados ya curados (no
+     * sobreescribe email si ya existe).
+     */
+    private void applyAuthFields(Player p, AuthSyncRequest req) {
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        if (StringUtils.hasText(req.firstName())) p.setFirstName(req.firstName());</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        if (StringUtils.hasText(req.lastName()))  p.setLastName(req.lastName());</span>
+<span class="nc bnc" id="L134" title="All 4 branches missed.">        if (StringUtils.hasText(req.email()) &amp;&amp; p.getEmail() == null) p.setEmail(req.email());</span>
+<span class="nc bnc" id="L135" title="All 4 branches missed.">        if (StringUtils.hasText(req.lichessUsername()) &amp;&amp; p.getLichessUsername() == null) {</span>
+<span class="nc" id="L136">            p.setLichessUsername(req.lichessUsername().trim());</span>
+        }
+<span class="nc" id="L138">    }</span>
+
+    // ─── GET /users/{id}/profile ──────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public PlayerProfileResponse getProfile(Long id) {
+<span class="nc" id="L144">        Player p = findOrThrow(id);</span>
+<span class="nc" id="L145">        String title = titleRepo.findByPlayerIdAndIsCurrentTrue(id)</span>
+<span class="nc" id="L146">                .map(t -&gt; t.getTitle().name())</span>
+<span class="nc" id="L147">                .orElse(null);</span>
+<span class="nc" id="L148">        return toProfileResponse(p, title);</span>
+    }
+
+    // ─── POST /users/provision (auto-provision desde JWT) ────────────────────
+
+    /**
+     * Crea o reclama idempotentemente un Player a partir de la identidad de
+     * Supabase Auth. El API Gateway lo llama cuando un JWT válido entra y aún
+     * no existe Player asociado (típicamente registro reciente cuyo webhook
+     * no ha sido procesado, o webhook deshabilitado en local).
+     *
+     * &lt;p&gt;Reusa la misma lógica que {@code UserRegisteredConsumer}:
+     * &lt;ol&gt;
+     *   &lt;li&gt;Match por {@code supabaseUserId} → no-op.&lt;/li&gt;
+     *   &lt;li&gt;Match por email → asocia el UUID al Player existente.&lt;/li&gt;
+     *   &lt;li&gt;Si no, crea Player nuevo.&lt;/li&gt;
+     * &lt;/ol&gt;
+     *
+     * Es idempotente: llamar dos veces con el mismo UUID retorna el mismo Player.
+     * Robusto a concurrencia: si dos requests llegan simultáneas, el segundo
+     * captura la unique violation y devuelve el Player creado por el primero.
+     */
+    @Transactional(noRollbackFor = org.springframework.dao.DataIntegrityViolationException.class)
+    public PlayerProfileResponse provisionBySupabaseId(ProvisionPlayerRequest req) {
+<span class="nc" id="L172">        UUID supabaseUserId = req.supabaseUserId();</span>
+
+        // 1. Idempotencia: ya existe Player con ese UUID → return as-is.
+<span class="nc" id="L175">        Player existing = playerRepo.findBySupabaseUserId(supabaseUserId).orElse(null);</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        if (existing != null) {</span>
+<span class="nc" id="L177">            String title = titleRepo.findByPlayerIdAndIsCurrentTrue(existing.getId())</span>
+<span class="nc" id="L178">                    .map(t -&gt; t.getTitle().name()).orElse(null);</span>
+<span class="nc" id="L179">            return toProfileResponse(existing, title);</span>
+        }
+
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        Club club = StringUtils.hasText(req.clubName())</span>
+<span class="nc" id="L183">                ? clubRepo.findFirstByNameIgnoreCase(req.clubName().trim()).orElse(null)</span>
+<span class="nc" id="L184">                : null;</span>
+
+        // 2. Match por email → asociar.
+<span class="nc bnc" id="L187" title="All 2 branches missed.">        if (StringUtils.hasText(req.email())) {</span>
+<span class="nc" id="L188">            Player byEmail = playerRepo.findByEmail(req.email()).orElse(null);</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">            if (byEmail != null) {</span>
+<span class="nc" id="L190">                byEmail.setSupabaseUserId(supabaseUserId);</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">                if (StringUtils.hasText(req.lichessUsername())</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">                        &amp;&amp; !StringUtils.hasText(byEmail.getLichessUsername())) {</span>
+<span class="nc" id="L193">                    byEmail.setLichessUsername(req.lichessUsername().trim());</span>
+                }
+<span class="nc bnc" id="L195" title="All 4 branches missed.">                if (club != null &amp;&amp; byEmail.getClub() == null) {</span>
+<span class="nc" id="L196">                    byEmail.setClub(club);</span>
+                }
+<span class="nc" id="L198">                playerRepo.save(byEmail);</span>
+<span class="nc" id="L199">                log.info(&quot;provision: asociado supabaseUserId={} a Player existente id={}&quot;,</span>
+<span class="nc" id="L200">                        supabaseUserId, byEmail.getId());</span>
+<span class="nc" id="L201">                String title = titleRepo.findByPlayerIdAndIsCurrentTrue(byEmail.getId())</span>
+<span class="nc" id="L202">                        .map(t -&gt; t.getTitle().name()).orElse(null);</span>
+<span class="nc" id="L203">                return toProfileResponse(byEmail, title);</span>
+            }
+        }
+
+        // 3. Crear nuevo Player. Bajo concurrencia (varias llamadas al
+        //    mismo tiempo para el mismo supabaseUserId, típico cuando el
+        //    frontend dispara N requests en paralelo apenas hay sesión)
+        //    el primer INSERT gana y los demás chocan con la unique de
+        //    supabase_user_id o email. Capturamos y re-leemos para
+        //    devolver el Player ya creado por el ganador.
+<span class="nc" id="L213">        Instant now = Instant.now();</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">        String firstName = StringUtils.hasText(req.firstName()) ? req.firstName() : &quot;Jugador&quot;;</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">        String lastName  = StringUtils.hasText(req.lastName())  ? req.lastName()</span>
+<span class="nc" id="L216">                : supabaseUserId.toString().substring(0, 8);</span>
+<span class="nc" id="L217">        Player p = Player.builder()</span>
+<span class="nc" id="L218">                .firstName(firstName)</span>
+<span class="nc" id="L219">                .lastName(lastName)</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">                .email(StringUtils.hasText(req.email()) ? req.email() : null)</span>
+<span class="nc" id="L221">                .supabaseUserId(supabaseUserId)</span>
+<span class="nc bnc" id="L222" title="All 2 branches missed.">                .lichessUsername(StringUtils.hasText(req.lichessUsername())</span>
+<span class="nc" id="L223">                        ? req.lichessUsername().trim() : null)</span>
+<span class="nc" id="L224">                .club(club)</span>
+<span class="nc" id="L225">                .createdAt(now)</span>
+<span class="nc" id="L226">                .updatedAt(now)</span>
+<span class="nc" id="L227">                .build();</span>
+        try {
+<span class="nc" id="L229">            playerRepo.saveAndFlush(p);</span>
+<span class="nc" id="L230">        } catch (org.springframework.dao.DataIntegrityViolationException dup) {</span>
+<span class="nc" id="L231">            log.info(&quot;provision: race detectada para supabaseUserId={}, re-leyendo Player ganador&quot;,</span>
+                    supabaseUserId);
+<span class="nc" id="L233">            em.clear();</span>
+<span class="nc" id="L234">            Player winner = playerRepo.findBySupabaseUserId(supabaseUserId)</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">                    .or(() -&gt; StringUtils.hasText(req.email())</span>
+<span class="nc" id="L236">                            ? playerRepo.findByEmail(req.email())</span>
+<span class="nc" id="L237">                            : java.util.Optional.empty())</span>
+<span class="nc" id="L238">                    .orElseThrow(() -&gt; dup);</span>
+<span class="nc" id="L239">            String wTitle = titleRepo.findByPlayerIdAndIsCurrentTrue(winner.getId())</span>
+<span class="nc" id="L240">                    .map(t -&gt; t.getTitle().name()).orElse(null);</span>
+<span class="nc" id="L241">            return toProfileResponse(winner, wTitle);</span>
+<span class="nc" id="L242">        }</span>
+<span class="nc" id="L243">        log.info(&quot;provision: Player creado id={} supabaseUserId={} email={} club={}&quot;,</span>
+<span class="nc bnc" id="L244" title="All 2 branches missed.">                p.getId(), supabaseUserId, p.getEmail(), club != null ? club.getName() : &quot;—&quot;);</span>
+<span class="nc" id="L245">        return toProfileResponse(p, null);</span>
+    }
+
+    // ─── GET /users/by-supabase-id/{supabaseUserId} ──────────────────────────
+
+    @Transactional(readOnly = true)
+    public PlayerProfileResponse getProfileByEmail(String email) {
+<span class="nc bnc" id="L252" title="All 2 branches missed.">        if (!StringUtils.hasText(email)) {</span>
+<span class="nc" id="L253">            throw new ApiException(400, &quot;INVALID_EMAIL&quot;, &quot;El parámetro 'email' es obligatorio&quot;);</span>
+        }
+<span class="nc" id="L255">        Player p = playerRepo.findByEmail(email.trim().toLowerCase())</span>
+<span class="nc" id="L256">                .orElseThrow(() -&gt; new ApiException(404, &quot;PLAYER_NOT_FOUND&quot;,</span>
+                        &quot;Jugador con email &quot; + email + &quot; no encontrado&quot;));
+<span class="nc" id="L258">        String title = titleRepo.findByPlayerIdAndIsCurrentTrue(p.getId())</span>
+<span class="nc" id="L259">                .map(t -&gt; t.getTitle().name()).orElse(null);</span>
+<span class="nc" id="L260">        return toProfileResponse(p, title);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public PlayerProfileResponse getProfileBySupabaseId(UUID supabaseUserId) {
+<span class="nc" id="L265">        Player p = playerRepo.findBySupabaseUserId(supabaseUserId)</span>
+<span class="nc" id="L266">                .orElseThrow(() -&gt; new ApiException(404, &quot;PLAYER_NOT_FOUND&quot;,</span>
+                        &quot;Jugador con supabaseUserId &quot; + supabaseUserId + &quot; no encontrado&quot;));
+<span class="nc" id="L268">        String title = titleRepo.findByPlayerIdAndIsCurrentTrue(p.getId())</span>
+<span class="nc" id="L269">                .map(t -&gt; t.getTitle().name())</span>
+<span class="nc" id="L270">                .orElse(null);</span>
+<span class="nc" id="L271">        return toProfileResponse(p, title);</span>
+    }
+
+    // ─── GET /users/search ────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List&lt;PlayerSearchResponse&gt; search(String q, int limit) {
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        if (!StringUtils.hasText(q)) {</span>
+<span class="fc" id="L279">            throw new ApiException(400, &quot;INVALID_QUERY&quot;, &quot;El parámetro 'q' no puede estar vacío&quot;);</span>
+        }
+<span class="fc" id="L281">        int safeLimit = Math.min(limit, 50);</span>
+<span class="fc" id="L282">        return playerRepo.searchFuzzy(q.trim(), safeLimit).stream()</span>
+<span class="fc" id="L283">                .map(p -&gt; {</span>
+<span class="fc" id="L284">                    String title = titleRepo.findByPlayerIdAndIsCurrentTrue(p.getId())</span>
+<span class="fc" id="L285">                            .map(t -&gt; t.getTitle().name()).orElse(null);</span>
+<span class="fc" id="L286">                    return toSearchResponse(p, title);</span>
+                })
+<span class="fc" id="L288">                .toList();</span>
+    }
+
+    // ─── GET /users/{id}/rating-history ──────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List&lt;RatingHistoryResponse&gt; getRatingHistory(Long id, RatingType type) {
+<span class="nc" id="L295">        findOrThrow(id);</span>
+<span class="nc" id="L296">        return historyRepo.findByPlayerIdAndRatingTypeOrderByRecordedAtDesc(id, type)</span>
+<span class="nc" id="L297">                .stream()</span>
+<span class="nc" id="L298">                .map(rh -&gt; new RatingHistoryResponse(</span>
+<span class="nc" id="L299">                        rh.getId(),</span>
+<span class="nc" id="L300">                        rh.getRatingType().name(),</span>
+<span class="nc" id="L301">                        rh.getRatingValue(),</span>
+<span class="nc" id="L302">                        rh.getRatingPrevValue(),</span>
+<span class="nc" id="L303">                        rh.getDelta(),</span>
+<span class="nc" id="L304">                        rh.getRecordedAt(),</span>
+<span class="nc" id="L305">                        rh.getSource()))</span>
+<span class="nc" id="L306">                .toList();</span>
+    }
+
+    // ─── PUT /users/{id}/profile ──────────────────────────────────────────────
+
+    @Transactional
+    public PlayerProfileResponse updateProfile(Long id, UpdateProfileRequest req) {
+<span class="nc" id="L313">        Player p = findOrThrow(id);</span>
+<span class="nc" id="L314">        List&lt;String&gt; changed = new java.util.ArrayList&lt;&gt;();</span>
+
+<span class="nc bnc" id="L316" title="All 2 branches missed.">        if (StringUtils.hasText(req.firstName())) {</span>
+<span class="nc" id="L317">            p.setFirstName(req.firstName());</span>
+<span class="nc" id="L318">            changed.add(&quot;firstName&quot;);</span>
+        }
+<span class="nc bnc" id="L320" title="All 2 branches missed.">        if (StringUtils.hasText(req.lastName())) {</span>
+<span class="nc" id="L321">            p.setLastName(req.lastName());</span>
+<span class="nc" id="L322">            changed.add(&quot;lastName&quot;);</span>
+        }
+<span class="nc bnc" id="L324" title="All 2 branches missed.">        if (req.clubId() != null) {</span>
+<span class="nc" id="L325">            Club club = clubRepo.findById(req.clubId())</span>
+<span class="nc" id="L326">                    .orElseThrow(() -&gt; new ApiException(404, &quot;CLUB_NOT_FOUND&quot;, &quot;Club no encontrado&quot;));</span>
+<span class="nc" id="L327">            p.setClub(club);</span>
+<span class="nc" id="L328">            changed.add(&quot;clubId&quot;);</span>
+        }
+<span class="nc bnc" id="L330" title="All 2 branches missed.">        if (req.region() != null) {</span>
+<span class="nc" id="L331">            p.setRegion(req.region());</span>
+<span class="nc" id="L332">            changed.add(&quot;region&quot;);</span>
+        }
+
+<span class="nc" id="L335">        playerRepo.save(p);</span>
+
+<span class="nc bnc" id="L337" title="All 2 branches missed.">        if (!changed.isEmpty()) {</span>
+<span class="nc" id="L338">            events.publishUserUpdated(p.getId(), changed);</span>
+        }
+
+<span class="nc" id="L341">        String title = titleRepo.findByPlayerIdAndIsCurrentTrue(id)</span>
+<span class="nc" id="L342">                .map(t -&gt; t.getTitle().name()).orElse(null);</span>
+<span class="nc" id="L343">        return toProfileResponse(p, title);</span>
+    }
+
+    // ─── PUT /users/{id}/elo (endpoint interno) ───────────────────────────────
+
+    @Transactional
+    public void updateElo(Long id, UpdateEloRequest req) {
+<span class="nc" id="L350">        Player p = findOrThrow(id);</span>
+
+<span class="nc" id="L352">        int oldElo  = currentElo(p, req.ratingType());</span>
+<span class="nc" id="L353">        int newElo  = req.newValue();</span>
+
+<span class="nc" id="L355">        applyElo(p, req.ratingType(), newElo);</span>
+<span class="nc" id="L356">        playerRepo.save(p);</span>
+
+<span class="nc" id="L358">        RatingHistory history = RatingHistory.builder()</span>
+<span class="nc" id="L359">                .player(p)</span>
+<span class="nc" id="L360">                .ratingType(req.ratingType())</span>
+<span class="nc" id="L361">                .ratingValue(newElo)</span>
+<span class="nc bnc" id="L362" title="All 2 branches missed.">                .ratingPrevValue(oldElo == 0 ? null : oldElo)</span>
+<span class="nc bnc" id="L363" title="All 2 branches missed.">                .delta(oldElo == 0 ? null : (short) (newElo - oldElo))</span>
+<span class="nc" id="L364">                .recordedAt(Instant.now())</span>
+<span class="nc" id="L365">                .source(req.source())</span>
+<span class="nc" id="L366">                .build();</span>
+<span class="nc" id="L367">        historyRepo.save(history);</span>
+
+<span class="nc" id="L369">        events.publishEloUpdated(id, oldElo, newElo, req.ratingType(), null);</span>
+<span class="nc" id="L370">        log.info(&quot;ELO actualizado vía REST para jugador {}: {} → {} ({})&quot;,</span>
+<span class="nc" id="L371">                id, oldElo, newElo, req.ratingType());</span>
+<span class="nc" id="L372">    }</span>
+
+    // ─── Helpers ──────────────────────────────────────────────────────────────
+
+    private Player findOrThrow(Long id) {
+<span class="pc" id="L377">        return playerRepo.findById(id)</span>
+<span class="pc" id="L378">                .orElseThrow(() -&gt; new ApiException(404, &quot;PLAYER_NOT_FOUND&quot;,</span>
+                        &quot;Jugador con id &quot; + id + &quot; no encontrado&quot;));
+    }
+
+    private int currentElo(Player p, RatingType type) {
+<span class="nc bnc" id="L383" title="All 5 branches missed.">        Integer v = switch (type) {</span>
+<span class="nc" id="L384">            case NATIONAL      -&gt; p.getEloNational();</span>
+<span class="nc" id="L385">            case FIDE_STANDARD -&gt; p.getEloFideStandard();</span>
+<span class="nc" id="L386">            case FIDE_RAPID    -&gt; p.getEloFideRapid();</span>
+<span class="nc" id="L387">            case FIDE_BLITZ    -&gt; p.getEloFideBlitz();</span>
+<span class="nc" id="L388">            case PLATFORM      -&gt; p.getEloPlatform();</span>
+        };
+<span class="nc bnc" id="L390" title="All 2 branches missed.">        return v != null ? v : 0;</span>
+    }
+
+    private void applyElo(Player p, RatingType type, int value) {
+<span class="nc bnc" id="L394" title="All 6 branches missed.">        switch (type) {</span>
+<span class="nc" id="L395">            case NATIONAL      -&gt; p.setEloNational(value);</span>
+<span class="nc" id="L396">            case FIDE_STANDARD -&gt; p.setEloFideStandard(value);</span>
+<span class="nc" id="L397">            case FIDE_RAPID    -&gt; p.setEloFideRapid(value);</span>
+<span class="nc" id="L398">            case FIDE_BLITZ    -&gt; p.setEloFideBlitz(value);</span>
+<span class="nc" id="L399">            case PLATFORM      -&gt; p.setEloPlatform(value);</span>
+        }
+<span class="nc" id="L401">    }</span>
+
+    private PlayerProfileResponse toProfileResponse(Player p, String title) {
+<span class="nc" id="L404">        return new PlayerProfileResponse(</span>
+<span class="nc" id="L405">                p.getId(),</span>
+<span class="nc" id="L406">                p.getFirstName(),</span>
+<span class="nc" id="L407">                p.getLastName(),</span>
+<span class="nc" id="L408">                p.getEmail(),</span>
+<span class="nc" id="L409">                p.getRut(),</span>
+<span class="nc" id="L410">                p.getBirthDate(),</span>
+<span class="nc" id="L411">                p.getGender(),</span>
+<span class="nc" id="L412">                p.getRegion(),</span>
+<span class="nc" id="L413">                p.getFideId(),</span>
+<span class="nc" id="L414">                p.getFederationId(),</span>
+<span class="nc" id="L415">                p.getLichessUsername(),</span>
+<span class="nc" id="L416">                p.getEnrichmentSource(),</span>
+<span class="nc" id="L417">                p.getEnrichedAt(),</span>
+<span class="nc bnc" id="L418" title="All 2 branches missed.">                p.getCountry() != null</span>
+<span class="nc" id="L419">                        ? new CountryDto(p.getCountry().getId(), p.getCountry().getIsoCode(),</span>
+<span class="nc" id="L420">                                         p.getCountry().getName(), p.getCountry().getFideFederation())</span>
+<span class="nc" id="L421">                        : null,</span>
+<span class="nc bnc" id="L422" title="All 2 branches missed.">                p.getClub() != null</span>
+<span class="nc" id="L423">                        ? new ClubDto(p.getClub().getId(), p.getClub().getName(),</span>
+<span class="nc" id="L424">                                      p.getClub().getCity(), p.getClub().getFederationCode())</span>
+<span class="nc" id="L425">                        : null,</span>
+<span class="nc" id="L426">                p.getEloNational(),</span>
+<span class="nc" id="L427">                p.getEloFideStandard(),</span>
+<span class="nc" id="L428">                p.getEloFideRapid(),</span>
+<span class="nc" id="L429">                p.getEloFideBlitz(),</span>
+<span class="nc" id="L430">                p.getEloPlatform(),</span>
+                title,
+<span class="nc" id="L432">                p.getCreatedAt(),</span>
+<span class="nc" id="L433">                p.getUpdatedAt()</span>
+        );
+    }
+
+    private PlayerSearchResponse toSearchResponse(Player p, String title) {
+<span class="fc" id="L438">        return new PlayerSearchResponse(</span>
+<span class="fc" id="L439">                p.getId(),</span>
+<span class="fc" id="L440">                p.getFirstName(),</span>
+<span class="fc" id="L441">                p.getLastName(),</span>
+<span class="fc" id="L442">                p.getFideId(),</span>
+<span class="fc" id="L443">                p.getFederationId(),</span>
+<span class="fc" id="L444">                p.getRut(),</span>
+<span class="pc bpc" id="L445" title="1 of 2 branches missed.">                p.getCountry() != null ? p.getCountry().getIsoCode() : null,</span>
+<span class="fc" id="L446">                p.getEloNational(),</span>
+<span class="fc" id="L447">                p.getEloFideStandard(),</span>
+<span class="fc" id="L448">                p.getEloPlatform(),</span>
+                title,
+<span class="pc bpc" id="L450" title="1 of 2 branches missed.">                p.getClub() != null ? p.getClub().getName() : null,</span>
+<span class="fc" id="L451">                p.getEnrichmentSource()</span>
+        );
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

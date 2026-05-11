@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LiveGameDtos.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ms-game</a> &gt; <a href="index.source.html" class="el_package">cl.chessquery.game.dto</a> &gt; <span class="el_source">LiveGameDtos.java</span></div><h1>LiveGameDtos.java</h1><pre class="source lang-java linenums">package cl.chessquery.game.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+
+import java.time.Instant;
+import java.util.List;
+
+public final class LiveGameDtos {
+    private LiveGameDtos() {}
+
+    /** POST /games/live  (creador = white). */
+<span class="fc" id="L14">    public record CreateLiveGameRequest(</span>
+            @NotNull Long whitePlayerId,
+            Integer whiteEloBefore,
+            Long timeControlInitialMs,
+            Long timeControlIncrementMs
+    ) {}
+
+    /** POST /games/live/{id}/join. */
+<span class="fc" id="L22">    public record JoinLiveGameRequest(</span>
+            @NotNull Long playerId,
+            Integer eloBefore
+    ) {}
+
+    /** POST /games/live/{id}/move. */
+<span class="fc" id="L28">    public record MoveRequest(</span>
+            @NotNull Long playerId,
+            @NotBlank
+            @Pattern(regexp = &quot;^[a-h][1-8][a-h][1-8][qrbn]?$&quot;,
+                     message = &quot;uci debe ser e2e4, e7e8q, etc.&quot;)
+            String uci,
+            Long clockWhiteMs,
+            Long clockBlackMs
+    ) {}
+
+    /** POST /games/live/{id}/resign. */
+<span class="fc" id="L39">    public record ResignRequest(@NotNull Long playerId) {}</span>
+
+    /** POST /games/live/{id}/rematch — clicker initia revancha con colores invertidos. */
+<span class="nc" id="L42">    public record RematchRequest(@NotNull Long playerId) {}</span>
+
+    /** POST /games/live/{id}/invite — invitar a un email. Si el email matchea
+     *  un Player existente, recibe push in-app además del email magic link. */
+<span class="nc" id="L46">    public record InviteRequest(</span>
+            @NotBlank String email,
+            String gameUrl
+    ) {}
+
+<span class="fc" id="L51">    public record LiveMoveResponse(</span>
+            Integer moveNumber,
+            String color,
+            String uci,
+            String san,
+            String fenAfter,
+            Long clockWhiteMs,
+            Long clockBlackMs,
+            Instant createdAt
+    ) {}
+
+<span class="fc" id="L62">    public record LiveGameResponse(</span>
+            Long id,
+            Long whitePlayerId,
+            Long blackPlayerId,
+            String status,
+            String currentFen,
+            String turn,
+            String result,
+            String endReason,
+            Long timeControlInitialMs,
+            Long timeControlIncrementMs,
+            Long clockWhiteMs,
+            Long clockBlackMs,
+            Long finalizedGameId,
+            List&lt;LiveMoveResponse&gt; moves,
+            Instant startedAt,
+            Instant finishedAt,
+            Instant lastMoveAt,
+            String detectedOpeningEco,
+            String detectedOpeningName
+    ) {}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

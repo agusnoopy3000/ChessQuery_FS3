@@ -104,6 +104,21 @@ a:hover { color: var(--accent-hi); }
   max-width: 62ch;
 }
 
+.hero-actions {
+  margin-top: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.hero-actions > * { min-width: 160px; }
+
+@media (max-width: 640px) {
+  .hero-actions { gap: 10px; }
+  .hero-actions > * { width: 100%; }
+}
+
 .page-header {
   display: flex;
   justify-content: space-between;
@@ -140,7 +155,7 @@ a:hover { color: var(--accent-hi); }
   border-bottom: 1px solid var(--border);
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 12px;
   background: rgba(20, 18, 16, 0.55);
   backdrop-filter: blur(10px);
 }

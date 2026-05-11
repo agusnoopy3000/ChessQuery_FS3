@@ -1,0 +1,41 @@
+# =============================================================================
+# Override para demo en máquinas con poca RAM (M1 8GB, etc.)
+# =============================================================================
+# Uso (sobre docker-compose.yml):
+#   docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d --wait \
+#     user_db tournament_db game_db notif_db rabbitmq redis \
+#     ms-users ms-tournament ms-game ms-notifications \
+#     bff-player bff-organizer api-gateway nginx
+#
+# O usa el target del Makefile:
+#   make demo-up
+#
+# Qué hace:
+#   - Tope de heap JVM a 256 MB por microservicio (vs ~1 GB default).
+#     Suficiente para demo (50 req/s pico) y deja ~2 GB libres para
+#     Supabase + browser + sistema en una M1 de 8 GB.
+#   - No incluye: ms-etl, ms-analytics, bff-admin, analytics_db
+#     (apagados explícitamente al pasar solo los servicios de demo a
+#     `docker compose up`).
+# =============================================================================
+
+services:
+  ms-users:
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx256m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -XX:TieredStopAtLevel=1"
+
+  ms-tournament:
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx256m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -XX:TieredStopAtLevel=1"
+
+  ms-game:
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx256m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -XX:TieredStopAtLevel=1"
+
+  ms-notifications:
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx256m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -XX:TieredStopAtLevel=1"
+
+  api-gateway:
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx256m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -XX:TieredStopAtLevel=1"

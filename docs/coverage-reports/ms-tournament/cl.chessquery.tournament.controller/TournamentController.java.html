@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TournamentController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ms-tournament</a> &gt; <a href="index.source.html" class="el_package">cl.chessquery.tournament.controller</a> &gt; <span class="el_source">TournamentController.java</span></div><h1>TournamentController.java</h1><pre class="source lang-java linenums">package cl.chessquery.tournament.controller;
+
+import cl.chessquery.tournament.dto.*;
+import cl.chessquery.tournament.entity.TournamentFormat;
+import cl.chessquery.tournament.entity.TournamentStatus;
+import cl.chessquery.tournament.exception.ApiException;
+import cl.chessquery.tournament.service.TournamentService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping(&quot;/tournaments&quot;)
+<span class="nc" id="L19">@RequiredArgsConstructor</span>
+@Tag(name = &quot;Tournaments&quot;, description = &quot;Gestión de torneos, inscripciones y rondas&quot;)
+public class TournamentController {
+
+    private final TournamentService tournamentService;
+
+    // ── Crear torneo ──────────────────────────────────────────────────────────
+
+    @Operation(summary = &quot;Crear un nuevo torneo (requiere rol ORGANIZER)&quot;)
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public TournamentResponse createTournament(
+            @Valid @RequestBody CreateTournamentRequest request,
+            @RequestHeader(value = &quot;X-User-Role&quot;, required = false) String userRole,
+            @RequestHeader(value = &quot;X-User-Id&quot;, required = false) Long userId) {
+
+<span class="nc bnc" id="L35" title="All 4 branches missed.">        if (!&quot;ORGANIZER&quot;.equalsIgnoreCase(userRole) &amp;&amp; !&quot;ADMIN&quot;.equalsIgnoreCase(userRole)) {</span>
+<span class="nc" id="L36">            throw new ApiException(403, &quot;FORBIDDEN&quot;,</span>
+                    &quot;Solo los organizadores pueden crear torneos&quot;);
+        }
+
+<span class="nc bnc" id="L40" title="All 2 branches missed.">        Long organizerId = userId != null ? userId</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">                : (request.organizerId() != null ? request.organizerId() : null);</span>
+
+<span class="nc bnc" id="L43" title="All 2 branches missed.">        if (organizerId == null) {</span>
+<span class="nc" id="L44">            throw new ApiException(400, &quot;MISSING_ORGANIZER&quot;,</span>
+                    &quot;Se requiere el ID del organizador&quot;);
+        }
+
+<span class="nc" id="L48">        return tournamentService.createTournament(request, organizerId);</span>
+    }
+
+    // ── Listar torneos ────────────────────────────────────────────────────────
+
+    @Operation(summary = &quot;Listar torneos con filtros opcionales de estado y formato&quot;)
+    @GetMapping
+    public PageResponse&lt;TournamentResponse&gt; listTournaments(
+            @RequestParam(required = false) TournamentStatus status,
+            @RequestParam(required = false) TournamentFormat format,
+            @RequestParam(defaultValue = &quot;0&quot;) int page,
+            @RequestParam(defaultValue = &quot;20&quot;) int size) {
+<span class="nc" id="L60">        return tournamentService.listTournaments(status, format, page, size);</span>
+    }
+
+    // ── Obtener torneo ─────────────────────────────────────────────────────────
+
+    @Operation(summary = &quot;Obtener un torneo por ID&quot;)
+    @GetMapping(&quot;/{id}&quot;)
+    public TournamentResponse getTournament(@PathVariable Long id) {
+<span class="nc" id="L68">        return tournamentService.getTournament(id);</span>
+    }
+
+    @Operation(summary = &quot;Eliminar torneo (solo organizador dueño o admin). &quot; +
+            &quot;Bloqueado si el torneo está IN_PROGRESS o ya tiene rondas/partidas asociadas.&quot;)
+    @DeleteMapping(&quot;/{id}&quot;)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteTournament(
+            @PathVariable Long id,
+            @RequestHeader(value = &quot;X-User-Role&quot;, required = false) String userRole,
+            @RequestHeader(value = &quot;X-User-Id&quot;, required = false) Long userId) {
+
+<span class="nc bnc" id="L80" title="All 4 branches missed.">        if (!&quot;ORGANIZER&quot;.equalsIgnoreCase(userRole) &amp;&amp; !&quot;ADMIN&quot;.equalsIgnoreCase(userRole)) {</span>
+<span class="nc" id="L81">            throw new ApiException(403, &quot;FORBIDDEN&quot;,</span>
+                    &quot;Solo los organizadores pueden eliminar torneos&quot;);
+        }
+<span class="nc" id="L84">        boolean isAdmin = &quot;ADMIN&quot;.equalsIgnoreCase(userRole);</span>
+<span class="nc" id="L85">        tournamentService.deleteTournament(id, userId, isAdmin);</span>
+<span class="nc" id="L86">    }</span>
+
+    // ── Transición de estado ──────────────────────────────────────────────────
+
+    @Operation(summary = &quot;Cambiar el estado del torneo (DRAFT→OPEN→IN_PROGRESS→FINISHED)&quot;)
+    @PatchMapping(&quot;/{id}/status&quot;)
+    public TournamentResponse transitionStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody StatusTransitionRequest request,
+            @RequestHeader(value = &quot;X-User-Role&quot;, required = false) String userRole) {
+
+<span class="nc bnc" id="L97" title="All 4 branches missed.">        if (!&quot;ORGANIZER&quot;.equalsIgnoreCase(userRole) &amp;&amp; !&quot;ADMIN&quot;.equalsIgnoreCase(userRole)) {</span>
+<span class="nc" id="L98">            throw new ApiException(403, &quot;FORBIDDEN&quot;,</span>
+                    &quot;Solo los organizadores pueden cambiar el estado del torneo&quot;);
+        }
+
+<span class="nc" id="L102">        return tournamentService.transitionStatus(id, request.newStatus());</span>
+    }
+
+    // ── Inscripciones ─────────────────────────────────────────────────────────
+
+    @Operation(summary = &quot;Inscribir jugador en el torneo&quot;)
+    @PostMapping(&quot;/{id}/registrations&quot;)
+    @ResponseStatus(HttpStatus.CREATED)
+    public RegistrationResponse joinTournament(
+            @PathVariable Long id,
+            @Valid @RequestBody JoinTournamentRequest request) {
+<span class="nc" id="L113">        return tournamentService.joinTournament(id, request.playerId());</span>
+    }
+
+    @Operation(summary = &quot;Listar inscripciones de un torneo&quot;)
+    @GetMapping(&quot;/{id}/registrations&quot;)
+    public List&lt;RegistrationResponse&gt; listRegistrations(@PathVariable Long id) {
+<span class="nc" id="L119">        return tournamentService.listRegistrations(id);</span>
+    }
+
+    @Operation(summary = &quot;Aprobar una inscripción PENDING (organizador)&quot;)
+    @PatchMapping(&quot;/registrations/{registrationId}/approve&quot;)
+    public RegistrationResponse approveRegistration(
+            @PathVariable Long registrationId,
+            @RequestHeader(value = &quot;X-User-Role&quot;, required = false) String userRole) {
+<span class="nc bnc" id="L127" title="All 4 branches missed.">        if (!&quot;ORGANIZER&quot;.equalsIgnoreCase(userRole) &amp;&amp; !&quot;ADMIN&quot;.equalsIgnoreCase(userRole)) {</span>
+<span class="nc" id="L128">            throw new ApiException(403, &quot;FORBIDDEN&quot;,</span>
+                    &quot;Solo los organizadores pueden aprobar inscripciones&quot;);
+        }
+<span class="nc" id="L131">        return tournamentService.approveRegistration(registrationId);</span>
+    }
+
+    @Operation(summary = &quot;Rechazar una inscripción PENDING (organizador)&quot;)
+    @PatchMapping(&quot;/registrations/{registrationId}/reject&quot;)
+    public RegistrationResponse rejectRegistration(
+            @PathVariable Long registrationId,
+            @RequestBody(required = false) RejectRegistrationRequest request,
+            @RequestHeader(value = &quot;X-User-Role&quot;, required = false) String userRole) {
+<span class="nc bnc" id="L140" title="All 4 branches missed.">        if (!&quot;ORGANIZER&quot;.equalsIgnoreCase(userRole) &amp;&amp; !&quot;ADMIN&quot;.equalsIgnoreCase(userRole)) {</span>
+<span class="nc" id="L141">            throw new ApiException(403, &quot;FORBIDDEN&quot;,</span>
+                    &quot;Solo los organizadores pueden rechazar inscripciones&quot;);
+        }
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        String reason = request == null ? null : request.reason();</span>
+<span class="nc" id="L145">        return tournamentService.rejectRegistration(registrationId, reason);</span>
+    }
+
+    // ── Rondas ────────────────────────────────────────────────────────────────
+
+    @Operation(summary = &quot;Generar una ronda del torneo con emparejamientos automáticos&quot;)
+    @PostMapping(&quot;/{id}/rounds/{roundNumber}&quot;)
+    @ResponseStatus(HttpStatus.CREATED)
+    public RoundResponse generateRound(
+            @PathVariable Long id,
+            @PathVariable int roundNumber,
+            @RequestHeader(value = &quot;X-User-Role&quot;, required = false) String userRole) {
+
+<span class="nc bnc" id="L158" title="All 4 branches missed.">        if (!&quot;ORGANIZER&quot;.equalsIgnoreCase(userRole) &amp;&amp; !&quot;ADMIN&quot;.equalsIgnoreCase(userRole)) {</span>
+<span class="nc" id="L159">            throw new ApiException(403, &quot;FORBIDDEN&quot;,</span>
+                    &quot;Solo los organizadores pueden generar rondas&quot;);
+        }
+
+<span class="nc" id="L163">        return tournamentService.generateRound(id, roundNumber);</span>
+    }
+
+    @Operation(summary = &quot;Obtener una ronda con sus emparejamientos&quot;)
+    @GetMapping(&quot;/{id}/rounds/{roundNumber}&quot;)
+    public RoundResponse getRound(
+            @PathVariable Long id,
+            @PathVariable int roundNumber) {
+<span class="nc" id="L171">        return tournamentService.getRound(id, roundNumber);</span>
+    }
+
+    // ── Resultado de emparejamiento ───────────────────────────────────────────
+
+    @Operation(summary = &quot;Registrar resultado de una partida en el torneo&quot;)
+    @PatchMapping(&quot;/pairings/{pairingId}/result&quot;)
+    public PairingResponse recordResult(
+            @PathVariable Long pairingId,
+            @Valid @RequestBody PairingResultRequest request) {
+<span class="nc" id="L181">        return tournamentService.recordResult(pairingId, request.result());</span>
+    }
+
+    // ── Standings ─────────────────────────────────────────────────────────────
+
+    @Operation(summary = &quot;Obtener clasificación actual del torneo (con Buchholz y Sonneborn-Berger)&quot;)
+    @GetMapping(&quot;/{id}/standings&quot;)
+    public List&lt;StandingEntry&gt; getStandings(@PathVariable Long id) {
+<span class="nc" id="L189">        return tournamentService.getStandings(id);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

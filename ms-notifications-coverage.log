@@ -1,0 +1,138 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -------------------< cl.chessquery:ms-notifications >-------------------
+[INFO] Building ms-notifications 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.3.2:clean (default-clean) @ ms-notifications ---
+[INFO] Deleting /Users/agustingarridosnoopy/ChessQuery_FS3/ms-notifications/target
+[INFO] 
+[INFO] --- jacoco:0.8.11:prepare-agent (default) @ ms-notifications ---
+[INFO] argLine set to -javaagent:/Users/agustingarridosnoopy/.m2/repository/org/jacoco/org.jacoco.agent/0.8.11/org.jacoco.agent-0.8.11-runtime.jar=destfile=/Users/agustingarridosnoopy/ChessQuery_FS3/ms-notifications/target/jacoco.exec
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ ms-notifications ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 3 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ ms-notifications ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 19 source files with javac [debug release 17] to target/classes
+[INFO] Annotation processing is enabled because one or more processors were found
+  on the class path. A future release of javac may disable annotation processing
+  unless at least one processor is specified by name (-processor), or a search
+  path is specified (--processor-path, --processor-module-path), or annotation
+  processing is enabled explicitly (-proc:only, -proc:full).
+  Use -Xlint:-options to suppress this message.
+  Use -proc:none to disable annotation processing.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ ms-notifications ---
+[INFO] skip non existing resourceDirectory /Users/agustingarridosnoopy/ChessQuery_FS3/ms-notifications/src/test/resources
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ ms-notifications ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 1 source file with javac [debug release 17] to target/test-classes
+[INFO] Annotation processing is enabled because one or more processors were found
+  on the class path. A future release of javac may disable annotation processing
+  unless at least one processor is specified by name (-processor), or a search
+  path is specified (--processor-path, --processor-module-path), or annotation
+  processing is enabled explicitly (-proc:only, -proc:full).
+  Use -Xlint:-options to suppress this message.
+  Use -proc:none to disable annotation processing.
+[INFO] 
+[INFO] --- surefire:3.1.2:test (default-test) @ ms-notifications ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running cl.chessquery.notifications.service.NotificationServiceTest
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+WARNING: A Java agent has been loaded dynamically (/Users/agustingarridosnoopy/.m2/repository/net/bytebuddy/byte-buddy-agent/1.14.12/byte-buddy-agent-1.14.12.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+[ERROR] Tests run: 3, Failures: 2, Errors: 0, Skipped: 0, Time elapsed: 2.965 s <<< FAILURE! -- in cl.chessquery.notifications.service.NotificationServiceTest
+[ERROR] cl.chessquery.notifications.service.NotificationServiceTest.notifyWelcome_createsNotificationLogWithStatusSent -- Time elapsed: 2.578 s <<< FAILURE!
+org.mockito.exceptions.verification.TooManyActualInvocations: 
+
+notificationLogRepo.save(
+    <Capturing argument: NotificationLog>
+);
+Wanted 1 time:
+-> at cl.chessquery.notifications.service.NotificationServiceTest.notifyWelcome_createsNotificationLogWithStatusSent(NotificationServiceTest.java:56)
+But was 2 times:
+-> at cl.chessquery.notifications.service.NotificationService.saveLog(NotificationService.java:286)
+-> at cl.chessquery.notifications.service.NotificationService.saveLog(NotificationService.java:286)
+
+
+	at cl.chessquery.notifications.service.NotificationServiceTest.notifyWelcome_createsNotificationLogWithStatusSent(NotificationServiceTest.java:56)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] cl.chessquery.notifications.service.NotificationServiceTest.notifyEloUpdated_createsNotificationLogWithStatusSent -- Time elapsed: 0.007 s <<< FAILURE!
+org.mockito.exceptions.verification.TooManyActualInvocations: 
+
+notificationLogRepo.save(
+    <Capturing argument: NotificationLog>
+);
+Wanted 1 time:
+-> at cl.chessquery.notifications.service.NotificationServiceTest.notifyEloUpdated_createsNotificationLogWithStatusSent(NotificationServiceTest.java:82)
+But was 2 times:
+-> at cl.chessquery.notifications.service.NotificationService.saveLog(NotificationService.java:286)
+-> at cl.chessquery.notifications.service.NotificationService.saveLog(NotificationService.java:286)
+
+
+	at cl.chessquery.notifications.service.NotificationServiceTest.notifyEloUpdated_createsNotificationLogWithStatusSent(NotificationServiceTest.java:82)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[INFO] 
+[INFO] Results:
+[INFO] 
+[ERROR] Failures: 
+[ERROR]   NotificationServiceTest.notifyEloUpdated_createsNotificationLogWithStatusSent:82 
+notificationLogRepo.save(
+    <Capturing argument: NotificationLog>
+);
+Wanted 1 time:
+-> at cl.chessquery.notifications.service.NotificationServiceTest.notifyEloUpdated_createsNotificationLogWithStatusSent(NotificationServiceTest.java:82)
+But was 2 times:
+-> at cl.chessquery.notifications.service.NotificationService.saveLog(NotificationService.java:286)
+-> at cl.chessquery.notifications.service.NotificationService.saveLog(NotificationService.java:286)
+
+
+[ERROR]   NotificationServiceTest.notifyWelcome_createsNotificationLogWithStatusSent:56 
+notificationLogRepo.save(
+    <Capturing argument: NotificationLog>
+);
+Wanted 1 time:
+-> at cl.chessquery.notifications.service.NotificationServiceTest.notifyWelcome_createsNotificationLogWithStatusSent(NotificationServiceTest.java:56)
+But was 2 times:
+-> at cl.chessquery.notifications.service.NotificationService.saveLog(NotificationService.java:286)
+-> at cl.chessquery.notifications.service.NotificationService.saveLog(NotificationService.java:286)
+
+
+[INFO] 
+[ERROR] Tests run: 3, Failures: 2, Errors: 0, Skipped: 0
+[INFO] 
+[ERROR] There are test failures.
+
+Please refer to /Users/agustingarridosnoopy/ChessQuery_FS3/ms-notifications/target/surefire-reports for the individual test results.
+Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[INFO] 
+[INFO] --- jacoco:0.8.11:report (report) @ ms-notifications ---
+[INFO] Loading execution data file /Users/agustingarridosnoopy/ChessQuery_FS3/ms-notifications/target/jacoco.exec
+[INFO] Analyzed bundle 'ms-notifications' with 19 classes
+[INFO] 
+[INFO] --- jacoco:0.8.11:report (default-cli) @ ms-notifications ---
+[INFO] Loading execution data file /Users/agustingarridosnoopy/ChessQuery_FS3/ms-notifications/target/jacoco.exec
+[INFO] Analyzed bundle 'ms-notifications' with 19 classes
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  6.900 s
+[INFO] Finished at: 2026-05-11T18:03:43-04:00
+[INFO] ------------------------------------------------------------------------

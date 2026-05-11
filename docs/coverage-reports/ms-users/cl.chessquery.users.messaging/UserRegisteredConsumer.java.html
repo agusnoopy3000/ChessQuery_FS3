@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UserRegisteredConsumer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ms-users</a> &gt; <a href="index.source.html" class="el_package">cl.chessquery.users.messaging</a> &gt; <span class="el_source">UserRegisteredConsumer.java</span></div><h1>UserRegisteredConsumer.java</h1><pre class="source lang-java linenums">package cl.chessquery.users.messaging;
+
+import cl.chessquery.users.config.RabbitMQConfig;
+import cl.chessquery.users.dto.ProvisionPlayerRequest;
+import cl.chessquery.users.service.PlayerService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+
+import java.util.Map;
+import java.util.UUID;
+
+/**
+ * Consumidor del evento user.registered publicado por el API Gateway tras
+ * el webhook de Supabase Auth (auth.users.created).
+ *
+ * Delega la lógica de creación/asociación a {@link PlayerService#provisionBySupabaseId}
+ * para mantener single source of truth con el endpoint {@code POST /users/provision}
+ * (que se invoca cuando el webhook no llegó o un JWT entra antes que el evento Rabbit).
+ */
+<span class="fc" id="L23">@Slf4j</span>
+@Component
+<span class="fc" id="L25">@RequiredArgsConstructor</span>
+public class UserRegisteredConsumer {
+
+    private final PlayerService playerService;
+
+    @RabbitListener(queues = RabbitMQConfig.USERS_REGISTRATION_QUEUE)
+    public void onUserRegistered(Map&lt;String, Object&gt; message) {
+        @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L33">        Map&lt;String, Object&gt; payload = (Map&lt;String, Object&gt;) message.get(&quot;payload&quot;);</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (payload == null) {</span>
+<span class="fc" id="L35">            log.warn(&quot;user.registered recibido sin payload: {}&quot;, message);</span>
+<span class="fc" id="L36">            return;</span>
+        }
+
+<span class="fc" id="L39">        String userIdStr = (String) payload.get(&quot;userId&quot;);</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        if (!StringUtils.hasText(userIdStr)) {</span>
+<span class="fc" id="L41">            log.warn(&quot;user.registered sin userId, descartado&quot;);</span>
+<span class="fc" id="L42">            return;</span>
+        }
+
+        UUID supabaseUserId;
+        try {
+<span class="fc" id="L47">            supabaseUserId = UUID.fromString(userIdStr);</span>
+<span class="fc" id="L48">        } catch (IllegalArgumentException ex) {</span>
+<span class="fc" id="L49">            log.warn(&quot;user.registered con userId inválido: {}&quot;, userIdStr);</span>
+<span class="fc" id="L50">            return;</span>
+<span class="fc" id="L51">        }</span>
+
+<span class="fc" id="L53">        ProvisionPlayerRequest req = new ProvisionPlayerRequest(</span>
+                supabaseUserId,
+<span class="fc" id="L55">                (String) payload.get(&quot;email&quot;),</span>
+<span class="fc" id="L56">                (String) payload.getOrDefault(&quot;firstName&quot;, null),</span>
+<span class="fc" id="L57">                (String) payload.getOrDefault(&quot;lastName&quot;, null),</span>
+<span class="fc" id="L58">                (String) payload.getOrDefault(&quot;lichessUsername&quot;, null),</span>
+<span class="fc" id="L59">                (String) payload.getOrDefault(&quot;clubName&quot;, null)</span>
+        );
+<span class="fc" id="L61">        playerService.provisionBySupabaseId(req);</span>
+<span class="fc" id="L62">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

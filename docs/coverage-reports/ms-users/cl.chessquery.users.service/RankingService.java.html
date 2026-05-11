@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RankingService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ms-users</a> &gt; <a href="index.source.html" class="el_package">cl.chessquery.users.service</a> &gt; <span class="el_source">RankingService.java</span></div><h1>RankingService.java</h1><pre class="source lang-java linenums">package cl.chessquery.users.service;
+
+import cl.chessquery.users.dto.RankingEntryResponse;
+import cl.chessquery.users.entity.AgeCategory;
+import cl.chessquery.users.entity.Player;
+import cl.chessquery.users.repository.PlayerRepository;
+import cl.chessquery.users.repository.PlayerTitleHistoryRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+
+@Service
+<span class="nc" id="L17">@RequiredArgsConstructor</span>
+public class RankingService {
+
+    private final PlayerRepository            playerRepo;
+    private final PlayerTitleHistoryRepository titleRepo;
+
+    /**
+     * Ranking nacional filtrado por categoría de edad y región.
+     *
+     * @param category nombre del enum AgeCategory (null = sin filtro por edad)
+     * @param region   nombre de la región (null = sin filtro)
+     * @param limit    máximo de resultados (tope: 200)
+     */
+    @Transactional(readOnly = true)
+    public List&lt;RankingEntryResponse&gt; getRanking(String category, String region, int limit) {
+<span class="nc" id="L32">        int safeLimit = Math.min(limit, 200);</span>
+
+<span class="nc" id="L34">        AgeCategory cat = parseCategory(category);</span>
+
+<span class="nc" id="L36">        List&lt;Player&gt; players = playerRepo.findRanking(</span>
+                region,
+<span class="nc bnc" id="L38" title="All 2 branches missed.">                cat != null ? cat.minBirthDate() : null,</span>
+<span class="nc bnc" id="L39" title="All 2 branches missed.">                cat != null ? cat.maxBirthDate() : null,</span>
+<span class="nc" id="L40">                PageRequest.of(0, safeLimit)</span>
+        );
+
+<span class="nc" id="L43">        AtomicInteger pos = new AtomicInteger(1);</span>
+<span class="nc" id="L44">        return players.stream()</span>
+<span class="nc" id="L45">                .map(p -&gt; {</span>
+<span class="nc" id="L46">                    String title = titleRepo.findByPlayerIdAndIsCurrentTrue(p.getId())</span>
+<span class="nc" id="L47">                            .map(t -&gt; t.getTitle().name())</span>
+<span class="nc" id="L48">                            .orElse(null);</span>
+<span class="nc" id="L49">                    AgeCategory playerCat = AgeCategory.fromBirthDate(p.getBirthDate());</span>
+<span class="nc" id="L50">                    return new RankingEntryResponse(</span>
+<span class="nc" id="L51">                            pos.getAndIncrement(),</span>
+<span class="nc" id="L52">                            p.getId(),</span>
+<span class="nc" id="L53">                            p.getFirstName(),</span>
+<span class="nc" id="L54">                            p.getLastName(),</span>
+<span class="nc" id="L55">                            p.getRegion(),</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">                            p.getClub() != null ? p.getClub().getName() : null,</span>
+<span class="nc" id="L57">                            p.getEloNational(),</span>
+<span class="nc" id="L58">                            p.getEloFideStandard(),</span>
+                            title,
+<span class="nc" id="L60">                            playerCat.name(),</span>
+<span class="nc" id="L61">                            p.getEnrichmentSource()</span>
+                    );
+                })
+<span class="nc" id="L64">                .toList();</span>
+    }
+
+    private AgeCategory parseCategory(String category) {
+<span class="nc bnc" id="L68" title="All 4 branches missed.">        if (category == null || category.isBlank()) return null;</span>
+        try {
+<span class="nc" id="L70">            return AgeCategory.valueOf(category.toUpperCase());</span>
+<span class="nc" id="L71">        } catch (IllegalArgumentException e) {</span>
+<span class="nc" id="L72">            return null;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

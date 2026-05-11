@@ -89,6 +89,7 @@ const HeroCTA = ({
 }) => (
   <button
     onClick={onClick}
+    aria-label={`${title}: ${description}`}
     style={{
       display: 'flex',
       flexDirection: 'column',
@@ -109,6 +110,17 @@ const HeroCTA = ({
       boxShadow: variant === 'primary' ? '0 8px 24px rgba(106,191,116,0.25)' : 'none',
       minWidth: 200,
       flex: 1,
+      outline: 'none',
+    }}
+    onFocus={(e) => {
+      e.currentTarget.style.boxShadow =
+        variant === 'primary'
+          ? '0 8px 24px rgba(106,191,116,0.25), 0 0 0 3px rgba(106,191,116,0.45)'
+          : '0 0 0 3px rgba(106,191,116,0.45)';
+    }}
+    onBlur={(e) => {
+      e.currentTarget.style.boxShadow =
+        variant === 'primary' ? '0 8px 24px rgba(106,191,116,0.25)' : 'none';
     }}
     onMouseEnter={(e) => {
       e.currentTarget.style.transform = 'translateY(-2px)';
@@ -277,7 +289,10 @@ export const PlayerPortalPage = () => {
       </section>
 
       {/* === KPI cards === */}
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+      <section
+        aria-label="Indicadores"
+        style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}
+      >
         <KpiCard
           label="ELO PRINCIPAL"
           subLabel={ratingLabel}
@@ -297,24 +312,27 @@ export const PlayerPortalPage = () => {
       </section>
 
       {/* === CTAs === */}
-      <section style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+      <section
+        aria-label="Acciones rápidas"
+        style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}
+      >
         <HeroCTA
           icon="♟"
-          title="Empezar partida"
-          description="Crea o únete a una partida en vivo"
+          title="Jugar ahora"
+          description="Crea o únete a una partida"
           onClick={() => navigate('/play')}
         />
         <HeroCTA
           icon="🏆"
-          title="Ver torneos"
-          description="Inscripciones abiertas y en curso"
+          title="Torneos"
+          description="Inscripciones y rondas en curso"
           onClick={() => navigate('/tournaments')}
           variant="secondary"
         />
         <HeroCTA
           icon="👤"
           title="Mi perfil"
-          description="Estadísticas detalladas y Lichess"
+          description="Estadísticas y vínculos"
           onClick={() => navigate('/player/me')}
           variant="secondary"
         />
@@ -339,7 +357,7 @@ export const PlayerPortalPage = () => {
           }}
         >
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ fontSize: 14, fontWeight: 700 }}>Últimas partidas</div>
+            <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>Últimas partidas</h2>
             <div
               style={{
                 fontSize: 11,
@@ -350,7 +368,7 @@ export const PlayerPortalPage = () => {
                 marginTop: 2,
               }}
             >
-              {recentGames.length} de tus jugadas más recientes
+              {recentGames.length === 0 ? 'Sin partidas todavía' : `Últimas ${recentGames.length}`}
             </div>
           </div>
           {stats.favoriteOpening && (
@@ -361,10 +379,11 @@ export const PlayerPortalPage = () => {
         </div>
         {recentGames.length === 0 ? (
           <div style={{ padding: '32px 20px', textAlign: 'center', color: 'var(--cq-text-dim, #7a7d6e)' }}>
-            <div style={{ fontSize: 28, marginBottom: 8 }}>♞</div>
-            <div style={{ fontSize: 14, marginBottom: 12 }}>Aún no tienes partidas registradas.</div>
+            <div style={{ fontSize: 28, marginBottom: 8 }} aria-hidden="true">♞</div>
+            <div style={{ fontSize: 14, marginBottom: 12 }}>Sin partidas todavía.</div>
             <button
               onClick={() => navigate('/play')}
+              aria-label="Ir a jugar mi primera partida"
               style={{
                 background: '#6abf74',
                 color: '#0a100a',
@@ -377,7 +396,7 @@ export const PlayerPortalPage = () => {
                 cursor: 'pointer',
               }}
             >
-              Jugar tu primera partida →
+              Jugar mi primera partida →
             </button>
           </div>
         ) : (

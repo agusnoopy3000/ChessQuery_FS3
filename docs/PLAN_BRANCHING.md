@@ -48,15 +48,30 @@ Commits siguen **Conventional Commits**: `feat(ms-game): ...`, `fix(api-gateway)
 
 | PR | Rama | Contenido | Estado |
 |---|---|---|---|
+| #1 | `minuta/semana-1` | Minuta inicial del equipo | merged |
+| #3 | `docs/minuta-20032026` | Minuta seguimiento | merged |
 | #5 | `feat/ms-auth` | JWT, BCrypt, refresh tokens | merged |
 | #6 | `feat/ms-users` | Player, federación FIDE, fuzzy search | merged |
 | #7 | `feat/ms-tournament` | Factory + Strategy de pairings | merged |
-| #8 | `feat/ms-game` | ELO calc, PGN storage, openings | merged |
+| #8 | `feat/ms-game` | ELO calc, PGN storage, openings ECO | merged |
+| #9 | `feat/ms-analytics` | Stats agregadas + consumers RabbitMQ | merged |
+| #10 | `feat/ms-notifications` | Push in-app + email transaccional | merged |
+| #11 | `feat/ms-etl` | Sync FIDE/AJEFECH/Lichess (Python) | merged |
 | #12 | `feat/chess-portal-pages` | Páginas del portal del jugador | merged |
 | #13 | `feat/organizer-panel` | Panel del organizador | merged |
 | #14 | `feat/admin-panel` | Panel administrador (ETL) | merged |
+| #15 | `codex/fix-register-role-visuals` | Fix visual registro de rol | merged |
+| #16 | `feat/player-registration-flow` | Flujo registro jugador completo | merged |
 
-Total commits en `main`: **>50** distribuidos entre los 3 integrantes.
+Total commits en `main`: **133** (al cierre de Parcial N°2),
+distribuidos entre los 3 integrantes.
+
+Commits notables post-merge (fixes y refinamiento):
+
+- `4f1b100` — provision idempotente + preflight demo (resuelve race condition)
+- `50732f9` — setup Windows + fix invite encoding (URL double-encoding)
+- `c0e2669` — gateway connection pool resiliente a restarts
+- `75bc89d` — fix lentitud live game + session pollution cross-tab
 
 ## 5. Ejemplos de gestión de conflictos
 

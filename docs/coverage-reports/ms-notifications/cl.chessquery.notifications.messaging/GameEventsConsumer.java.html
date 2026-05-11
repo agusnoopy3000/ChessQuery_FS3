@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GameEventsConsumer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ms-notifications</a> &gt; <a href="index.source.html" class="el_package">cl.chessquery.notifications.messaging</a> &gt; <span class="el_source">GameEventsConsumer.java</span></div><h1>GameEventsConsumer.java</h1><pre class="source lang-java linenums">package cl.chessquery.notifications.messaging;
+
+import cl.chessquery.notifications.config.RabbitMQConfig;
+import cl.chessquery.notifications.entity.ProcessedEvent;
+import cl.chessquery.notifications.repository.ProcessedEventRepository;
+import cl.chessquery.notifications.service.NotificationService;
+import com.rabbitmq.client.Channel;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.amqp.support.AmqpHeaders;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.messaging.handler.annotation.Header;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.io.IOException;
+import java.time.Instant;
+
+/**
+ * Consumidor de la cola notifications.game.events (binding elo.*).
+ *
+ * NOTA: se usa una cola dedicada &quot;notifications.game.events&quot; en lugar de &quot;game.events&quot;
+ * para evitar el patrón competing consumers con MS-Analytics.
+ * Cada microservicio consumidor debe tener su propia cola.
+ */
+<span class="nc" id="L27">@Slf4j</span>
+@Component
+<span class="nc" id="L29">@RequiredArgsConstructor</span>
+public class GameEventsConsumer {
+
+    private final NotificationService      notificationService;
+    private final ProcessedEventRepository processedEventRepo;
+
+    @RabbitListener(queues = RabbitMQConfig.NOTIF_GAME_EVENTS_QUEUE)
+    @Transactional
+    public void onGameEvent(ChessEvent event,
+                            Channel channel,
+                            @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) throws IOException {
+<span class="nc bnc" id="L40" title="All 2 branches missed.">        if (alreadyProcessed(event.getEventId())) {</span>
+<span class="nc" id="L41">            log.debug(&quot;Evento de game ya procesado, ignorando: {}&quot;, event.getEventId());</span>
+<span class="nc" id="L42">            channel.basicAck(deliveryTag, false);</span>
+<span class="nc" id="L43">            return;</span>
+        }
+
+        try {
+<span class="nc bnc" id="L47" title="All 4 branches missed.">            switch (event.getEventType()) {</span>
+<span class="nc" id="L48">                case &quot;elo.updated&quot; -&gt; notificationService.notifyEloUpdated(event.getPayload());</span>
+<span class="nc" id="L49">                case &quot;game.finished&quot; -&gt; notificationService.notifyGameFinished(event.getPayload());</span>
+<span class="nc" id="L50">                case &quot;game.invitation&quot; -&gt; notificationService.notifyGameInvitation(event.getPayload());</span>
+<span class="nc" id="L51">                default -&gt; log.debug(&quot;Tipo de evento ignorado en notifications.game.events: {}&quot;, event.getEventType());</span>
+            }
+<span class="nc" id="L53">            markProcessed(event.getEventId());</span>
+<span class="nc" id="L54">            channel.basicAck(deliveryTag, false);</span>
+<span class="nc" id="L55">        } catch (DataIntegrityViolationException e) {</span>
+<span class="nc" id="L56">            log.warn(&quot;Conflicto de idempotencia en notifications.game.events para evento {}&quot;, event.getEventId());</span>
+<span class="nc" id="L57">            channel.basicAck(deliveryTag, false);</span>
+<span class="nc" id="L58">        } catch (Exception e) {</span>
+<span class="nc" id="L59">            log.error(&quot;Error procesando evento de game {}: {}&quot;, event.getEventId(), e.getMessage(), e);</span>
+<span class="nc" id="L60">            channel.basicNack(deliveryTag, false, false);</span>
+<span class="nc" id="L61">        }</span>
+<span class="nc" id="L62">    }</span>
+
+    private boolean alreadyProcessed(String eventId) {
+<span class="nc bnc" id="L65" title="All 4 branches missed.">        return eventId != null &amp;&amp; processedEventRepo.existsById(eventId);</span>
+    }
+
+    private void markProcessed(String eventId) {
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        if (eventId != null) {</span>
+<span class="nc" id="L70">            processedEventRepo.save(ProcessedEvent.builder()</span>
+<span class="nc" id="L71">                    .eventId(eventId)</span>
+<span class="nc" id="L72">                    .processedAt(Instant.now())</span>
+<span class="nc" id="L73">                    .build());</span>
+        }
+<span class="nc" id="L75">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

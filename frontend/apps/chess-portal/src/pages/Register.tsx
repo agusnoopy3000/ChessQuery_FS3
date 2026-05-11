@@ -572,7 +572,7 @@ export const RegisterPage = () => {
             </button>
 
             <p style={{ textAlign: 'center', fontSize: 13, color: '#4a4d40' }}>
-              ¿Ya tenés cuenta?{' '}
+              ¿Ya tienes cuenta?{' '}
               <a
                 href="/login"
                 style={{ color: '#6abf74', fontWeight: 600, textDecoration: 'none' }}

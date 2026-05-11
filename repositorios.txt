@@ -1,0 +1,132 @@
+============================================================
+ChessQuery — Enlaces a repositorios
+DSY1106 Desarrollo Fullstack III — DuocUC — Parcial N°2
+Equipo: Martín Mora, Agustín Garrido, Gabriel Espinoza
+============================================================
+
+REPOSITORIO PRINCIPAL (monorepo)
+--------------------------------
+https://github.com/agusnoopy3000/ChessQuery_FS3
+
+Contiene la totalidad del proyecto organizado como monorepo:
+backend (Java + Python), frontend (TypeScript/React) y
+toda la documentación e infraestructura.
+
+
+COMPONENTES BACKEND
+-------------------
+
+[1] ms-auth (legacy — reemplazado por Supabase Auth en demo)
+    https://github.com/agusnoopy3000/ChessQuery_FS3/tree/main/ms-auth
+    Microservicio Spring Boot 3.2.4. JWT HS256, refresh tokens
+    SHA-256, BCrypt para passwords. Puerto 9090.
+
+[2] ms-users
+    https://github.com/agusnoopy3000/ChessQuery_FS3/tree/main/ms-users
+    Microservicio Spring Boot. Player profiles, ELO nacional/FIDE,
+    búsqueda fuzzy con pg_trgm, provisión idempotente desde
+    Supabase. Puerto 8081.
+
+[3] ms-tournament
+    https://github.com/agusnoopy3000/ChessQuery_FS3/tree/main/ms-tournament
+    Microservicio Spring Boot. CRUD torneos, inscripciones,
+    Factory + Strategy de pairings (Swiss / Round-Robin / Knockout),
+    standings con Buchholz y Sonneborn-Berger. Puerto 8082.
+
+[4] ms-game
+    https://github.com/agusnoopy3000/ChessQuery_FS3/tree/main/ms-game
+    Microservicio Spring Boot. Live games, ELO calc (fórmula FIDE),
+    detección de aperturas ECO, persistencia PGN en Supabase Storage,
+    Realtime broadcast de jugadas. Puerto 8083.
+
+[5] ms-analytics
+    https://github.com/agusnoopy3000/ChessQuery_FS3/tree/main/ms-analytics
+    Microservicio Spring Boot. Stats pre-agregadas (PLAYER_STATS_MV)
+    alimentadas por consumers RabbitMQ. Puerto 8084.
+
+[6] ms-notifications
+    https://github.com/agusnoopy3000/ChessQuery_FS3/tree/main/ms-notifications
+    Microservicio Spring Boot. Push in-app + email transaccional.
+    Consumer idempotente de eventos game/user/tournament. Puerto 8085.
+
+[7] ms-etl
+    https://github.com/agusnoopy3000/ChessQuery_FS3/tree/main/ms-etl
+    Microservicio Python/FastAPI. Sync FIDE / AJEFECH / Lichess
+    rating histórico. Puerto 8086.
+
+[8] api-gateway
+    https://github.com/agusnoopy3000/ChessQuery_FS3/tree/main/api-gateway
+    Spring Cloud Gateway. Auth via JWKS Supabase, rate limiting Redis,
+    PlayerIdResolver (UUID Supabase → player.id) con caché Caffeine.
+    Puerto 8080.
+
+[9] bff-player
+    https://github.com/agusnoopy3000/ChessQuery_FS3/tree/main/bff-player
+    NestJS Backend For Frontend. Compone respuestas para chess-portal
+    (jugador). Puerto 3001.
+
+[10] bff-organizer
+     https://github.com/agusnoopy3000/ChessQuery_FS3/tree/main/bff-organizer
+     NestJS BFF para organizer-panel. Compone tableros de gestión
+     de torneos. Puerto 3002.
+
+[11] bff-admin
+     https://github.com/agusnoopy3000/ChessQuery_FS3/tree/main/bff-admin
+     NestJS BFF para admin-panel (fuera de scope demo, código
+     versionado para uso futuro). Puerto 3003.
+
+
+ARQUETIPO MAVEN
+---------------
+
+[12] chessquery-ms-archetype
+     https://github.com/agusnoopy3000/ChessQuery_FS3/tree/main/archetypes/chessquery-ms-archetype
+     Arquetipo Maven que estandariza la creación de nuevos
+     microservicios Spring Boot con el stack del proyecto
+     (Boot 3.2.4, Flyway, RabbitMQ, Resilience4j, Springdoc,
+     Lombok, JaCoCo, Dockerfile multi-stage).
+
+
+COMPONENTE FRONTEND NPM
+-----------------------
+
+[13] @chessquery/ui-lib (workspace package)
+     https://github.com/agusnoopy3000/ChessQuery_FS3/tree/main/frontend/packages/ui-lib
+     Librería de componentes React compartida por las 3 apps
+     (chess-portal, organizer-panel, admin-panel) vía NPM workspaces.
+
+[14] @chessquery/shared (workspace package)
+     https://github.com/agusnoopy3000/ChessQuery_FS3/tree/main/frontend/packages/shared
+     Types, hooks (`useAuth`) y cliente API base compartido.
+
+[15] chess-portal (SPA jugador, Vite + React 18)
+     https://github.com/agusnoopy3000/ChessQuery_FS3/tree/main/frontend/apps/chess-portal
+     Puerto 5173.
+
+[16] organizer-panel (SPA organizador, Vite + React 18)
+     https://github.com/agusnoopy3000/ChessQuery_FS3/tree/main/frontend/apps/organizer-panel
+     Puerto 5174.
+
+
+INFRAESTRUCTURA Y DOCUMENTACIÓN
+-------------------------------
+
+[17] infrastructure/
+     https://github.com/agusnoopy3000/ChessQuery_FS3/tree/main/infrastructure
+     docker-compose.yml, override demo M1 (docker-compose.demo.yml),
+     Makefile con targets up/down/demo-up/preflight, nginx config.
+
+[18] docs/
+     https://github.com/agusnoopy3000/ChessQuery_FS3/tree/main/docs
+     Análisis de patrones, plan de branching, plan de demo,
+     cheatsheet defensa oral, READMEs Windows/M1, planes de migración.
+
+
+============================================================
+Documentos clave para la defensa oral (Parcial N°2)
+============================================================
+
+- docs/ANALISIS_PATRONES.md  → 8 patrones diseño + 6 arquitectónicos
+- docs/PLAN_BRANCHING.md     → estrategia + PRs + ejemplo conflictos
+- docs/CHEATSHEET_DEFENSA.md → distribución de temas por integrante
+- archetypes/chessquery-ms-archetype/README.md → uso del arquetipo

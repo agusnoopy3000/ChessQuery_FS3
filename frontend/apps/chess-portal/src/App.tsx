@@ -47,7 +47,7 @@ const OrganizerRedirect = () => {
         <div style={{ fontSize: 48, marginBottom: 16 }}>♖</div>
         <h2 style={{ marginTop: 0 }}>Bienvenido, organizador</h2>
         <p style={{ color: 'var(--text-muted)', marginBottom: 24 }}>
-          Este es el portal de jugadores. Como organizador, gestionás torneos
+          Este es el portal de jugadores. Como organizador, gestionas torneos
           desde el <strong>Panel del Organizador</strong> en una URL distinta.
         </p>
         <Button size="lg" onClick={() => window.location.assign(organizerUrl)}>

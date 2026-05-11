@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LiveGameController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ms-game</a> &gt; <a href="index.source.html" class="el_package">cl.chessquery.game.controller</a> &gt; <span class="el_source">LiveGameController.java</span></div><h1>LiveGameController.java</h1><pre class="source lang-java linenums">package cl.chessquery.game.controller;
+
+import cl.chessquery.game.dto.LiveGameDtos.*;
+import cl.chessquery.game.service.LiveGameService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping(&quot;/games/live&quot;)
+<span class="nc" id="L14">@RequiredArgsConstructor</span>
+@Tag(name = &quot;Live Games&quot;, description = &quot;Partidas en tiempo real entre 2 jugadores&quot;)
+public class LiveGameController {
+
+    private final LiveGameService live;
+
+    @Operation(summary = &quot;Crear sesión live (creador = white)&quot;)
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public LiveGameResponse create(@Valid @RequestBody CreateLiveGameRequest req) {
+<span class="nc" id="L24">        return live.create(req);</span>
+    }
+
+    @Operation(summary = &quot;Estado actual de la sesión + jugadas&quot;)
+    @GetMapping(&quot;/{id}&quot;)
+    public LiveGameResponse get(@PathVariable Long id) {
+<span class="nc" id="L30">        return live.get(id);</span>
+    }
+
+    @Operation(summary = &quot;Sumarse a la partida como rival (black)&quot;)
+    @PostMapping(&quot;/{id}/join&quot;)
+    public LiveGameResponse join(@PathVariable Long id, @Valid @RequestBody JoinLiveGameRequest req) {
+<span class="nc" id="L36">        return live.join(id, req);</span>
+    }
+
+    @Operation(summary = &quot;Registrar una jugada en UCI (e2e4, e7e8q…)&quot;)
+    @PostMapping(&quot;/{id}/move&quot;)
+    public LiveGameResponse move(@PathVariable Long id, @Valid @RequestBody MoveRequest req) {
+<span class="nc" id="L42">        return live.move(id, req);</span>
+    }
+
+    @Operation(summary = &quot;Rendirse y cerrar la partida&quot;)
+    @PostMapping(&quot;/{id}/resign&quot;)
+    public LiveGameResponse resign(@PathVariable Long id, @Valid @RequestBody ResignRequest req) {
+<span class="nc" id="L48">        return live.resign(id, req);</span>
+    }
+
+    @Operation(summary = &quot;Cerrar la partida en tablas por acuerdo mutuo (R11)&quot;)
+    @PostMapping(&quot;/{id}/draw&quot;)
+    public LiveGameResponse draw(@PathVariable Long id, @Valid @RequestBody ResignRequest req) {
+<span class="nc" id="L54">        return live.drawAgreement(id, req);</span>
+    }
+
+    @Operation(summary = &quot;Reportar pérdida por tiempo (R5) — el oponente gana&quot;)
+    @PostMapping(&quot;/{id}/timeout&quot;)
+    public LiveGameResponse timeout(@PathVariable Long id, @Valid @RequestBody ResignRequest req) {
+<span class="nc" id="L60">        return live.timeout(id, req);</span>
+    }
+
+    @Operation(summary = &quot;Revancha — crea nueva sesión con colores invertidos (status WAITING)&quot;)
+    @PostMapping(&quot;/{id}/rematch&quot;)
+    @ResponseStatus(HttpStatus.CREATED)
+    public LiveGameResponse rematch(@PathVariable Long id, @Valid @RequestBody RematchRequest req) {
+<span class="nc" id="L67">        return live.rematch(id, req);</span>
+    }
+
+    @Operation(summary = &quot;Invitar a otro jugador por email — si tiene cuenta, recibe push in-app además del email&quot;)
+    @PostMapping(&quot;/{id}/invite&quot;)
+    public java.util.Map&lt;String, Object&gt; invite(
+            @PathVariable Long id,
+            @Valid @RequestBody InviteRequest req,
+            @RequestHeader(value = &quot;X-User-Id&quot;, required = false) Long inviterId) {
+<span class="nc" id="L76">        return live.invitePlayer(id, req.email(), req.gameUrl(), inviterId);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

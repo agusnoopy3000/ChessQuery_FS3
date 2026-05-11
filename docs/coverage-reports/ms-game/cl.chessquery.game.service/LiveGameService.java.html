@@ -1,0 +1,595 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LiveGameService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ms-game</a> &gt; <a href="index.source.html" class="el_package">cl.chessquery.game.service</a> &gt; <span class="el_source">LiveGameService.java</span></div><h1>LiveGameService.java</h1><pre class="source lang-java linenums">package cl.chessquery.game.service;
+
+import cl.chessquery.game.dto.LiveGameDtos.*;
+import cl.chessquery.game.dto.RegisterGameRequest;
+import cl.chessquery.game.entity.GameType;
+import cl.chessquery.game.entity.LiveGameMove;
+import cl.chessquery.game.entity.LiveGameSession;
+import cl.chessquery.game.entity.LiveGameSession.SessionStatus;
+import cl.chessquery.game.exception.ApiException;
+import cl.chessquery.game.opening.OpeningDetector;
+import cl.chessquery.game.repository.LiveGameMoveRepository;
+import cl.chessquery.game.repository.LiveGameSessionRepository;
+import cl.chessquery.game.realtime.LiveGameBroadcaster;
+import com.github.bhlangonijr.chesslib.Board;
+import com.github.bhlangonijr.chesslib.Side;
+import com.github.bhlangonijr.chesslib.move.Move;
+import com.github.bhlangonijr.chesslib.move.MoveList;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+
+<span class="fc" id="L27">@Slf4j</span>
+@Service
+<span class="fc" id="L29">@RequiredArgsConstructor</span>
+public class LiveGameService {
+
+    private static final String INITIAL_FEN =
+            &quot;rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1&quot;;
+
+    private final LiveGameSessionRepository sessionRepo;
+    private final LiveGameMoveRepository    moveRepo;
+    private final LiveGameFinalizer          finalizer;
+    private final LiveGameBroadcaster        broadcaster;
+    private final OpeningDetector            openingDetector;
+    private final EventPublisherService      events;
+    private final org.springframework.web.client.RestTemplate restTemplate;
+    @org.springframework.beans.factory.annotation.Value(&quot;${gateway.ms-users.url:http://ms-users:8081}&quot;)
+    private String msUsersUrl;
+
+    // ── Invitar a otro jugador a una partida ──────────────────────────────
+
+    /**
+     * Invita por email a un jugador a unirse a la partida. Si el email matchea
+     * un Player registrado, publica un evento {@code game.invitation} para que
+     * ms-notifications cree una notificación in-app (toast push). El email
+     * propiamente dicho lo manda el frontend vía Supabase magic link.
+     *
+     * Devuelve {@code { matched: boolean, playerId?: number }} para que el
+     * frontend pueda saber si el destinatario tendrá feedback in-app o solo
+     * el correo.
+     */
+    public java.util.Map&lt;String, Object&gt; invitePlayer(Long sessionId, String email,
+                                                       String gameUrl, Long inviterId) {
+<span class="nc" id="L59">        LiveGameSession s = findOrThrow(sessionId);</span>
+<span class="nc" id="L60">        java.util.Map&lt;String, Object&gt; result = new java.util.HashMap&lt;&gt;();</span>
+<span class="nc" id="L61">        result.put(&quot;matched&quot;, false);</span>
+
+<span class="nc bnc" id="L63" title="All 4 branches missed.">        if (email == null || email.isBlank()) {</span>
+<span class="nc" id="L64">            return result;</span>
+        }
+
+<span class="nc" id="L67">        Long invitedPlayerId = null;</span>
+<span class="nc" id="L68">        String invitedName = null;</span>
+        try {
+<span class="nc" id="L70">            String url = msUsersUrl + &quot;/users/by-email?email={email}&quot;;</span>
+            @SuppressWarnings(&quot;unchecked&quot;)
+<span class="nc" id="L72">            java.util.Map&lt;String, Object&gt; body = restTemplate.getForObject(url, java.util.Map.class, email.trim());</span>
+<span class="nc bnc" id="L73" title="All 4 branches missed.">            if (body != null &amp;&amp; body.get(&quot;id&quot;) instanceof Number) {</span>
+<span class="nc" id="L74">                invitedPlayerId = ((Number) body.get(&quot;id&quot;)).longValue();</span>
+<span class="nc" id="L75">                invitedName = (body.get(&quot;firstName&quot;) + &quot; &quot; + body.get(&quot;lastName&quot;)).trim();</span>
+            }
+<span class="nc" id="L77">        } catch (org.springframework.web.client.HttpClientErrorException.NotFound nf) {</span>
+<span class="nc" id="L78">            log.debug(&quot;invite: email {} no tiene Player registrado, solo se enviará magic link&quot;, email);</span>
+<span class="nc" id="L79">        } catch (Exception ex) {</span>
+<span class="nc" id="L80">            log.warn(&quot;invite: lookup ms-users falló para email={}: {}&quot;, email, ex.getMessage());</span>
+<span class="nc" id="L81">        }</span>
+
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        if (invitedPlayerId == null) {</span>
+<span class="nc" id="L84">            return result;</span>
+        }
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (invitedPlayerId.equals(inviterId)) {</span>
+<span class="nc" id="L87">            log.debug(&quot;invite: el invitado es el propio creador, no notifico&quot;);</span>
+<span class="nc" id="L88">            return result;</span>
+        }
+
+<span class="nc" id="L91">        String inviterName = &quot;tu rival&quot;;</span>
+<span class="nc bnc" id="L92" title="All 4 branches missed.">        if (inviterId != null &amp;&amp; inviterId.equals(s.getWhitePlayerId())) {</span>
+<span class="nc" id="L93">            inviterName = &quot;el creador de la partida&quot;;</span>
+        }
+<span class="nc" id="L95">        events.publishGameInvitation(sessionId, invitedPlayerId, inviterId, inviterName, gameUrl);</span>
+<span class="nc" id="L96">        log.info(&quot;invite: game.invitation publicado game={} → player={} ({})&quot;,</span>
+                sessionId, invitedPlayerId, invitedName);
+
+<span class="nc" id="L99">        result.put(&quot;matched&quot;, true);</span>
+<span class="nc" id="L100">        result.put(&quot;playerId&quot;, invitedPlayerId);</span>
+<span class="nc" id="L101">        return result;</span>
+    }
+
+    // ── Crear sesión (creator = white) ─────────────────────────────────────
+
+    @Transactional
+    public LiveGameResponse create(CreateLiveGameRequest req) {
+<span class="fc" id="L108">        LiveGameSession s = LiveGameSession.builder()</span>
+<span class="fc" id="L109">                .whitePlayerId(req.whitePlayerId())</span>
+<span class="fc" id="L110">                .status(SessionStatus.WAITING)</span>
+<span class="fc" id="L111">                .initialFen(INITIAL_FEN)</span>
+<span class="fc" id="L112">                .currentFen(INITIAL_FEN)</span>
+<span class="fc" id="L113">                .turn(&quot;w&quot;)</span>
+<span class="fc" id="L114">                .timeControlInitialMs(req.timeControlInitialMs())</span>
+<span class="fc" id="L115">                .timeControlIncrementMs(req.timeControlIncrementMs())</span>
+<span class="fc" id="L116">                .clockWhiteMs(req.timeControlInitialMs())</span>
+<span class="fc" id="L117">                .clockBlackMs(req.timeControlInitialMs())</span>
+<span class="fc" id="L118">                .whiteEloBefore(req.whiteEloBefore())</span>
+<span class="fc" id="L119">                .build();</span>
+<span class="fc" id="L120">        sessionRepo.save(s);</span>
+<span class="fc" id="L121">        log.info(&quot;LiveGame creada id={} white={}&quot;, s.getId(), s.getWhitePlayerId());</span>
+<span class="fc" id="L122">        return toResponse(s, List.of());</span>
+    }
+
+    // ── Obtener (con jugadas) ──────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public LiveGameResponse get(Long id) {
+<span class="nc" id="L129">        LiveGameSession s = findOrThrow(id);</span>
+<span class="nc" id="L130">        List&lt;LiveGameMove&gt; moves = moveRepo.findBySessionIdOrderByCreatedAtAsc(id);</span>
+<span class="nc" id="L131">        return toResponse(s, moves);</span>
+    }
+
+    // ── Join (rival = black) ───────────────────────────────────────────────
+
+    @Transactional
+    public LiveGameResponse join(Long id, JoinLiveGameRequest req) {
+<span class="fc" id="L138">        LiveGameSession s = findOrThrow(id);</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if (s.getStatus() != SessionStatus.WAITING) {</span>
+<span class="nc bnc" id="L140" title="All 4 branches missed.">            if (s.getStatus() == SessionStatus.ACTIVE &amp;&amp; req.playerId().equals(s.getBlackPlayerId())) {</span>
+<span class="nc" id="L141">                return toResponse(s, moveRepo.findBySessionIdOrderByCreatedAtAsc(id));</span>
+            }
+<span class="nc" id="L143">            throw new ApiException(409, &quot;SESSION_NOT_WAITING&quot;,</span>
+                    &quot;La sesión no está en estado WAITING&quot;);
+        }
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (req.playerId().equals(s.getWhitePlayerId())) {</span>
+<span class="nc" id="L147">            throw new ApiException(400, &quot;SAME_PLAYER&quot;,</span>
+                    &quot;El creador y el rival no pueden ser el mismo jugador&quot;);
+        }
+<span class="fc" id="L150">        Instant now = Instant.now();</span>
+<span class="fc" id="L151">        s.setBlackPlayerId(req.playerId());</span>
+<span class="fc" id="L152">        s.setBlackEloBefore(req.eloBefore());</span>
+<span class="fc" id="L153">        s.setStatus(SessionStatus.ACTIVE);</span>
+<span class="fc" id="L154">        s.setStartedAt(now);</span>
+<span class="fc" id="L155">        sessionRepo.save(s);</span>
+<span class="fc" id="L156">        log.info(&quot;LiveGame {} joined: black={}&quot;, id, req.playerId());</span>
+<span class="fc" id="L157">        LiveGameResponse response = toResponse(s, moveRepo.findBySessionIdOrderByCreatedAtAsc(id));</span>
+<span class="fc" id="L158">        Map&lt;String, Object&gt; startedPayload = new java.util.HashMap&lt;&gt;();</span>
+<span class="fc" id="L159">        startedPayload.put(&quot;blackPlayerId&quot;, req.playerId());</span>
+<span class="fc" id="L160">        startedPayload.put(&quot;startedAt&quot;, now.toString());</span>
+<span class="fc" id="L161">        startedPayload.put(&quot;state&quot;, response);</span>
+<span class="fc" id="L162">        broadcaster.publish(id, &quot;game.started&quot;, startedPayload);</span>
+<span class="fc" id="L163">        return response;</span>
+    }
+
+    // ── Move ───────────────────────────────────────────────────────────────
+
+    @Transactional
+    public LiveGameResponse move(Long id, MoveRequest req) {
+<span class="fc" id="L170">        LiveGameSession s = findOrThrow(id);</span>
+<span class="fc" id="L171">        LiveGameResponse idempotentRetry = idempotentMoveRetry(s, req);</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (idempotentRetry != null) {</span>
+<span class="fc" id="L173">            return idempotentRetry;</span>
+        }
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">        if (s.getStatus() != SessionStatus.ACTIVE) {</span>
+<span class="nc" id="L176">            throw new ApiException(409, &quot;SESSION_NOT_ACTIVE&quot;,</span>
+<span class="nc" id="L177">                    &quot;La sesión no está activa (estado=&quot; + s.getStatus() + &quot;)&quot;);</span>
+        }
+        // Verificar turno
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        Side expected = &quot;w&quot;.equals(s.getTurn()) ? Side.WHITE : Side.BLACK;</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        Long expectedPlayerId = expected == Side.WHITE ? s.getWhitePlayerId() : s.getBlackPlayerId();</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        if (!req.playerId().equals(expectedPlayerId)) {</span>
+<span class="fc" id="L183">            throw new ApiException(403, &quot;NOT_YOUR_TURN&quot;,</span>
+<span class="fc" id="L184">                    &quot;No es el turno del jugador &quot; + req.playerId());</span>
+        }
+
+        // Validar y aplicar jugada con chesslib
+<span class="fc" id="L188">        Board board = new Board();</span>
+<span class="fc" id="L189">        board.loadFromFen(s.getCurrentFen());</span>
+        Move move;
+        try {
+<span class="fc" id="L192">            move = new Move(req.uci(), board.getSideToMove());</span>
+<span class="nc" id="L193">        } catch (Exception e) {</span>
+<span class="nc" id="L194">            throw new ApiException(400, &quot;INVALID_UCI&quot;,</span>
+<span class="nc" id="L195">                    &quot;UCI inválido: &quot; + req.uci());</span>
+<span class="fc" id="L196">        }</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (!board.legalMoves().contains(move)) {</span>
+<span class="fc" id="L198">            throw new ApiException(400, &quot;ILLEGAL_MOVE&quot;,</span>
+                    &quot;Jugada ilegal en la posición actual&quot;);
+        }
+<span class="fc" id="L201">        String san = sanForMove(board, move);</span>
+<span class="fc" id="L202">        board.doMove(move);</span>
+
+        // Persistir jugada
+<span class="fc" id="L205">        int totalPrev = (int) moveRepo.countBySessionId(id);</span>
+<span class="fc" id="L206">        int moveNumber = (totalPrev / 2) + 1;</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        String color = expected == Side.WHITE ? &quot;w&quot; : &quot;b&quot;;</span>
+<span class="fc" id="L208">        LiveGameMove lm = LiveGameMove.builder()</span>
+<span class="fc" id="L209">                .sessionId(id)</span>
+<span class="fc" id="L210">                .moveNumber(moveNumber)</span>
+<span class="fc" id="L211">                .playerId(req.playerId())</span>
+<span class="fc" id="L212">                .color(color)</span>
+<span class="fc" id="L213">                .uci(req.uci())</span>
+<span class="fc" id="L214">                .san(san)</span>
+<span class="fc" id="L215">                .fenAfter(board.getFen())</span>
+<span class="fc" id="L216">                .clockWhiteMs(req.clockWhiteMs())</span>
+<span class="fc" id="L217">                .clockBlackMs(req.clockBlackMs())</span>
+<span class="fc" id="L218">                .build();</span>
+<span class="fc" id="L219">        moveRepo.save(lm);</span>
+
+        // Actualizar sesión
+<span class="fc" id="L222">        Instant now = Instant.now();</span>
+<span class="fc" id="L223">        s.setCurrentFen(board.getFen());</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        s.setTurn(board.getSideToMove() == Side.WHITE ? &quot;w&quot; : &quot;b&quot;);</span>
+<span class="fc" id="L225">        s.setLastMoveAt(now);</span>
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">        if (req.clockWhiteMs() != null) s.setClockWhiteMs(req.clockWhiteMs());</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (req.clockBlackMs() != null) s.setClockBlackMs(req.clockBlackMs());</span>
+
+        // Detectar fin
+<span class="fc" id="L230">        String terminal = detectTerminal(board);</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">        if (terminal != null) {</span>
+<span class="nc bnc" id="L232" title="All 2 branches missed.">            String result = switch (terminal) {</span>
+<span class="nc bnc" id="L233" title="All 2 branches missed.">                case &quot;CHECKMATE&quot; -&gt; color.equals(&quot;w&quot;) ? &quot;1-0&quot; : &quot;0-1&quot;;</span>
+<span class="nc" id="L234">                default -&gt; &quot;1/2-1/2&quot;;</span>
+            };
+<span class="nc" id="L236">            finishSession(s, result, terminal, now);</span>
+        }
+<span class="fc" id="L238">        sessionRepo.save(s);</span>
+
+        // Construir response una sola vez para devolver Y broadcastear.
+        // Enviar el estado completo en el broadcast permite al rival actualizar
+        // su tablero sin un GET adicional (elimina ~50-200ms de round-trip).
+<span class="fc" id="L243">        LiveGameResponse response = toResponse(s, moveRepo.findBySessionIdOrderByCreatedAtAsc(id));</span>
+
+<span class="fc" id="L245">        Map&lt;String, Object&gt; movePayload = new java.util.HashMap&lt;&gt;();</span>
+<span class="fc" id="L246">        movePayload.put(&quot;moveNumber&quot;, moveNumber);</span>
+<span class="fc" id="L247">        movePayload.put(&quot;color&quot;, color);</span>
+<span class="fc" id="L248">        movePayload.put(&quot;uci&quot;, req.uci());</span>
+<span class="fc" id="L249">        movePayload.put(&quot;san&quot;, san);</span>
+<span class="fc" id="L250">        movePayload.put(&quot;fenAfter&quot;, board.getFen());</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">        movePayload.put(&quot;clockWhiteMs&quot;, req.clockWhiteMs() == null ? -1L : req.clockWhiteMs());</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">        movePayload.put(&quot;clockBlackMs&quot;, req.clockBlackMs() == null ? -1L : req.clockBlackMs());</span>
+<span class="fc" id="L253">        movePayload.put(&quot;state&quot;, response);</span>
+<span class="fc" id="L254">        broadcaster.publish(id, &quot;move.played&quot;, movePayload);</span>
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">        if (terminal != null) {</span>
+<span class="nc" id="L256">            broadcastFinished(s);</span>
+        }
+
+<span class="fc" id="L259">        return response;</span>
+    }
+
+    // ── Rematch ────────────────────────────────────────────────────────────
+
+    /**
+     * Crea una nueva sesión con colores invertidos a partir de una sesión
+     * FINISHED. Convención: el original.blackPlayerId pasa a ser white en
+     * la nueva (color swap). Status WAITING. El rival original se entera
+     * vía broadcast 'game.rematch.created' en el canal de la sesión vieja.
+     */
+    @Transactional
+    public LiveGameResponse rematch(Long id, RematchRequest req) {
+<span class="nc" id="L272">        LiveGameSession original = findOrThrow(id);</span>
+<span class="nc bnc" id="L273" title="All 2 branches missed.">        if (original.getStatus() != SessionStatus.FINISHED) {</span>
+<span class="nc" id="L274">            throw new ApiException(409, &quot;SESSION_NOT_FINISHED&quot;,</span>
+                    &quot;Solo se puede pedir revancha de una partida finalizada&quot;);
+        }
+<span class="nc bnc" id="L277" title="All 2 branches missed.">        if (original.getBlackPlayerId() == null) {</span>
+<span class="nc" id="L278">            throw new ApiException(400, &quot;NO_OPPONENT&quot;,</span>
+                    &quot;No hay rival con quien hacer revancha&quot;);
+        }
+<span class="nc bnc" id="L281" title="All 2 branches missed.">        boolean isParticipant = req.playerId().equals(original.getWhitePlayerId())</span>
+<span class="nc bnc" id="L282" title="All 2 branches missed.">                || req.playerId().equals(original.getBlackPlayerId());</span>
+<span class="nc bnc" id="L283" title="All 2 branches missed.">        if (!isParticipant) {</span>
+<span class="nc" id="L284">            throw new ApiException(403, &quot;NOT_A_PLAYER&quot;,</span>
+                    &quot;Solo los participantes pueden pedir revancha&quot;);
+        }
+
+        // Color swap: el black original pasa a ser white en la nueva.
+<span class="nc" id="L289">        LiveGameSession s = LiveGameSession.builder()</span>
+<span class="nc" id="L290">                .whitePlayerId(original.getBlackPlayerId())</span>
+<span class="nc" id="L291">                .status(SessionStatus.WAITING)</span>
+<span class="nc" id="L292">                .initialFen(INITIAL_FEN)</span>
+<span class="nc" id="L293">                .currentFen(INITIAL_FEN)</span>
+<span class="nc" id="L294">                .turn(&quot;w&quot;)</span>
+<span class="nc" id="L295">                .timeControlInitialMs(original.getTimeControlInitialMs())</span>
+<span class="nc" id="L296">                .timeControlIncrementMs(original.getTimeControlIncrementMs())</span>
+<span class="nc" id="L297">                .clockWhiteMs(original.getTimeControlInitialMs())</span>
+<span class="nc" id="L298">                .clockBlackMs(original.getTimeControlInitialMs())</span>
+<span class="nc" id="L299">                .whiteEloBefore(original.getBlackEloBefore())</span>
+<span class="nc" id="L300">                .build();</span>
+<span class="nc" id="L301">        sessionRepo.save(s);</span>
+<span class="nc" id="L302">        log.info(&quot;LiveGame {} rematch creado como {} (whiteWasBlack={})&quot;,</span>
+<span class="nc" id="L303">                id, s.getId(), original.getBlackPlayerId());</span>
+
+        // Notificar a quien sigue suscrito al canal viejo (modal abierto).
+<span class="nc" id="L306">        Map&lt;String, Object&gt; rematchPayload = new java.util.HashMap&lt;&gt;();</span>
+<span class="nc" id="L307">        rematchPayload.put(&quot;newSessionId&quot;, s.getId());</span>
+<span class="nc" id="L308">        rematchPayload.put(&quot;requestedBy&quot;, req.playerId());</span>
+<span class="nc" id="L309">        broadcaster.publish(id, &quot;game.rematch.created&quot;, rematchPayload);</span>
+
+<span class="nc" id="L311">        return toResponse(s, List.of());</span>
+    }
+
+    // ── Resign ─────────────────────────────────────────────────────────────
+
+    @Transactional
+    public LiveGameResponse resign(Long id, ResignRequest req) {
+<span class="fc" id="L318">        LiveGameSession s = findOrThrow(id);</span>
+<span class="fc" id="L319">        LiveGameResponse idempotentRetry = idempotentFinishedRetry(s, req.playerId(), &quot;RESIGN&quot;);</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">        if (idempotentRetry != null) {</span>
+<span class="nc" id="L321">            return idempotentRetry;</span>
+        }
+<span class="pc bpc" id="L323" title="1 of 2 branches missed.">        if (s.getStatus() != SessionStatus.ACTIVE) {</span>
+<span class="nc" id="L324">            throw new ApiException(409, &quot;SESSION_NOT_ACTIVE&quot;,</span>
+                    &quot;La sesión no está activa&quot;);
+        }
+<span class="fc" id="L327">        boolean whiteResigns = req.playerId().equals(s.getWhitePlayerId());</span>
+<span class="fc" id="L328">        boolean blackResigns = req.playerId().equals(s.getBlackPlayerId());</span>
+<span class="pc bpc" id="L329" title="2 of 4 branches missed.">        if (!whiteResigns &amp;&amp; !blackResigns) {</span>
+<span class="nc" id="L330">            throw new ApiException(403, &quot;NOT_A_PLAYER&quot;,</span>
+<span class="nc" id="L331">                    &quot;El jugador &quot; + req.playerId() + &quot; no participa en esta partida&quot;);</span>
+        }
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">        String result = whiteResigns ? &quot;0-1&quot; : &quot;1-0&quot;;</span>
+<span class="fc" id="L334">        Instant now = Instant.now();</span>
+<span class="fc" id="L335">        finishSession(s, result, &quot;RESIGN&quot;, now);</span>
+<span class="fc" id="L336">        sessionRepo.save(s);</span>
+<span class="fc" id="L337">        broadcastFinished(s);</span>
+<span class="fc" id="L338">        return toResponse(s, moveRepo.findBySessionIdOrderByCreatedAtAsc(id));</span>
+    }
+
+    // ── Timeout / pérdida por tiempo (R5) ─────────────────────────────────
+
+    /**
+     * Cierra la partida cuando el reloj de un jugador llega a 0. El cliente
+     * detecta el time-out y notifica; el servidor registra al oponente como
+     * ganador con endReason TIMEOUT.
+     */
+    @Transactional
+    public LiveGameResponse timeout(Long id, ResignRequest req) {
+<span class="nc" id="L350">        LiveGameSession s = findOrThrow(id);</span>
+<span class="nc" id="L351">        LiveGameResponse idempotentRetry = idempotentFinishedRetry(s, req.playerId(), &quot;TIMEOUT&quot;);</span>
+<span class="nc bnc" id="L352" title="All 2 branches missed.">        if (idempotentRetry != null) {</span>
+<span class="nc" id="L353">            return idempotentRetry;</span>
+        }
+<span class="nc bnc" id="L355" title="All 2 branches missed.">        if (s.getStatus() != SessionStatus.ACTIVE) {</span>
+<span class="nc" id="L356">            throw new ApiException(409, &quot;SESSION_NOT_ACTIVE&quot;,</span>
+                    &quot;La sesión no está activa&quot;);
+        }
+<span class="nc" id="L359">        boolean whiteFlagged = req.playerId().equals(s.getWhitePlayerId());</span>
+<span class="nc" id="L360">        boolean blackFlagged = req.playerId().equals(s.getBlackPlayerId());</span>
+<span class="nc bnc" id="L361" title="All 4 branches missed.">        if (!whiteFlagged &amp;&amp; !blackFlagged) {</span>
+<span class="nc" id="L362">            throw new ApiException(403, &quot;NOT_A_PLAYER&quot;,</span>
+<span class="nc" id="L363">                    &quot;El jugador &quot; + req.playerId() + &quot; no participa en esta partida&quot;);</span>
+        }
+        // El que se quedó sin tiempo pierde; el oponente gana.
+<span class="nc bnc" id="L366" title="All 2 branches missed.">        String result = whiteFlagged ? &quot;0-1&quot; : &quot;1-0&quot;;</span>
+<span class="nc" id="L367">        Instant now = Instant.now();</span>
+        // Forzamos el reloj a 0 para reflejar el evento.
+<span class="nc bnc" id="L369" title="All 2 branches missed.">        if (whiteFlagged) s.setClockWhiteMs(0L);</span>
+<span class="nc" id="L370">        else s.setClockBlackMs(0L);</span>
+<span class="nc" id="L371">        finishSession(s, result, &quot;TIMEOUT&quot;, now);</span>
+<span class="nc" id="L372">        sessionRepo.save(s);</span>
+<span class="nc" id="L373">        broadcastFinished(s);</span>
+<span class="nc" id="L374">        return toResponse(s, moveRepo.findBySessionIdOrderByCreatedAtAsc(id));</span>
+    }
+
+    // ── Draw by agreement (R11) ───────────────────────────────────────────
+
+    /**
+     * Cierra la partida con resultado 1/2-1/2 cuando ambos jugadores acuerdan
+     * tablas. Solo participa quien está jugando; la negociación de la oferta
+     * la hacen los clientes vía Realtime broadcast (draw.offered/accepted/rejected).
+     */
+    @Transactional
+    public LiveGameResponse drawAgreement(Long id, ResignRequest req) {
+<span class="nc" id="L386">        LiveGameSession s = findOrThrow(id);</span>
+<span class="nc" id="L387">        LiveGameResponse idempotentRetry = idempotentFinishedRetry(s, req.playerId(), &quot;DRAW_AGREEMENT&quot;);</span>
+<span class="nc bnc" id="L388" title="All 2 branches missed.">        if (idempotentRetry != null) {</span>
+<span class="nc" id="L389">            return idempotentRetry;</span>
+        }
+<span class="nc bnc" id="L391" title="All 2 branches missed.">        if (s.getStatus() != SessionStatus.ACTIVE) {</span>
+<span class="nc" id="L392">            throw new ApiException(409, &quot;SESSION_NOT_ACTIVE&quot;,</span>
+                    &quot;La sesión no está activa&quot;);
+        }
+<span class="nc bnc" id="L395" title="All 2 branches missed.">        if (!req.playerId().equals(s.getWhitePlayerId())</span>
+<span class="nc bnc" id="L396" title="All 2 branches missed.">                &amp;&amp; !req.playerId().equals(s.getBlackPlayerId())) {</span>
+<span class="nc" id="L397">            throw new ApiException(403, &quot;NOT_A_PLAYER&quot;,</span>
+<span class="nc" id="L398">                    &quot;El jugador &quot; + req.playerId() + &quot; no participa en esta partida&quot;);</span>
+        }
+<span class="nc" id="L400">        Instant now = Instant.now();</span>
+<span class="nc" id="L401">        finishSession(s, &quot;1/2-1/2&quot;, &quot;DRAW_AGREEMENT&quot;, now);</span>
+<span class="nc" id="L402">        sessionRepo.save(s);</span>
+<span class="nc" id="L403">        broadcastFinished(s);</span>
+<span class="nc" id="L404">        return toResponse(s, moveRepo.findBySessionIdOrderByCreatedAtAsc(id));</span>
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+
+    private LiveGameSession findOrThrow(Long id) {
+<span class="fc" id="L410">        return sessionRepo.findById(id)</span>
+<span class="pc" id="L411">                .orElseThrow(() -&gt; new ApiException(404, &quot;SESSION_NOT_FOUND&quot;,</span>
+                        &quot;Sesión live &quot; + id + &quot; no encontrada&quot;));
+    }
+
+    private LiveGameResponse idempotentMoveRetry(LiveGameSession s, MoveRequest req) {
+<span class="fc" id="L416">        return moveRepo.findTopBySessionIdOrderByCreatedAtDesc(s.getId())</span>
+<span class="fc" id="L417">                .filter(last -&gt; req.playerId().equals(last.getPlayerId()))</span>
+<span class="fc" id="L418">                .filter(last -&gt; req.uci().equals(last.getUci()))</span>
+<span class="fc" id="L419">                .filter(last -&gt; last.getFenAfter().equals(s.getCurrentFen()))</span>
+<span class="fc" id="L420">                .map(last -&gt; toResponse(s, moveRepo.findBySessionIdOrderByCreatedAtAsc(s.getId())))</span>
+<span class="fc" id="L421">                .orElse(null);</span>
+    }
+
+    private LiveGameResponse idempotentFinishedRetry(LiveGameSession s, Long playerId, String reason) {
+<span class="pc bpc" id="L425" title="3 of 4 branches missed.">        if (s.getStatus() != SessionStatus.FINISHED || !reason.equals(s.getEndReason())) {</span>
+<span class="fc" id="L426">            return null;</span>
+        }
+<span class="nc bnc" id="L428" title="All 4 branches missed.">        boolean participant = playerId.equals(s.getWhitePlayerId()) || playerId.equals(s.getBlackPlayerId());</span>
+<span class="nc bnc" id="L429" title="All 2 branches missed.">        if (!participant) {</span>
+<span class="nc" id="L430">            return null;</span>
+        }
+<span class="nc" id="L432">        return toResponse(s, moveRepo.findBySessionIdOrderByCreatedAtAsc(s.getId()));</span>
+    }
+
+    /** Marca FINISHED y agenda la materialización async en `game` con PGN. */
+    private void finishSession(LiveGameSession s, String result, String reason, Instant now) {
+<span class="fc" id="L437">        s.setStatus(SessionStatus.FINISHED);</span>
+<span class="fc" id="L438">        s.setResult(result);</span>
+<span class="fc" id="L439">        s.setEndReason(reason);</span>
+<span class="fc" id="L440">        s.setFinishedAt(now);</span>
+
+<span class="pc bpc" id="L442" title="1 of 2 branches missed.">        if (s.getBlackPlayerId() == null) {</span>
+<span class="nc" id="L443">            log.warn(&quot;LiveGame {} finalizada sin oponente; no se materializa game&quot;, s.getId());</span>
+<span class="nc" id="L444">            return;</span>
+        }
+
+        // Construir PGN desde la lista de jugadas
+<span class="fc" id="L448">        List&lt;LiveGameMove&gt; moves = moveRepo.findBySessionIdOrderByCreatedAtAsc(s.getId());</span>
+<span class="fc" id="L449">        String pgn = buildPgn(s, moves, result);</span>
+
+<span class="pc bpc" id="L451" title="1 of 2 branches missed.">        int duration = s.getStartedAt() != null</span>
+<span class="fc" id="L452">                ? (int) Math.max(0, java.time.Duration.between(s.getStartedAt(), now).toSeconds())</span>
+<span class="pc" id="L453">                : 0;</span>
+<span class="fc" id="L454">        finalizer.scheduleAfterCommit(s.getId(), new RegisterGameRequest(</span>
+<span class="fc" id="L455">                s.getWhitePlayerId(),</span>
+<span class="fc" id="L456">                s.getBlackPlayerId(),</span>
+                result,
+                GameType.CASUAL,
+<span class="fc" id="L459">                s.getWhiteEloBefore(),</span>
+<span class="fc" id="L460">                s.getBlackEloBefore(),</span>
+<span class="fc" id="L461">                moves.size(),</span>
+                null,
+<span class="fc" id="L463">                duration,</span>
+<span class="pc bpc" id="L464" title="1 of 2 branches missed.">                s.getStartedAt() != null ? s.getStartedAt() : now,</span>
+                pgn
+        ));
+<span class="fc" id="L467">        log.info(&quot;LiveGame {} finalizada (result={} reason={}); materialización PGN programada&quot;,</span>
+<span class="fc" id="L468">                s.getId(), result, reason);</span>
+<span class="fc" id="L469">    }</span>
+
+    private void broadcastFinished(LiveGameSession s) {
+<span class="fc" id="L472">        LiveGameResponse response = toResponse(s, moveRepo.findBySessionIdOrderByCreatedAtAsc(s.getId()));</span>
+<span class="fc" id="L473">        Map&lt;String, Object&gt; payload = new java.util.HashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L474" title="1 of 2 branches missed.">        payload.put(&quot;result&quot;, s.getResult() == null ? &quot;&quot; : s.getResult());</span>
+<span class="pc bpc" id="L475" title="1 of 2 branches missed.">        payload.put(&quot;endReason&quot;, s.getEndReason() == null ? &quot;&quot; : s.getEndReason());</span>
+<span class="pc bpc" id="L476" title="1 of 2 branches missed.">        payload.put(&quot;finalizedGameId&quot;, s.getFinalizedGameId() == null ? -1L : s.getFinalizedGameId());</span>
+<span class="fc" id="L477">        payload.put(&quot;state&quot;, response);</span>
+<span class="fc" id="L478">        broadcaster.publish(s.getId(), &quot;game.finished&quot;, payload);</span>
+<span class="fc" id="L479">    }</span>
+
+    /** Detecta CHECKMATE / STALEMATE / DRAW (50-move, repetition, insuficiente). */
+    private String detectTerminal(Board board) {
+<span class="pc bpc" id="L483" title="1 of 2 branches missed.">        if (board.isMated()) return &quot;CHECKMATE&quot;;</span>
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">        if (board.isStaleMate()) return &quot;STALEMATE&quot;;</span>
+<span class="pc bpc" id="L485" title="1 of 2 branches missed.">        if (board.isInsufficientMaterial()) return &quot;DRAW_INSUFFICIENT&quot;;</span>
+<span class="pc bpc" id="L486" title="1 of 2 branches missed.">        if (board.isRepetition()) return &quot;DRAW_REPETITION&quot;;</span>
+<span class="pc bpc" id="L487" title="1 of 2 branches missed.">        if (board.getHalfMoveCounter() &gt;= 100) return &quot;DRAW_50MOVE&quot;;</span>
+<span class="fc" id="L488">        return null;</span>
+    }
+
+    /** SAN de una jugada legal sobre la posición actual del board (sin aplicarla). */
+    private String sanForMove(Board board, Move move) {
+<span class="fc" id="L493">        Board copy = board.clone();</span>
+<span class="fc" id="L494">        MoveList ml = new MoveList(copy.getFen());</span>
+<span class="fc" id="L495">        ml.add(move);</span>
+        try {
+<span class="fc" id="L497">            return ml.toSanArray()[0];</span>
+<span class="nc" id="L498">        } catch (Exception e) {</span>
+<span class="nc" id="L499">            return move.toString();</span>
+        }
+    }
+
+    /** PGN mínimo válido a partir de los movimientos persistidos. */
+    private String buildPgn(LiveGameSession s, List&lt;LiveGameMove&gt; moves, String result) {
+<span class="fc" id="L505">        StringBuilder sb = new StringBuilder();</span>
+        // Seven Tag Roster (orden requerido por PGN spec): Event, Site, Date, Round, White, Black, Result.
+<span class="fc" id="L507">        sb.append(&quot;[Event \&quot;ChessQuery Live\&quot;]\n&quot;);</span>
+<span class="fc" id="L508">        sb.append(&quot;[Site \&quot;chessquery.local\&quot;]\n&quot;);</span>
+<span class="fc" id="L509">        sb.append(&quot;[Date \&quot;&quot;).append(Instant.now().toString().substring(0, 10).replace('-', '.')).append(&quot;\&quot;]\n&quot;);</span>
+<span class="fc" id="L510">        sb.append(&quot;[Round \&quot;-\&quot;]\n&quot;);</span>
+<span class="fc" id="L511">        sb.append(&quot;[White \&quot;Player &quot;).append(s.getWhitePlayerId()).append(&quot;\&quot;]\n&quot;);</span>
+<span class="fc" id="L512">        sb.append(&quot;[Black \&quot;Player &quot;).append(s.getBlackPlayerId()).append(&quot;\&quot;]\n&quot;);</span>
+<span class="fc" id="L513">        sb.append(&quot;[Result \&quot;&quot;).append(result).append(&quot;\&quot;]\n&quot;);</span>
+        // Tags adicionales útiles para parsers (lichess los reconoce).
+<span class="pc bpc" id="L515" title="1 of 2 branches missed.">        if (s.getEndReason() != null) {</span>
+<span class="fc" id="L516">            sb.append(&quot;[Termination \&quot;&quot;).append(terminationLabel(s.getEndReason())).append(&quot;\&quot;]\n&quot;);</span>
+        }
+<span class="pc bpc" id="L518" title="1 of 2 branches missed.">        if (s.getTimeControlInitialMs() != null) {</span>
+<span class="fc" id="L519">            long base = s.getTimeControlInitialMs() / 1000;</span>
+<span class="pc bpc" id="L520" title="1 of 2 branches missed.">            long inc = s.getTimeControlIncrementMs() == null ? 0 : s.getTimeControlIncrementMs() / 1000;</span>
+<span class="fc" id="L521">            sb.append(&quot;[TimeControl \&quot;&quot;).append(base).append('+').append(inc).append(&quot;\&quot;]\n&quot;);</span>
+        }
+<span class="fc" id="L523">        sb.append('\n');</span>
+
+<span class="fc bfc" id="L525" title="All 2 branches covered.">        for (LiveGameMove m : moves) {</span>
+<span class="fc bfc" id="L526" title="All 2 branches covered.">            if (&quot;w&quot;.equals(m.getColor())) {</span>
+<span class="fc" id="L527">                sb.append(m.getMoveNumber()).append(&quot;. &quot;);</span>
+            }
+<span class="fc" id="L529">            sb.append(m.getSan()).append(' ');</span>
+<span class="fc" id="L530">        }</span>
+<span class="fc" id="L531">        sb.append(result).append('\n');</span>
+<span class="fc" id="L532">        return sb.toString();</span>
+    }
+
+    private String terminationLabel(String endReason) {
+<span class="pc bpc" id="L536" title="8 of 9 branches missed.">        return switch (endReason) {</span>
+<span class="nc" id="L537">            case &quot;CHECKMATE&quot; -&gt; &quot;Normal&quot;;</span>
+<span class="fc" id="L538">            case &quot;RESIGN&quot; -&gt; &quot;Abandoned&quot;;</span>
+<span class="nc" id="L539">            case &quot;STALEMATE&quot; -&gt; &quot;Stalemate&quot;;</span>
+<span class="nc" id="L540">            case &quot;DRAW_INSUFFICIENT&quot; -&gt; &quot;Insufficient material&quot;;</span>
+<span class="nc" id="L541">            case &quot;DRAW_REPETITION&quot; -&gt; &quot;Threefold repetition&quot;;</span>
+<span class="nc" id="L542">            case &quot;DRAW_50MOVE&quot; -&gt; &quot;Fifty-move rule&quot;;</span>
+<span class="nc" id="L543">            case &quot;DRAW_AGREEMENT&quot; -&gt; &quot;Agreed&quot;;</span>
+<span class="nc" id="L544">            case &quot;TIMEOUT&quot; -&gt; &quot;Time forfeit&quot;;</span>
+<span class="nc" id="L545">            default -&gt; &quot;Unterminated&quot;;</span>
+        };
+    }
+
+    private LiveGameResponse toResponse(LiveGameSession s, List&lt;LiveGameMove&gt; moves) {
+<span class="fc" id="L550">        List&lt;LiveMoveResponse&gt; mr = moves.stream()</span>
+<span class="fc" id="L551">                .map(m -&gt; new LiveMoveResponse(</span>
+<span class="fc" id="L552">                        m.getMoveNumber(), m.getColor(), m.getUci(), m.getSan(),</span>
+<span class="fc" id="L553">                        m.getFenAfter(), m.getClockWhiteMs(), m.getClockBlackMs(),</span>
+<span class="fc" id="L554">                        m.getCreatedAt()))</span>
+<span class="fc" id="L555">                .toList();</span>
+<span class="fc" id="L556">        String openingEco = null;</span>
+<span class="fc" id="L557">        String openingName = null;</span>
+<span class="pc bpc" id="L558" title="1 of 4 branches missed.">        if (moves.size() &gt;= 2 &amp;&amp; moves.size() &lt;= 30) {</span>
+            // Solo detectamos durante apertura (jugadas 2-15). Después no aporta.
+<span class="fc" id="L560">            String sanLine = moves.stream().map(LiveGameMove::getSan)</span>
+<span class="fc" id="L561">                    .collect(java.util.stream.Collectors.joining(&quot; &quot;));</span>
+            try {
+<span class="fc" id="L563">                var op = openingDetector.detectOpening(sanLine);</span>
+<span class="pc bpc" id="L564" title="1 of 2 branches missed.">                if (op.isPresent()) {</span>
+<span class="nc" id="L565">                    openingEco = op.get().getEcoCode();</span>
+<span class="nc" id="L566">                    openingName = op.get().getName();</span>
+                }
+<span class="nc" id="L568">            } catch (Exception e) {</span>
+<span class="nc" id="L569">                log.debug(&quot;No se pudo detectar apertura inline: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L570">            }</span>
+        }
+<span class="fc" id="L572">        return new LiveGameResponse(</span>
+<span class="fc" id="L573">                s.getId(),</span>
+<span class="fc" id="L574">                s.getWhitePlayerId(),</span>
+<span class="fc" id="L575">                s.getBlackPlayerId(),</span>
+<span class="fc" id="L576">                s.getStatus().name(),</span>
+<span class="fc" id="L577">                s.getCurrentFen(),</span>
+<span class="fc" id="L578">                s.getTurn(),</span>
+<span class="fc" id="L579">                s.getResult(),</span>
+<span class="fc" id="L580">                s.getEndReason(),</span>
+<span class="fc" id="L581">                s.getTimeControlInitialMs(),</span>
+<span class="fc" id="L582">                s.getTimeControlIncrementMs(),</span>
+<span class="fc" id="L583">                s.getClockWhiteMs(),</span>
+<span class="fc" id="L584">                s.getClockBlackMs(),</span>
+<span class="fc" id="L585">                s.getFinalizedGameId(),</span>
+                mr,
+<span class="fc" id="L587">                s.getStartedAt(),</span>
+<span class="fc" id="L588">                s.getFinishedAt(),</span>
+<span class="fc" id="L589">                s.getLastMoveAt(),</span>
+                openingEco,
+                openingName
+        );
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

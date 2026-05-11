@@ -6,7 +6,7 @@ COMPOSE  = docker compose
 ENV_FILE = .env
 DC_FILE  = docker-compose.yml
 
-.PHONY: help up down logs reset ps clean-setup check-env build demo-reset
+.PHONY: help up down logs reset ps clean-setup check-env build demo-reset demo-prebuild demo-up demo-down preflight
 
 # ---------------------------------------------------------------------------
 # Ayuda por defecto
@@ -17,6 +17,10 @@ help:
 	@echo ""
 	@echo "  make up          Reconstruye imágenes y levanta todos los servicios"
 	@echo "  make build       Reconstruye imágenes Docker sin levantar (--no-cache)"
+	@echo "  make demo-prebuild  Build SOLO scope demo (correr la noche antes)"
+	@echo "  make demo-up        Up scope demo con heap reducido (M1 8GB ready)"
+	@echo "  make demo-down      Detener scope demo"
+	@echo "  make preflight      Check 5 min antes de demo"
 	@echo "  make demo-reset  Limpia datos de demo conservando los seeds"
 	@echo "  make down        Detiene y elimina los contenedores"
 	@echo "  make logs        Muestra logs en tiempo real (Ctrl+C para salir)"
@@ -101,6 +105,47 @@ ps:
 demo-reset:
 	@echo "[make] Reseteando datos de demo..."
 	@./scripts/demo-reset.sh
+
+# ---------------------------------------------------------------------------
+# demo-prebuild: buildea SOLO los servicios de scope demo (la noche
+# anterior). Saca de la ruta crítica el `--no-cache` del día de demo.
+# ---------------------------------------------------------------------------
+DEMO_SERVICES = ms-users ms-tournament ms-game ms-notifications \
+                bff-player bff-organizer api-gateway
+
+DEMO_INFRA    = user_db tournament_db game_db notif_db \
+                rabbitmq redis
+
+DEMO_COMPOSE  = -f $(DC_FILE) -f docker-compose.demo.yml
+
+demo-prebuild: check-env
+	@echo "[make] Pre-build de servicios demo (cache)..."
+	$(COMPOSE) --env-file $(ENV_FILE) $(DEMO_COMPOSE) build $(DEMO_SERVICES)
+
+# ---------------------------------------------------------------------------
+# demo-up: levanta SOLO scope demo con tope de heap optimizado para M1
+# 8GB (ver docker-compose.demo.yml). Espera healthchecks y sale.
+# ---------------------------------------------------------------------------
+demo-up: check-env
+	@echo "[make] Levantando stack de demo (heap reducido)..."
+	$(COMPOSE) --env-file $(ENV_FILE) $(DEMO_COMPOSE) up -d --wait --no-build \
+	    $(DEMO_INFRA) $(DEMO_SERVICES) nginx
+	@echo ""
+	@echo "  Demo lista. Si login devuelve 504/502 tras restart de Supabase:"
+	@echo "    docker restart supabase_kong_ChessQuery_FS3"
+
+# ---------------------------------------------------------------------------
+# demo-down: detiene solo los contenedores de scope demo.
+# ---------------------------------------------------------------------------
+demo-down:
+	$(COMPOSE) --env-file $(ENV_FILE) $(DEMO_COMPOSE) stop \
+	    $(DEMO_INFRA) $(DEMO_SERVICES) nginx
+
+# ---------------------------------------------------------------------------
+# preflight: corre el check de 5 min antes de demo
+# ---------------------------------------------------------------------------
+preflight:
+	@bash $(CURDIR)/../scripts/preflight.sh
 
 # ---------------------------------------------------------------------------
 # clean-setup: recrea los contenedores one-shot de setup

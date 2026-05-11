@@ -28,17 +28,28 @@ Plataforma de microservicios para ajedrez competitivo en Chile.
 ## Arrancar todo (Docker)
 
 ```bash
-cd infrastructure
-make up
+# Desarrollo (todos los servicios)
+cd infrastructure && make up
+
+# Demo en MacBook Air M1 8GB (override JVM + apaga out-of-scope)
+cd infrastructure && make demo-up
+
+# 5 min antes de la demo: health check completo
+make preflight
 ```
 
-## Documentación
+## Documentación clave (Parcial N°2)
 
-- [`CONTEXT.md`](./CONTEXT.md) — ERD completo, contratos REST, eventos.
-- [`docs/ANALISIS_PATRONES.md`](./docs/ANALISIS_PATRONES.md) — patrones de diseño y arquetipos.
-- [`docs/PLAN_BRANCHING.md`](./docs/PLAN_BRANCHING.md) — estrategia de branching.
-- [`HISTORIAS_USUARIO.md`](./HISTORIAS_USUARIO.md) — historias de usuario.
-- [`PLAN_DEMO.md`](./PLAN_DEMO.md) — guion de la demo.
+| Doc | Contenido | Indicador rúbrica |
+|---|---|---|
+| [`docs/ANALISIS_PATRONES.md`](./docs/ANALISIS_PATRONES.md) | 8 patrones diseño + 6 arquitectónicos + arquetipo Maven | 1, 2, 5, 6 |
+| [`docs/PLAN_BRANCHING.md`](./docs/PLAN_BRANCHING.md) | Estrategia branching + PRs + ejemplos conflictos | 3, 7 |
+| [`docs/CHEATSHEET_DEFENSA.md`](./docs/CHEATSHEET_DEFENSA.md) | Distribución temas defensa por integrante | 5, 6, 7, 8 |
+| [`repositorios.txt`](./repositorios.txt) | Enlaces a c/repositorio con descripción | Requisito entrega |
+| [`CONTEXT.md`](./CONTEXT.md) | ERD completo, contratos REST, eventos | — |
+| [`PLAN_DEMO.md`](./PLAN_DEMO.md) | Guion de la demo (4 flujos E2E) | — |
+| [`docs/README-WINDOWS.md`](./docs/README-WINDOWS.md) | Setup Windows con setup.ps1 | — |
+| [`docs/README-DEMO-M1.md`](./docs/README-DEMO-M1.md) | Demo en MacBook Air M1 8GB | — |
 
 ## Desarrollo
 

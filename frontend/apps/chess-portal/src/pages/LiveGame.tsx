@@ -872,7 +872,7 @@ export const LiveGamePage = () => {
               </p>
             )}
             <p style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--text-muted)' }}>
-              O compartí el link directo:
+              O comparte el link directo:
             </p>
             <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
               <input
@@ -1093,7 +1093,7 @@ const PromotionPicker = ({ color, onPick, onCancel }: PromotionPickerProps) => {
           boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
         }}
       >
-        <h3 style={{ margin: '0 0 12px', fontSize: 16 }}>Elegí pieza para promocionar</h3>
+        <h3 style={{ margin: '0 0 12px', fontSize: 16 }}>Elige pieza para promocionar</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
           {(['q', 'r', 'b', 'n'] as const).map((p) => (
             <button

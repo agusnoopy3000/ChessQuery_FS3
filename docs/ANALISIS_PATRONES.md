@@ -140,6 +140,57 @@ de cada portal, oportunidad de cache por audiencia.
 Aplicado de forma transversal por el contenedor de Spring. Servicios como
 `AuthService`, `EloCalculator` se instancian una sola vez por contexto.
 
+### 2.8 Idempotent Receiver — Provisión de Players bajo concurrencia
+
+**Ubicación:** `ms-users/.../service/PlayerService.java:provisionBySupabaseId`
+y `ms-notifications/.../messaging/GameEventsConsumer.java` (tabla
+`processed_event`).
+
+**Problema que resuelve:** El frontend dispara varias requests paralelas al
+gateway apenas hay sesión Supabase, lo que se traduce en N llamadas
+concurrentes a `POST /users/provision`. Sin protección, el primer INSERT
+gana y los siguientes fallan con violación de unique constraint
+(`supabase_user_id` o `email`) → HTTP 500.
+
+**Solución:**
+
+```java
+@Transactional(noRollbackFor = DataIntegrityViolationException.class)
+public PlayerProfileResponse provisionBySupabaseId(...) {
+    // 1. Short-circuit si ya existe (idempotente)
+    if (playerRepo.findBySupabaseUserId(uuid).isPresent()) return existing;
+    // 2. Intento de creación
+    try { playerRepo.saveAndFlush(p); }
+    catch (DataIntegrityViolationException dup) {
+        // 3. Race: re-leer y devolver el ganador
+        em.clear();
+        return toProfileResponse(playerRepo.findBySupabaseUserId(uuid).orElseThrow(), ...);
+    }
+}
+```
+
+En `ms-notifications`, la idempotencia se aplica a nivel de mensaje: cada
+`event_id` consumido se guarda en `processed_event` antes del side-effect,
+de modo que un re-delivery de RabbitMQ no genera notificaciones
+duplicadas.
+
+**Beneficio:** Verificado experimentalmente con 5 requests concurrentes →
+5 × HTTP 200 con mismo `id`. Antes: 1 × 200 + 4 × 500.
+
+### 2.9 Health Indicator — Spring Actuator
+
+**Ubicación:** `ms-game/.../storage/SupabaseStorageHealthIndicator.java`.
+
+**Problema que resuelve:** `ms-game` depende de Supabase Storage para
+subir PGN. Si Storage está caído, los healthchecks de Spring deberían
+reflejarlo para que Docker Compose marque al servicio `unhealthy` y
+detenga propagación de errores.
+
+**Solución:** Implementación de `HealthIndicator` que hace HEAD a Storage
+en cada `/actuator/health`. Devuelve `UP`/`DOWN` con el `responseTime`
+en el detalle. Bajo cold-start, el primer health-check tarda hasta 10s
+(documentado y warm-up incluido en `preflight.sh`).
+
 ---
 
 ## 3. Patrones Arquitectónicos
@@ -271,18 +322,31 @@ vía NPM workspaces (`"@chessquery/ui-lib": "workspace:*"`).
 | Circuit Breaker | Diseño / Resiliencia | ms-tournament → ms-users | 1, 5 |
 | Observer / Pub-Sub | Diseño / Integración | RabbitMQ ChessEvents | 1, 5 |
 | Repository | Diseño | Todos los MS | 1, 5 |
+| Singleton | Diseño | Spring beans transversal | 1, 5 |
+| Idempotent Receiver | Diseño / Resiliencia | ms-users provision, ms-notifications | 1, 5 |
+| Health Indicator | Diseño / Observabilidad | ms-game → Supabase Storage | 1, 5 |
 | BFF | Arquitectónico | bff-player/organizer/admin | 2, 6 |
 | API Gateway | Arquitectónico | api-gateway | 2, 6 |
 | Microservices + DB-per-service | Arquitectónico | Todo el sistema | 2, 6 |
 | Event-Driven Architecture | Arquitectónico | RabbitMQ | 2, 6 |
-| JWT Stateless | Arquitectónico / Seguridad | ms-auth | 2, 6 |
+| JWT Stateless | Arquitectónico / Seguridad | ms-auth → Supabase | 2, 6 |
+| Materialized View | Arquitectónico / Datos | analytics_db.player_stats_mv | 2, 6 |
 
 ---
 
 ## 7. Conclusiones
 
-El proyecto aplica **5 patrones de diseño** + **5 patrones arquitectónicos**
+El proyecto aplica **8 patrones de diseño** + **6 patrones arquitectónicos**
 integrados de forma coherente, cada uno justificado por un problema concreto
-del dominio (no aplicados por moda). El arquetipo Maven asegura que la
-estandarización sobreviva al crecimiento del equipo y al ingreso de nuevos
-microservicios.
+del dominio (no aplicados por moda). El arquetipo Maven `chessquery-ms-archetype`
+asegura que la estandarización sobreviva al crecimiento del equipo y al
+ingreso de nuevos microservicios.
+
+### Cumplimiento de la rúbrica (Parcial N°2)
+
+| Indicador | Peso | Evidencia |
+|---|---|---|
+| 1. ≥3 patrones de diseño justificados | 10% | §2 (8 patrones documentados) |
+| 2. Arquetipos + patrones arquitectónicos coherentes | 10% | §3 + §4 |
+| 5. Defensa: explica patrones diseño | 20% | `CHEATSHEET_DEFENSA.md` |
+| 6. Defensa: explica arquetipos + arquitectura | 20% | `CHEATSHEET_DEFENSA.md` |

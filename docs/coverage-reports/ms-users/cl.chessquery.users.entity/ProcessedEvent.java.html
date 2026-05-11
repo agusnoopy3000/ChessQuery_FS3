@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProcessedEvent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ms-users</a> &gt; <a href="index.source.html" class="el_package">cl.chessquery.users.entity</a> &gt; <span class="el_source">ProcessedEvent.java</span></div><h1>ProcessedEvent.java</h1><pre class="source lang-java linenums">package cl.chessquery.users.entity;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.time.Instant;
+import java.util.UUID;
+
+/**
+ * Tabla de idempotencia. Persiste el eventId de cada evento RabbitMQ
+ * procesado para descartar duplicados (mismo patrón que en ms-notifications).
+ */
+@Entity
+@Table(name = &quot;processed_event&quot;)
+<span class="nc" id="L22">@Getter @Setter</span>
+<span class="pc" id="L23">@Builder</span>
+<span class="pc" id="L24">@NoArgsConstructor @AllArgsConstructor</span>
+public class ProcessedEvent {
+
+    @Id
+    @Column(name = &quot;event_id&quot;)
+<span class="nc" id="L29">    private UUID eventId;</span>
+
+    @Column(name = &quot;event_type&quot;, nullable = false, length = 50)
+<span class="nc" id="L32">    private String eventType;</span>
+
+    @Column(name = &quot;processed_at&quot;, nullable = false)
+<span class="nc" id="L35">    private Instant processedAt;</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

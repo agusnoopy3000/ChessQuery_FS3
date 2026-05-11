@@ -1,4 +1,12 @@
-# ms-auth — Servicio de Autenticación
+# ms-auth — Servicio de Autenticación (legacy)
+
+> **NOTA**: en la demo de Parcial N°2, `ms-auth` fue reemplazado por
+> **Supabase Auth** (gestión de usuarios + emisión de JWT). El gateway
+> valida tokens contra JWKS de Supabase en lugar de `ms-auth/auth/validate`.
+> Este módulo permanece en el repo como evidencia del patrón JWT/refresh
+> implementado en la Parcial N°1 y queda disponible para escenarios
+> on-premise. El paquete `ms-users` ahora maneja el ciclo de vida del
+> Player vía `/users/provision` (idempotente) en sincronía con Supabase.
 
 JWT issuance, refresh tokens y validación. Spring Boot 3.2.4 sobre Java 17.
 

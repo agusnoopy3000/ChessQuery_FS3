@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Player.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ms-users</a> &gt; <a href="index.source.html" class="el_package">cl.chessquery.users.entity</a> &gt; <span class="el_source">Player.java</span></div><h1>Player.java</h1><pre class="source lang-java linenums">package cl.chessquery.users.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.UUID;
+
+@Entity
+@Table(name = &quot;player&quot;)
+<span class="pc" id="L12">@Getter @Setter</span>
+<span class="pc" id="L13">@Builder</span>
+<span class="pc" id="L14">@NoArgsConstructor @AllArgsConstructor</span>
+public class Player {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+<span class="fc" id="L19">    private Long id;</span>
+
+    @Column(name = &quot;first_name&quot;, nullable = false, length = 100)
+<span class="fc" id="L22">    private String firstName;</span>
+
+    @Column(name = &quot;last_name&quot;, nullable = false, length = 100)
+<span class="fc" id="L25">    private String lastName;</span>
+
+    /** RUT chileno. Formato: &quot;12345678-9&quot;. Nullable para jugadores extranjeros. */
+    @Column(length = 12, unique = true)
+<span class="fc" id="L29">    private String rut;</span>
+
+    @Column(length = 255, unique = true)
+<span class="nc" id="L32">    private String email;</span>
+
+    /** UUID del usuario en Supabase Auth (auth.users.id). */
+    @Column(name = &quot;supabase_user_id&quot;, unique = true)
+<span class="nc" id="L36">    private UUID supabaseUserId;</span>
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;country_id&quot;)
+<span class="fc" id="L40">    private Country country;</span>
+
+    @Column(length = 100)
+<span class="nc" id="L43">    private String region;</span>
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;club_id&quot;)
+<span class="fc" id="L47">    private Club club;</span>
+
+    @Column(name = &quot;birth_date&quot;)
+<span class="fc" id="L50">    private LocalDate birthDate;</span>
+
+    /** 'M', 'F' o 'O'. CHECK constraint en BD. */
+    @Column(length = 1)
+<span class="nc" id="L54">    private String gender;</span>
+
+    @Column(name = &quot;fide_id&quot;, length = 20, unique = true)
+<span class="fc" id="L57">    private String fideId;</span>
+
+    @Column(name = &quot;federation_id&quot;, length = 50, unique = true)
+<span class="fc" id="L60">    private String federationId;</span>
+
+    @Column(name = &quot;lichess_username&quot;, length = 100, unique = true)
+<span class="nc" id="L63">    private String lichessUsername;</span>
+
+    // ── ELO snapshots (desnormalización documentada) ──────────────────────────
+    // Historial completo en RATING_HISTORY. Estos campos se actualizan
+    // vía evento elo.updated (consumidor) o endpoint PUT /users/{id}/elo.
+
+    @Column(name = &quot;elo_national&quot;)
+<span class="fc" id="L70">    private Integer eloNational;</span>
+
+    @Column(name = &quot;elo_fide_standard&quot;)
+<span class="fc" id="L73">    private Integer eloFideStandard;</span>
+
+    @Column(name = &quot;elo_fide_rapid&quot;)
+<span class="nc" id="L76">    private Integer eloFideRapid;</span>
+
+    @Column(name = &quot;elo_fide_blitz&quot;)
+<span class="nc" id="L79">    private Integer eloFideBlitz;</span>
+
+    @Column(name = &quot;elo_platform&quot;)
+<span class="fc" id="L82">    private Integer eloPlatform;</span>
+
+    /** Fuente de la última enriquecimiento federado: AJEFECH, LICHESS, FIDE, null. */
+    @Column(name = &quot;enrichment_source&quot;, length = 20)
+<span class="fc" id="L86">    private String enrichmentSource;</span>
+
+    @Column(name = &quot;enriched_at&quot;)
+<span class="fc" id="L89">    private Instant enrichedAt;</span>
+
+    @Column(name = &quot;created_at&quot;, nullable = false, updatable = false)
+<span class="nc" id="L92">    private Instant createdAt;</span>
+
+    @Column(name = &quot;updated_at&quot;)
+<span class="nc" id="L95">    private Instant updatedAt;</span>
+
+    @PrePersist
+    protected void onCreate() {
+<span class="nc" id="L99">        createdAt = Instant.now();</span>
+<span class="nc" id="L100">        updatedAt = createdAt;</span>
+<span class="nc" id="L101">    }</span>
+
+    @PreUpdate
+    protected void onUpdate() {
+<span class="nc" id="L105">        updatedAt = Instant.now();</span>
+<span class="nc" id="L106">    }</span>
+
+    /** Nombre completo para logs y eventos. */
+    public String fullName() {
+<span class="nc" id="L110">        return firstName + &quot; &quot; + lastName;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>
