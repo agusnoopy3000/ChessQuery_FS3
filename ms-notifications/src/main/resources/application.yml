@@ -47,11 +47,25 @@ spring:
       "[mail.smtp.auth]": false
       "[mail.smtp.starttls.enable]": false
 
+# ── Actuator / Management ───────────────────────────────────────────────────
+# Deshabilitar el MailHealthIndicator: testConnection del JavaMailSender se
+# cuelga 30+ segundos hacia Inbucket en dev local y bloquea threads de Tomcat,
+# causando timeouts en endpoints normales (notifications, unread-count) durante
+# partidas en vivo cuando el polling es intenso.
+management:
+  health:
+    mail:
+      enabled: false
+
 # ── Servidor ────────────────────────────────────────────────────────────────
 server:
   port: ${SERVER_PORT:8085}
   error:
     include-message: never
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 10
 
 # ── SpringDoc / Swagger ─────────────────────────────────────────────────────
 springdoc:
