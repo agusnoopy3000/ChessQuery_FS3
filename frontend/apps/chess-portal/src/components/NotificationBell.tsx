@@ -4,6 +4,7 @@ import { playerApi, NotificationItem } from '../api';
 
 const POLL_MS = 8_000;
 const TOAST_DURATION_MS = 5_000;
+const MAX_TOASTS = 3;
 
 const eventIcon = (eventType: string): string => {
   if (eventType === 'game.invitation') return '⚔️';
@@ -74,7 +75,11 @@ export const NotificationBell = () => {
 
   const pushToast = useCallback((n: NotificationItem) => {
     const key = Date.now() + Math.random();
-    setToasts((prev) => [...prev, { key, notification: n }]);
+    setToasts((prev) => {
+      const next = [...prev, { key, notification: n }];
+      // FIFO: si superamos el máximo, descartamos los más viejos.
+      return next.length > MAX_TOASTS ? next.slice(next.length - MAX_TOASTS) : next;
+    });
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.key !== key));
     }, TOAST_DURATION_MS);
