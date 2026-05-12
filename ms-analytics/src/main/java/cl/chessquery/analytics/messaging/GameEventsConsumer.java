@@ -75,7 +75,8 @@ public class GameEventsConsumer {
         String  result            = (String) payload.get("result");
         Integer openingId         = payload.get("openingId") != null
                                     ? toInt(payload.get("openingId")) : null;
-        int     totalMoves        = toInt(payload.get("totalMoves"));
+        int     totalMoves        = payload.get("totalMoves") != null
+                                    ? toInt(payload.get("totalMoves")) : 0;
 
         // Guardar o actualizar GameRecord
         GameRecord record = gameRecordRepo.findById(gameId)
