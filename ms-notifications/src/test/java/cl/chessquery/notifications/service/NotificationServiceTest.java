@@ -27,6 +27,8 @@ class NotificationServiceTest {
     private NotificationLogRepository notificationLogRepo;
     @Spy
     private ObjectMapper              objectMapper = new ObjectMapper();
+    @Mock
+    private PlayerNameResolver        playerNameResolver;
 
     @InjectMocks
     private NotificationService notificationService;

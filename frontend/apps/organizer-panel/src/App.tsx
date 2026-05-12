@@ -48,7 +48,7 @@ export const App = () => {
     <Shell
       subtitle="organizer workspace"
       items={buildNav(location.pathname, navigate)}
-      user={{ name: user.email.split('@')[0], role: user.role, email: user.email }}
+      user={{ name: (user.name && user.name.trim()) || user.email.split('@')[0], role: user.role, email: user.email }}
       onLogout={() => logout().then(() => navigate('/login'))}
     >
       <NotificationBell />

@@ -111,7 +111,7 @@ export const App = () => {
     <Shell
       subtitle={user?.role ? `${user.role.toLowerCase()} workspace` : 'portal público'}
       items={items}
-      user={user ? { name: user.email.split('@')[0], role: user.role, email: user.email } : undefined}
+      user={user ? { name: (user.name && user.name.trim()) || user.email.split('@')[0], role: user.role, email: user.email } : undefined}
       onLogout={user ? () => logout().then(() => navigate('/')) : undefined}
     >
       {!user ? (

@@ -22,6 +22,7 @@ public class NotificationService {
     private final MockEmailService           mockEmailService;
     private final NotificationLogRepository  notificationLogRepo;
     private final ObjectMapper               objectMapper;
+    private final PlayerNameResolver         playerNameResolver;
 
     /**
      * Email de bienvenida cuando un usuario se registra.
@@ -75,14 +76,15 @@ public class NotificationService {
     @Transactional
     public void notifyRegistrationPending(Map<String, Object> payload) {
         Long organizerId = toLong(payload.get("organizerId"));
-        Object playerId  = payload.get("playerId");
+        Long playerId    = toLong(payload.get("playerId"));
         Object tournamentName = payload.getOrDefault("tournamentName", "tu torneo");
         if (organizerId == null) {
             log.debug("registration.pending sin organizerId, ignorado");
             return;
         }
-        String msg = String.format("Nueva inscripción del jugador %s en %s — requiere tu aprobación",
-                playerId, tournamentName);
+        String playerName = playerNameResolver.resolve(playerId);
+        String msg = String.format("Nueva inscripción de %s en %s — requiere tu aprobación",
+                playerName, tournamentName);
         saveLog(organizerId, Channel.IN_APP, "registration.pending", msg, payload, NotifStatus.SENT);
     }
 
@@ -193,10 +195,11 @@ public class NotificationService {
         Object finalizedGameId = gameId;
         if (recipientId == null) return;
         String outcome = describeResult(result, myColor);
+        String opponentName = playerNameResolver.resolve(opponentId);
         String subject = String.format("Partida #%s finalizada · %s", finalizedGameId, outcome);
         String body = String.format(
-                "Tu partida contra el jugador %s terminó: %s. Resultado %s. PGN guardado como game #%s.",
-                opponentId, outcome, result, finalizedGameId);
+                "Tu partida contra %s terminó: %s. Resultado %s. PGN guardado como game #%s.",
+                opponentName, outcome, result, finalizedGameId);
         mockEmailService.sendEmail(recipientId,
                 "jugador-" + recipientId + "@chessquery.cl", subject, body);
         saveLog(recipientId, Channel.EMAIL, "game.finished", subject, payload, NotifStatus.SENT);

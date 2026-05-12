@@ -309,6 +309,7 @@ services:
       RABBITMQ_USER: ${RABBITMQ_USER:-chessquery}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-chessquery_dev}
       SERVER_PORT: "8085"
+      MS_USERS_URL: http://ms-users:8081
       # N2: SMTP a Inbucket de Supabase local (override en .env si usás Mailpit)
       SMTP_HOST: ${SMTP_HOST:-host.docker.internal}
       SMTP_PORT: ${SMTP_PORT:-54325}
