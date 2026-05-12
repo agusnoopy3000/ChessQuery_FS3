@@ -67,11 +67,17 @@ const buildNavItems = (
   navigate: ReturnType<typeof useNavigate>,
 ): ShellNavItem[] => {
   if (role === 'PLAYER') {
+    // startsWith('/play') matchea tanto '/play' como '/player/me' por
+    // prefijo de string; usamos comparación exacta + '/' separador para
+    // evitar que dos items aparezcan resaltados simultaneamente.
+    const isPlay = pathname === '/play' || pathname.startsWith('/play/');
+    const isTournaments = pathname === '/tournaments' || pathname.startsWith('/tournaments/');
+    const isMe = pathname === '/player/me' || pathname.startsWith('/player/');
     return [
       { id: 'portal', label: 'Portal', icon: '♔', desc: 'Centro del jugador', active: pathname === '/portal', onClick: () => navigate('/portal') },
-      { id: 'play', label: 'Jugar', icon: '♞', desc: 'Emparejamientos', active: pathname.startsWith('/play'), onClick: () => navigate('/play') },
-      { id: 'tournaments', label: 'Torneos', icon: '♜', desc: 'Inscripción a torneos', active: pathname.startsWith('/tournaments'), onClick: () => navigate('/tournaments') },
-      { id: 'me', label: 'Mi perfil', icon: '♙', desc: 'Estadísticas y cuenta', active: pathname === '/player/me', onClick: () => navigate('/player/me') },
+      { id: 'play', label: 'Jugar', icon: '♞', desc: 'Emparejamientos', active: isPlay, onClick: () => navigate('/play') },
+      { id: 'tournaments', label: 'Torneos', icon: '♜', desc: 'Inscripción a torneos', active: isTournaments, onClick: () => navigate('/tournaments') },
+      { id: 'me', label: 'Mi perfil', icon: '♙', desc: 'Estadísticas y cuenta', active: isMe, onClick: () => navigate('/player/me') },
     ];
   }
 

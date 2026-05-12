@@ -48,6 +48,39 @@ export class PlayerService {
     };
   }
 
+  /**
+   * Enriquece cada game con whiteName/blackName resolviendo los playerIds
+   * en paralelo desde ms-users. Si una resolución falla, deja name undefined
+   * y el front cae al fallback "#N".
+   */
+  private async enrichGamesWithNames(games: unknown[]): Promise<unknown[]> {
+    if (!Array.isArray(games) || games.length === 0) return games ?? [];
+    const { msUsers } = this.http.urls;
+    const ids = new Set<number>();
+    for (const g of games as Array<{ whitePlayerId?: number; blackPlayerId?: number }>) {
+      if (g?.whitePlayerId != null) ids.add(g.whitePlayerId);
+      if (g?.blackPlayerId != null) ids.add(g.blackPlayerId);
+    }
+    if (ids.size === 0) return games;
+    const profiles = await Promise.all(
+      Array.from(ids).map((id) =>
+        this.http
+          .get<{ id: number; firstName?: string; lastName?: string }>(`${msUsers}/users/${id}/profile`)
+          .catch(() => ({ id } as { id: number; firstName?: string; lastName?: string })),
+      ),
+    );
+    const nameById = new Map<number, string | undefined>();
+    for (const p of profiles) {
+      const name = `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim();
+      nameById.set(p.id, name || undefined);
+    }
+    return (games as Array<Record<string, unknown>>).map((g) => ({
+      ...g,
+      whiteName: g.whitePlayerId != null ? nameById.get(g.whitePlayerId as number) : undefined,
+      blackName: g.blackPlayerId != null ? nameById.get(g.blackPlayerId as number) : undefined,
+    }));
+  }
+
   async getDashboard(userId: string): Promise<DashboardResponse> {
     const { msUsers, msGame, msAnalytics } = this.http.urls;
     const playerId = await this.resolvePlayerId(userId);
@@ -62,11 +95,9 @@ export class PlayerService {
         .catch(() => this.emptyStats(playerId)),
     ]);
 
-    return {
-      profile,
-      recentGames: recentGamesPage?.content ?? [],
-      stats,
-    };
+    const recentGames = await this.enrichGamesWithNames(recentGamesPage?.content ?? []);
+
+    return { profile, recentGames, stats };
   }
 
   async getPublicProfile(playerId: string): Promise<DashboardResponse> {
@@ -82,11 +113,9 @@ export class PlayerService {
         .catch(() => this.emptyStats(playerId)),
     ]);
 
-    return {
-      profile,
-      recentGames: recentGamesPage?.content ?? [],
-      stats,
-    };
+    const recentGames = await this.enrichGamesWithNames(recentGamesPage?.content ?? []);
+
+    return { profile, recentGames, stats };
   }
 
   async getRatingChart(
@@ -278,16 +307,19 @@ export class PlayerService {
   }
 
   // ── N1: inbox de notificaciones ─────────────────────────────────────────
+  // Timeouts cortos (5s) porque el frontend hace polling cada 8s; si una
+  // llamada cuelga 15s, el siguiente polling se encuentra con la conexion
+  // todavia ocupada y la UI da sensacion de bloqueo durante moves.
   async listNotifications(userId: string): Promise<unknown> {
     const { msNotifications } = this.http.urls;
     const playerId = await this.resolvePlayerId(userId);
-    return this.http.get<unknown>(`${msNotifications}/notifications?recipientId=${playerId}&limit=20`);
+    return this.http.get<unknown>(`${msNotifications}/notifications?recipientId=${playerId}&limit=20`, { timeout: 5000 });
   }
 
   async unreadNotificationCount(userId: string): Promise<unknown> {
     const { msNotifications } = this.http.urls;
     const playerId = await this.resolvePlayerId(userId);
-    return this.http.get<unknown>(`${msNotifications}/notifications/unread-count?recipientId=${playerId}`);
+    return this.http.get<unknown>(`${msNotifications}/notifications/unread-count?recipientId=${playerId}`, { timeout: 5000 });
   }
 
   async markNotificationRead(id: string): Promise<unknown> {

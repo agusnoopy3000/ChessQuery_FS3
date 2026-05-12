@@ -20,7 +20,7 @@ export const RatingBadge = ({ rating, label }: RatingBadgeProps) => {
   return (
     <Badge variant={variant}>
       {label && <span style={{ marginRight: 4, opacity: 0.8 }}>{label}</span>}
-      <strong>{rating}</strong>
+      <strong>{Math.round(rating)}</strong>
     </Badge>
   );
 };

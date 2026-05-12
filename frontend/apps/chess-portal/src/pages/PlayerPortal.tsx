@@ -7,10 +7,10 @@ import { playerApi } from '../api';
 
 const fontStack = "'Space Grotesk', system-ui, sans-serif";
 
-const formatNum = (n: number | null | undefined): string => {
+/** ELO en chess es siempre entero (1500, 2350, etc.). No abreviar con 'k'. */
+const formatElo = (n: number | null | undefined): string => {
   if (n == null) return '—';
-  if (n >= 1000) return (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k';
-  return String(n);
+  return String(Math.round(n));
 };
 
 const formatRelative = (iso: string): string => {
@@ -213,7 +213,7 @@ export const PlayerPortalPage = () => {
         <KpiCard
           label="ELO PRINCIPAL"
           subLabel={ratingLabel}
-          value={primaryRating != null ? formatNum(primaryRating) : '—'}
+          value={formatElo(primaryRating)}
           highlight
           chart={sparkData.length >= 2 ? <RatingSparkline data={sparkData} /> : null}
         />
