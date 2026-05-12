@@ -152,6 +152,18 @@ export const NotificationBell = () => {
     setToasts((prev) => prev.filter((t) => t.key !== key));
   };
 
+  /** Declinar invitación: marca la notificación como leída y cierra el toast.
+   *  No notifica al invitador (no hay endpoint dedicado todavía). */
+  const declineInvitation = async (key: number, notificationId: number) => {
+    dismissToast(key);
+    try {
+      await playerApi.markNotificationRead(notificationId);
+      setUnread((u) => Math.max(0, u - 1));
+    } catch {
+      /* ignore: el polling siguiente lo reconciliará */
+    }
+  };
+
   return (
     <>
       <div
@@ -232,7 +244,7 @@ export const NotificationBell = () => {
                     {n.subject || n.eventType}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                    {formatRelative(n.createdAt)} · {n.eventType}
+                    {formatRelative(n.createdAt)}
                   </div>
                 </div>
               </div>
@@ -256,12 +268,14 @@ export const NotificationBell = () => {
             <div
               key={key}
               onClick={() => {
-                if (link) navigate(link);
-                dismissToast(key);
+                if (!isInvitation && link) {
+                  navigate(link);
+                  dismissToast(key);
+                }
               }}
               style={{
                 pointerEvents: 'auto',
-                cursor: 'pointer',
+                cursor: isInvitation ? 'default' : (link ? 'pointer' : 'default'),
                 minWidth: 300, maxWidth: 380,
                 background: isInvitation ? 'rgba(35,28,22,0.98)' : 'rgba(28,31,26,0.98)',
                 border: '1px solid var(--border, #2a2d27)',
@@ -276,27 +290,42 @@ export const NotificationBell = () => {
               <span style={{ fontSize: 22, flexShrink: 0 }}>{eventIcon(n.eventType)}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text, #e8ead4)', lineHeight: 1.3 }}>
-                  {n.subject || n.eventType}
+                  {n.subject || (isInvitation ? 'Invitación a partida' : 'Notificación')}
                 </div>
-                {link && (
-                  <div
-                    style={{
-                      marginTop: 6,
-                      fontSize: 12,
-                      color: isInvitation ? '#f0b94e' : '#6abf74',
-                      fontWeight: 600,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 4,
-                    }}
-                  >
-                    {isInvitation ? '⚡ Aceptar y entrar a la partida' : 'Ver detalle'}
-                    <span>→</span>
+                {isInvitation && link && (
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); dismissToast(key); navigate(link); }}
+                      style={{
+                        flex: 1, padding: '7px 10px', borderRadius: 6, border: 'none',
+                        background: '#6abf74', color: '#0e100d',
+                        fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                        letterSpacing: '0.02em',
+                      }}
+                    >
+                      Aceptar
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); declineInvitation(key, n.id); }}
+                      style={{
+                        flex: 1, padding: '7px 10px', borderRadius: 6,
+                        border: '1px solid #4a4d40', background: 'transparent',
+                        color: 'var(--text-muted, #7a7d6e)',
+                        fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      }}
+                    >
+                      Declinar
+                    </button>
                   </div>
                 )}
-                {!link && (
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
-                    {n.eventType}
+                {!isInvitation && link && (
+                  <div
+                    style={{
+                      marginTop: 6, fontSize: 12, color: '#6abf74', fontWeight: 600,
+                      display: 'flex', alignItems: 'center', gap: 4,
+                    }}
+                  >
+                    Ver detalle <span>→</span>
                   </div>
                 )}
               </div>

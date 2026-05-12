@@ -383,8 +383,8 @@ export const LiveGamePage = () => {
           unset: () => { /* premove cancelado */ },
         },
       },
-      draggable: { enabled: isMyTurn || allowPremove },
-      animation: { enabled: true, duration: 200 },
+      draggable: { enabled: isMyTurn || allowPremove, autoDistance: false },
+      animation: { enabled: true, duration: 120 },
       highlight: { lastMove: true, check: true },
     };
 
@@ -1274,11 +1274,12 @@ function isPromotionMove(orig: Key, dest: Key, chess: Chess): boolean {
 }
 
 function groupMoves(moves: LiveMove[]): { white: string; black: string | null }[] {
+  // El <ol> en el render se encarga de la numeración: devolvemos solo SAN.
   const out: { white: string; black: string | null }[] = [];
   for (const m of moves) {
-    if (m.color === 'w') out.push({ white: `${m.moveNumber}. ${m.san}`, black: null });
+    if (m.color === 'w') out.push({ white: m.san, black: null });
     else if (out.length > 0) out[out.length - 1].black = m.san;
-    else out.push({ white: '', black: m.san });
+    else out.push({ white: '…', black: m.san });
   }
   return out;
 }

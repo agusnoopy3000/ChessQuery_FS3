@@ -37,48 +37,60 @@ export class UpstreamHttpService {
     };
   }
 
+  private static readonly TRANSIENT_CODES = new Set([
+    'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT', 'ECONNRESET',
+  ]);
+  private isTransient(err: AxiosError): boolean {
+    return !err.response && !!err.code && UpstreamHttpService.TRANSIENT_CODES.has(err.code);
+  }
+  private async withRetry<T>(op: () => Promise<T>, err: AxiosError): Promise<T> {
+    if (!this.isTransient(err)) throw err;
+    await new Promise((r) => setTimeout(r, 300));
+    return op();
+  }
+
   async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
-    try {
-      const res = await firstValueFrom(this.http.get<T>(url, { timeout: 5000, ...config }));
-      return res.data;
-    } catch (err) {
-      this.rethrow(err as AxiosError, 'GET', url);
+    const op = () => firstValueFrom(this.http.get<T>(url, { timeout: 5000, ...config })).then((r) => r.data);
+    try { return await op(); }
+    catch (err) {
+      try { return await this.withRetry(op, err as AxiosError); }
+      catch (err2) { this.rethrow(err2 as AxiosError, 'GET', url); }
     }
   }
 
   async post<T>(url: string, body: unknown, config?: AxiosRequestConfig): Promise<T> {
-    try {
-      const res = await firstValueFrom(this.http.post<T>(url, body, { timeout: 5000, ...config }));
-      return res.data;
-    } catch (err) {
-      this.rethrow(err as AxiosError, 'POST', url);
+    const op = () => firstValueFrom(this.http.post<T>(url, body, { timeout: 5000, ...config })).then((r) => r.data);
+    try { return await op(); }
+    catch (err) {
+      try { return await this.withRetry(op, err as AxiosError); }
+      catch (err2) { this.rethrow(err2 as AxiosError, 'POST', url); }
     }
   }
 
   async patch<T>(url: string, body: unknown, config?: AxiosRequestConfig): Promise<T> {
-    try {
-      const res = await firstValueFrom(this.http.patch<T>(url, body, { timeout: 5000, ...config }));
-      return res.data;
-    } catch (err) {
-      this.rethrow(err as AxiosError, 'PATCH', url);
+    const op = () => firstValueFrom(this.http.patch<T>(url, body, { timeout: 5000, ...config })).then((r) => r.data);
+    try { return await op(); }
+    catch (err) {
+      try { return await this.withRetry(op, err as AxiosError); }
+      catch (err2) { this.rethrow(err2 as AxiosError, 'PATCH', url); }
     }
   }
 
   async put<T>(url: string, body: unknown, config?: AxiosRequestConfig): Promise<T> {
-    try {
-      const res = await firstValueFrom(this.http.put<T>(url, body, { timeout: 5000, ...config }));
-      return res.data;
-    } catch (err) {
-      this.rethrow(err as AxiosError, 'PUT', url);
+    const op = () => firstValueFrom(this.http.put<T>(url, body, { timeout: 5000, ...config })).then((r) => r.data);
+    try { return await op(); }
+    catch (err) {
+      try { return await this.withRetry(op, err as AxiosError); }
+      catch (err2) { this.rethrow(err2 as AxiosError, 'PUT', url); }
     }
   }
 
   async delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
-    try {
-      const res = await firstValueFrom(this.http.delete<T>(url, { timeout: 5000, ...config }));
-      return res.data;
-    } catch (err) {
-      this.rethrow(err as AxiosError, 'DELETE', url);
+    const op = () => firstValueFrom(this.http.delete<T>(url, { timeout: 5000, ...config })).then((r) => r.data);
+    try { return await op(); }
+    catch (err) {
+      try { return await this.withRetry(op, err as AxiosError); }
+      catch (err2) { this.rethrow(err2 as AxiosError, 'DELETE', url); }
     }
   }
 
