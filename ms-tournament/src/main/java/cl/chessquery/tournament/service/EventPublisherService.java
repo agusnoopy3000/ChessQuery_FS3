@@ -32,12 +32,12 @@ public class EventPublisherService {
     }
 
     /** Routing key: player.registered */
-    public void publishPlayerRegistered(Long tournamentId, Long playerId, Integer seedRating) {
-        Map<String, Object> payload = Map.of(
-                "tournamentId", tournamentId,
-                "playerId",     playerId,
-                "seedRating",   seedRating != null ? seedRating : 0
-        );
+    public void publishPlayerRegistered(Long tournamentId, Long playerId, Integer seedRating, String tournamentName) {
+        java.util.Map<String, Object> payload = new java.util.HashMap<>();
+        payload.put("tournamentId", tournamentId);
+        payload.put("playerId",     playerId);
+        payload.put("seedRating",   seedRating != null ? seedRating : 0);
+        if (tournamentName != null) payload.put("tournamentName", tournamentName);
         publish("player.registered", payload);
     }
 

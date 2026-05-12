@@ -233,7 +233,7 @@ public class TournamentService {
         if (initialStatus == RegistrationStatus.PENDING) {
             events.publishRegistrationPending(t.getId(), playerId, t.getOrganizerId(), t.getName());
         } else {
-            events.publishPlayerRegistered(tournamentId, playerId, seedRating);
+            events.publishPlayerRegistered(tournamentId, playerId, seedRating, t.getName());
         }
         log.info("Jugador {} inscrito en torneo {} con seed={} status={}",
                 playerId, tournamentId, seedRating, initialStatus);
@@ -269,7 +269,7 @@ public class TournamentService {
         events.publishRegistrationApproved(t.getId(), reg.getPlayerId(), t.getName());
         // Mantenemos el evento original player.registered para no romper consumers
         // existentes (PLAYER_STATS_MV, etc.) — ahora se dispara al aprobar.
-        events.publishPlayerRegistered(t.getId(), reg.getPlayerId(), reg.getSeedRating());
+        events.publishPlayerRegistered(t.getId(), reg.getPlayerId(), reg.getSeedRating(), t.getName());
         log.info("Inscripción {} aprobada (torneo={} player={})",
                 reg.getId(), t.getId(), reg.getPlayerId());
         return toRegistrationResponse(reg);

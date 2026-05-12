@@ -52,21 +52,26 @@ public class NotificationService {
     @Transactional
     public void notifyRegistration(Map<String, Object> payload) {
         Long recipientId  = toLong(payload.get("playerId"));
-        Object tournamentId = payload.get("tournamentId");
-        Object seedRating   = payload.get("seedRating");
+        Object tournamentId   = payload.get("tournamentId");
+        Object tournamentName = payload.getOrDefault("tournamentName", "el torneo");
+        Object seedRating     = payload.get("seedRating");
 
-        String subject = "Inscripción confirmada en torneo";
+        String subject = String.format("Inscripción confirmada en %s", tournamentName);
         String body    = String.format(
-                "Te has inscrito en el torneo %s con rating de seed %s.",
-                tournamentId, seedRating);
+                "Te has inscrito en %s con rating de seed %s.",
+                tournamentName, seedRating);
 
         // En un sistema real se obtendría el email del jugador desde MS-Users.
         // Aquí usamos el recipientId como identificador del destinatario.
         mockEmailService.sendEmail(recipientId, "jugador-" + recipientId + "@chessquery.cl", subject, body);
         saveLog(recipientId, Channel.EMAIL, "player.registered", subject, payload, NotifStatus.SENT);
         saveLog(recipientId, Channel.IN_APP, "player.registered",
-                String.format("Estás inscrito en el torneo %s", tournamentId),
+                String.format("Estás inscrito en %s", tournamentName),
                 payload, NotifStatus.SENT);
+        // Evitar log adicional vacío que decía "torneo %s" con ID raw.
+        if (tournamentName.equals("el torneo")) {
+            log.debug("player.registered sin tournamentName en payload (tournamentId={})", tournamentId);
+        }
     }
 
     /**
