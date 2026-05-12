@@ -1,7 +1,7 @@
 import { ChangeEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@chessquery/shared';
+import { useAuth, translateAuthError } from '@chessquery/shared';
 import { playerApi } from '../api';
 
 /* ── Logo ── */
@@ -298,6 +298,15 @@ export const LoginPage = () => {
     setSubmitting(true);
     try {
       const u = await login(form.email.trim(), form.password);
+
+      // ORGANIZER: enviar directo al panel del organizador en :5174 sin
+      // pasar por el portal del jugador (cross-origin, no react-router).
+      if (u.role === 'ORGANIZER') {
+        const organizerUrl = `${window.location.protocol}//${window.location.hostname}:5174`;
+        window.location.assign(organizerUrl);
+        return;
+      }
+
       // Prefetch del dashboard en paralelo a la navegación.
       queryClient.prefetchQuery({
         queryKey: ['me', 'playerId', u.supabaseUserId],
@@ -310,10 +319,14 @@ export const LoginPage = () => {
       const decoded = nextParam ? decodeURIComponent(nextParam) : '';
       navigate(decoded && decoded.startsWith('/') ? decoded : '/');
     } catch (err) {
-      const message =
+      const raw =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
         (err as { message?: string })?.message;
-      setErrors({ _form: message ?? 'Credenciales inválidas' });
+      const message = translateAuthError(raw, 'Credenciales inválidas');
+      setErrors({ _form: message });
+      // Refrescamos el campo de contraseña para que el usuario vuelva a tipear;
+      // dejamos el email intacto para no obligar a reescribirlo.
+      setForm((f) => ({ ...f, password: '' }));
     } finally {
       setSubmitting(false);
     }

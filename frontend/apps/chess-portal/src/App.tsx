@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Role, useAuth } from '@chessquery/shared';
 import { Button, Card, Shell, ShellNavItem } from '@chessquery/ui-lib';
@@ -35,27 +36,32 @@ const RequireRole = ({ userRole, roles, children }: RequireRoleProps) => {
   return children;
 };
 
+export const organizerPanelUrl = (): string =>
+  `${window.location.protocol}//${window.location.hostname}:5174`;
+
 /**
- * Mensaje cuando un ORGANIZER intenta entrar al portal de jugadores.
- * El organizer-panel es una app separada en otro puerto.
+ * Cuando un ORGANIZER aterriza en el portal de jugadores (por login,
+ * registro o entrando a la URL directamente), lo redirigimos automaticamente
+ * al organizer-panel en puerto 5174 sin pasos manuales.
+ *
+ * Mientras la redireccion ocurre (~150ms) mostramos un spinner para evitar
+ * un flash de UI vacía o engañosa.
  */
 const OrganizerRedirect = () => {
-  const organizerUrl = `${window.location.protocol}//${window.location.hostname}:5174`;
+  useEffect(() => {
+    window.location.assign(organizerPanelUrl());
+  }, []);
   return (
     <div style={{ padding: 60, display: 'flex', justifyContent: 'center' }}>
-      <Card style={{ maxWidth: 520, padding: 32, textAlign: 'center' }}>
-        <div style={{ fontSize: 48, marginBottom: 16 }}>♖</div>
-        <h2 style={{ marginTop: 0 }}>Bienvenido, organizador</h2>
-        <p style={{ color: 'var(--text-muted)', marginBottom: 24 }}>
-          Este es el portal de jugadores. Como organizador, gestionas torneos
-          desde el <strong>Panel del Organizador</strong> en una URL distinta.
+      <Card style={{ maxWidth: 480, padding: 32, textAlign: 'center' }}>
+        <div className="spin" style={{ fontSize: 36, color: 'var(--accent)', marginBottom: 14 }}>⟳</div>
+        <h2 style={{ marginTop: 0 }}>Llevándote al panel del organizador…</h2>
+        <p style={{ color: 'var(--text-muted)', marginBottom: 16, fontSize: 13 }}>
+          Si la redirección no ocurre automáticamente, hacé click abajo.
         </p>
-        <Button size="lg" onClick={() => window.location.assign(organizerUrl)}>
-          Ir al Panel del Organizador →
+        <Button size="md" onClick={() => window.location.assign(organizerPanelUrl())}>
+          Abrir panel ahora →
         </Button>
-        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 16 }}>
-          ({organizerUrl})
-        </p>
       </Card>
     </div>
   );

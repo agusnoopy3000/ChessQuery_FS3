@@ -22,6 +22,7 @@ vi.mock('@tanstack/react-query', () => ({
 
 vi.mock('@chessquery/shared', () => ({
   useAuth: () => ({ login: loginMock }),
+  translateAuthError: (raw: string | undefined, fallback: string) => raw ?? fallback,
 }));
 
 vi.mock('../api', () => ({

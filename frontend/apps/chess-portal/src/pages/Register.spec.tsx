@@ -12,6 +12,7 @@ vi.mock('react-router-dom', () => ({
 
 vi.mock('@chessquery/shared', () => ({
   useAuth: () => ({ register: registerMock }),
+  translateAuthError: (raw: string | undefined, fallback: string) => raw ?? fallback,
 }));
 
 const toggleTerms = () => {

@@ -1,6 +1,6 @@
 import { ChangeEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '@chessquery/shared';
+import { useAuth, translateAuthError } from '@chessquery/shared';
 
 /* ── Logo ── */
 const ChessQueryLogo = () => (
@@ -300,10 +300,12 @@ export const LoginPage = () => {
       const decoded = nextParam ? decodeURIComponent(nextParam) : '';
       navigate(decoded && decoded.startsWith('/') ? decoded : '/');
     } catch (err) {
-      const message =
+      const raw =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
         (err as { message?: string })?.message;
-      setErrors({ _form: message ?? 'Credenciales inválidas' });
+      setErrors({ _form: translateAuthError(raw, 'Credenciales inválidas') });
+      // Refrescamos contraseña; email se preserva para evitar reescribir.
+      setForm((f) => ({ ...f, password: '' }));
     } finally {
       setSubmitting(false);
     }

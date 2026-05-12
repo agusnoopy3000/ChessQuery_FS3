@@ -1,6 +1,6 @@
 import { useState, ChangeEvent, FormEvent, ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Role, useAuth } from '@chessquery/shared';
+import { Role, useAuth, translateAuthError } from '@chessquery/shared';
 
 /* ── Logo SVG ── */
 const ChessQueryLogo = () => (
@@ -345,18 +345,23 @@ export const RegisterPage = () => {
         clubName: role === 'ORGANIZER' ? form.club.trim() || undefined : undefined,
       });
       // Si venía de un link de invitación (?next=/play/123), respetamos esa URL.
-      // Si no, mandamos al dashboard correspondiente al rol elegido.
       if (next && next.startsWith('/')) {
         navigate(next);
+      } else if (role === 'ORGANIZER') {
+        // Enviar directo al organizer-panel en :5174 (cross-origin, navegación full).
+        const organizerUrl = `${window.location.protocol}//${window.location.hostname}:5174`;
+        window.location.assign(organizerUrl);
       } else {
-        navigate(role === 'ORGANIZER' ? '/' : '/portal');
+        navigate('/portal');
       }
     } catch (err) {
-      const msg =
+      const raw =
         (err as { message?: string })?.message ??
-        (err as { error_description?: string })?.error_description ??
-        'No se pudo crear la cuenta';
-      setServerError(msg);
+        (err as { error_description?: string })?.error_description;
+      setServerError(translateAuthError(raw, 'No se pudo crear la cuenta'));
+      // Refrescamos contraseñas para que el usuario las reingrese; preservamos
+      // nombre, apellido y email que ya fueron validados.
+      setForm((f) => ({ ...f, password: '', confirmPassword: '' }));
     } finally {
       setSubmitting(false);
     }
