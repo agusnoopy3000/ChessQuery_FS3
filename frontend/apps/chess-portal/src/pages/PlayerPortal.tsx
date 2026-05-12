@@ -13,11 +13,6 @@ const formatNum = (n: number | null | undefined): string => {
   return String(n);
 };
 
-const formatPct = (n: number): string => {
-  if (Number.isNaN(n)) return '—';
-  return `${(n * 100).toFixed(0)}%`;
-};
-
 const formatRelative = (iso: string): string => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
@@ -73,77 +68,6 @@ const RatingSparkline = ({ data }: { data: number[] }) => {
   );
 };
 
-/* === Botón CTA grande === */
-const HeroCTA = ({
-  icon,
-  title,
-  description,
-  onClick,
-  variant = 'primary',
-}: {
-  icon: string;
-  title: string;
-  description: string;
-  onClick: () => void;
-  variant?: 'primary' | 'secondary';
-}) => (
-  <button
-    onClick={onClick}
-    aria-label={`${title}: ${description}`}
-    style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'flex-start',
-      gap: 6,
-      padding: '18px 20px',
-      background:
-        variant === 'primary'
-          ? 'linear-gradient(135deg, #6abf74 0%, #3d8a4a 100%)'
-          : 'rgba(255,255,255,0.03)',
-      border: variant === 'primary' ? 'none' : '1px solid var(--cq-border, #2a2d27)',
-      borderRadius: 14,
-      color: variant === 'primary' ? '#0a100a' : 'var(--cq-text, #e8ead4)',
-      cursor: 'pointer',
-      fontFamily: 'inherit',
-      textAlign: 'left',
-      transition: 'transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease',
-      boxShadow: variant === 'primary' ? '0 8px 24px rgba(106,191,116,0.25)' : 'none',
-      minWidth: 200,
-      flex: 1,
-      outline: 'none',
-    }}
-    onFocus={(e) => {
-      e.currentTarget.style.boxShadow =
-        variant === 'primary'
-          ? '0 8px 24px rgba(106,191,116,0.25), 0 0 0 3px rgba(106,191,116,0.45)'
-          : '0 0 0 3px rgba(106,191,116,0.45)';
-    }}
-    onBlur={(e) => {
-      e.currentTarget.style.boxShadow =
-        variant === 'primary' ? '0 8px 24px rgba(106,191,116,0.25)' : 'none';
-    }}
-    onMouseEnter={(e) => {
-      e.currentTarget.style.transform = 'translateY(-2px)';
-      if (variant === 'secondary') {
-        e.currentTarget.style.borderColor = 'rgba(106,191,116,0.4)';
-      }
-    }}
-    onMouseLeave={(e) => {
-      e.currentTarget.style.transform = 'translateY(0)';
-      if (variant === 'secondary') {
-        e.currentTarget.style.borderColor = 'var(--cq-border, #2a2d27)';
-      }
-    }}
-  >
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-      <span style={{ fontSize: 22 }}>{icon}</span>
-      <span style={{ fontSize: 14, opacity: 0.6 }}>→</span>
-    </div>
-    <div style={{ fontSize: 17, fontWeight: 700 }}>{title}</div>
-    <div style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.4 }}>{description}</div>
-  </button>
-);
-
 /* === Page === */
 export const PlayerPortalPage = () => {
   const navigate = useNavigate();
@@ -167,13 +91,9 @@ export const PlayerPortalPage = () => {
 
   if (dashboard.isLoading) {
     return (
-      <div style={{ padding: 28, display: 'grid', gap: 16, fontFamily: fontStack }}>
+      <div style={{ padding: 28, display: 'grid', gap: 16, fontFamily: fontStack, maxWidth: 1100, margin: '0 auto' }}>
         <Skeleton height={180} />
-        <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(3, 1fr)' }}>
-          <Skeleton height={120} />
-          <Skeleton height={120} />
-          <Skeleton height={120} />
-        </div>
+        <Skeleton height={140} />
         <Skeleton height={260} />
       </div>
     );
@@ -288,53 +208,14 @@ export const PlayerPortalPage = () => {
         </div>
       </section>
 
-      {/* === KPI cards === */}
-      <section
-        aria-label="Indicadores"
-        style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}
-      >
+      {/* === KPI ELO === */}
+      <section aria-label="Rating principal">
         <KpiCard
           label="ELO PRINCIPAL"
           subLabel={ratingLabel}
           value={primaryRating != null ? formatNum(primaryRating) : '—'}
           highlight
           chart={sparkData.length >= 2 ? <RatingSparkline data={sparkData} /> : null}
-        />
-        <KpiCard
-          label="PARTIDAS"
-          subLabel={`${stats.wins} V · ${stats.draws} T · ${stats.losses} D`}
-          value={formatNum(stats.totalGames)}
-        />
-        <KpiCard label="WIN RATE" subLabel="Victorias" value={formatPct(stats.winRate)} />
-        {stats.bestRating != null && (
-          <KpiCard label="MEJOR RATING" subLabel="Histórico" value={formatNum(stats.bestRating)} />
-        )}
-      </section>
-
-      {/* === CTAs === */}
-      <section
-        aria-label="Acciones rápidas"
-        style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}
-      >
-        <HeroCTA
-          icon="♟"
-          title="Jugar ahora"
-          description="Crea o únete a una partida"
-          onClick={() => navigate('/play')}
-        />
-        <HeroCTA
-          icon="🏆"
-          title="Torneos"
-          description="Inscripciones y rondas en curso"
-          onClick={() => navigate('/tournaments')}
-          variant="secondary"
-        />
-        <HeroCTA
-          icon="👤"
-          title="Mi perfil"
-          description="Estadísticas y vínculos"
-          onClick={() => navigate('/player/me')}
-          variant="secondary"
         />
       </section>
 
