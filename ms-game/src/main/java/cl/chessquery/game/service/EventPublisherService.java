@@ -23,17 +23,20 @@ public class EventPublisherService {
 
     /** Routing key: game.finished */
     public void publishGameFinished(Game game) {
-        Map<String, Object> payload = Map.of(
-                "gameId",          game.getId(),
-                "whitePlayerId",   game.getWhitePlayerId(),
-                "blackPlayerId",   game.getBlackPlayerId(),
-                "result",          game.getResult(),
-                "gameType",        game.getGameType().name(),
-                "whiteEloBefore",  game.getWhiteEloBefore() != null ? game.getWhiteEloBefore() : 0,
-                "blackEloBefore",  game.getBlackEloBefore() != null ? game.getBlackEloBefore() : 0,
-                "whiteEloAfter",   game.getWhiteEloAfter()  != null ? game.getWhiteEloAfter()  : 0,
-                "blackEloAfter",   game.getBlackEloAfter()  != null ? game.getBlackEloAfter()  : 0
-        );
+        java.util.Map<String, Object> payload = new java.util.HashMap<>();
+        payload.put("gameId",         game.getId());
+        payload.put("whitePlayerId",  game.getWhitePlayerId());
+        payload.put("blackPlayerId",  game.getBlackPlayerId());
+        payload.put("result",         game.getResult());
+        payload.put("gameType",       game.getGameType().name());
+        payload.put("whiteEloBefore", game.getWhiteEloBefore() != null ? game.getWhiteEloBefore() : 0);
+        payload.put("blackEloBefore", game.getBlackEloBefore() != null ? game.getBlackEloBefore() : 0);
+        payload.put("whiteEloAfter",  game.getWhiteEloAfter()  != null ? game.getWhiteEloAfter()  : 0);
+        payload.put("blackEloAfter",  game.getBlackEloAfter()  != null ? game.getBlackEloAfter()  : 0);
+        payload.put("totalMoves",     game.getTotalMoves() != null ? game.getTotalMoves() : 0);
+        if (game.getOpening() != null && game.getOpening().getId() != null) {
+            payload.put("openingId", game.getOpening().getId());
+        }
         publish("game.finished", payload);
     }
 
