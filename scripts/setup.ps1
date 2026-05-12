@@ -73,6 +73,26 @@ if (-not (Test-Path $envFile)) {
     Write-Ok ".env ya existe (no se sobreescribe)"
 }
 
+# .env de cada app del frontend (Vite los lee al iniciar)
+$frontendEnvs = @(
+    @{ Dir = "frontend/apps/chess-portal"; Label = "chess-portal" },
+    @{ Dir = "frontend/apps/organizer-panel"; Label = "organizer-panel" }
+)
+foreach ($entry in $frontendEnvs) {
+    $appEnv     = Join-Path $REPO_ROOT "$($entry.Dir)/.env"
+    $appExample = Join-Path $REPO_ROOT "$($entry.Dir)/.env.example"
+    if (-not (Test-Path $appEnv)) {
+        if (Test-Path $appExample) {
+            Copy-Item $appExample $appEnv
+            Write-Ok "$($entry.Label)/.env creado desde .env.example"
+        } else {
+            Write-Warn "$appExample no existe; revisa el repo"
+        }
+    } else {
+        Write-Ok "$($entry.Label)/.env ya existe"
+    }
+}
+
 # -----------------------------------------------------------------------------
 # 3. Supabase local
 # -----------------------------------------------------------------------------
@@ -106,17 +126,17 @@ try {
         bff-player bff-organizer api-gateway
     if ($LASTEXITCODE -ne 0) { Write-Err "Build falló"; exit 1 }
 
-    Write-Host "   ... up -d --wait (espera healthchecks)" -ForegroundColor DarkGray
+    Write-Host "   ... up -d --wait (espera healthchecks ~1-2 min)" -ForegroundColor DarkGray
+    # Nota: nginx ya no se levanta por defecto (esta bajo profile 'proxy' en
+    # docker-compose.yml). El frontend corre directo con Vite en :5173/5174.
     docker compose up -d --wait --no-build `
-        user_db tournament_db game_db notif_db etl_db `
+        user_db tournament_db game_db notif_db etl_db analytics_db `
         rabbitmq redis `
-        ms-users ms-tournament ms-game ms-etl ms-notifications `
-        bff-player bff-organizer api-gateway nginx
-    # ms-etl healthcheck es defectuoso (usa curl que no existe en la imagen),
-    # pero el servicio igual funciona. Ignorar exit code != 0 si solo es eso.
+        ms-users ms-tournament ms-game ms-analytics ms-etl ms-notifications `
+        bff-player bff-organizer bff-admin api-gateway
     if ($LASTEXITCODE -ne 0) {
-        Write-Warn "Algún healthcheck falló (probable: ms-etl)."
-        Write-Warn "Verifica con: docker compose ps  — si solo ms-etl está unhealthy, ignora."
+        Write-Warn "Algún healthcheck no pasó. Revisa con: docker compose ps"
+        Write-Warn "Si solo ms-etl tarda, espera 1 min mas y vuelve a verificar."
     } else {
         Write-Ok "Todos los servicios healthy"
     }
