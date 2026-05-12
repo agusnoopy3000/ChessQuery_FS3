@@ -49,7 +49,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-chessquery_dev}
       POSTGRES_DB: user_db
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - user_db_data:/var/lib/postgresql/data
     networks:
@@ -69,7 +69,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-chessquery_dev}
       POSTGRES_DB: tournament_db
     ports:
-      - "5434:5432"
+      - "127.0.0.1:5434:5432"
     volumes:
       - tournament_db_data:/var/lib/postgresql/data
     networks:
@@ -89,7 +89,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-chessquery_dev}
       POSTGRES_DB: game_db
     ports:
-      - "5435:5432"
+      - "127.0.0.1:5435:5432"
     volumes:
       - game_db_data:/var/lib/postgresql/data
     networks:
@@ -109,7 +109,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-chessquery_dev}
       POSTGRES_DB: analytics_db
     ports:
-      - "5436:5432"
+      - "127.0.0.1:5436:5432"
     volumes:
       - analytics_db_data:/var/lib/postgresql/data
     networks:
@@ -129,7 +129,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-chessquery_dev}
       POSTGRES_DB: notif_db
     ports:
-      - "5437:5432"
+      - "127.0.0.1:5437:5432"
     volumes:
       - notif_db_data:/var/lib/postgresql/data
     networks:
@@ -149,7 +149,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-chessquery_dev}
       POSTGRES_DB: etl_db
     ports:
-      - "5438:5432"
+      - "127.0.0.1:5438:5432"
     volumes:
       - etl_db_data:/var/lib/postgresql/data
     networks:
@@ -182,7 +182,7 @@ services:
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-chessquery_dev}
       SERVER_PORT: "8081"
     ports:
-      - "8081:8081"
+      - "127.0.0.1:8081:8081"
     depends_on:
       user_db:
         condition: service_healthy
@@ -213,7 +213,7 @@ services:
       MS_USERS_URL: http://ms-users:8081
       SERVER_PORT: "8082"
     ports:
-      - "8082:8082"
+      - "127.0.0.1:8082:8082"
     depends_on:
       tournament_db:
         condition: service_healthy
@@ -249,7 +249,7 @@ services:
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:-}
       STORAGE_PROVIDER: ${STORAGE_PROVIDER:-supabase}
     ports:
-      - "8083:8083"
+      - "127.0.0.1:8083:8083"
     depends_on:
       game_db:
         condition: service_healthy
@@ -279,7 +279,7 @@ services:
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-chessquery_dev}
       SERVER_PORT: "8084"
     ports:
-      - "8084:8084"
+      - "127.0.0.1:8084:8084"
     depends_on:
       analytics_db:
         condition: service_healthy
@@ -313,7 +313,7 @@ services:
       SMTP_HOST: ${SMTP_HOST:-host.docker.internal}
       SMTP_PORT: ${SMTP_PORT:-54325}
     ports:
-      - "8085:8085"
+      - "127.0.0.1:8085:8085"
     depends_on:
       notif_db:
         condition: service_healthy
@@ -359,7 +359,7 @@ services:
       AJEFECH_SYNC_CONCURRENCY: ${AJEFECH_SYNC_CONCURRENCY:-8}
       SERVER_PORT: "8086"
     ports:
-      - "8086:8086"
+      - "127.0.0.1:8086:8086"
     depends_on:
       etl_db:
         condition: service_healthy
@@ -394,7 +394,7 @@ services:
       MS_ANALYTICS_URL: http://ms-analytics:8084
       MS_NOTIFICATIONS_URL: http://ms-notifications:8085
     ports:
-      - "3001:3001"
+      - "127.0.0.1:3001:3001"
     depends_on:
       - ms-users
       - ms-game
@@ -416,7 +416,7 @@ services:
       MS_GAME_URL: http://ms-game:8083
       MS_ANALYTICS_URL: http://ms-analytics:8084
     ports:
-      - "3002:3002"
+      - "127.0.0.1:3002:3002"
     depends_on:
       - ms-users
       - ms-tournament
@@ -437,7 +437,7 @@ services:
       MS_ANALYTICS_URL: http://ms-analytics:8084
       MS_ETL_URL: http://ms-etl:8086
     ports:
-      - "3003:3003"
+      - "127.0.0.1:3003:3003"
     depends_on:
       - ms-users
       - ms-tournament
@@ -506,7 +506,7 @@ services:
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-chessquery_dev}
       RABBITMQ_DEFAULT_VHOST: /
     ports:
-      - "5672:5672"    # AMQP
+      - "127.0.0.1:5672:5672"    # AMQP
       - "15672:15672"  # Management UI  →  http://localhost:15672
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
@@ -547,7 +547,7 @@ services:
     restart: unless-stopped
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-chessquery_dev}
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     networks:

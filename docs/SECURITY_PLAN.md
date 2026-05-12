@@ -78,10 +78,11 @@
 
 ### P0 — bloquear los caminos críticos (1-2 días)
 
-**P0.1 — Cerrar puertos directos de MS y DBs en `docker-compose.yml`**
-- Quitar el mapping `:8081-8086:8081-8086` de los servicios `ms-*`. Solo el gateway expone `:8080`.
-- Quitar `:5432-5438:5432` de las DBs. Solo Studio/migraciones acceden via `docker compose exec` o un perfil `tools`.
-- Mantener acceso interno por DNS docker (`http://ms-users:8081`) entre containers.
+**P0.1 — Cerrar puertos directos de MS y DBs en `docker-compose.yml`** ✅ MITIGADO
+- Implementado: bindeo de puertos internos a `127.0.0.1` en lugar de `0.0.0.0`. Los puertos `5433-5438` (DBs), `8081-8086` (MS), `3001-3003` (BFFs), `6379` (Redis) y `5672` (AMQP) ya no son accesibles desde la LAN, solo desde el host local para debugging.
+- Públicos quedan: `80` (Nginx), `8080` (API Gateway) y `15672` (RabbitMQ Mgmt UI para inspección durante defensa oral).
+- Acceso interno entre containers sigue funcionando por DNS docker (`http://ms-users:8081`).
+- Cierre total de los puertos (no exponer ni a `127.0.0.1`) queda como mejora futura para producción.
 
 **P0.2 — Shared secret entre Gateway y MS**
 - Agregar header `X-Internal-Auth: ${INTERNAL_SHARED_SECRET}` que el gateway añade en cada request al downstream.
@@ -205,6 +206,7 @@ Durante la fase de desarrollo y preparación para la demo, se ejecutaron las sig
 - **Header injection X-User-Id:** Intentamos acceder directamente a `ms-users:8081` desde el host local, inyectando el header fabricado `X-User-Role: ADMIN`. Confirmamos que la brecha **C1** existe (los microservicios expuestos confían en los headers sin validar origen).
 - **Race condition en signup:** Se enviaron 5 peticiones concurrentes (`POST /users/provision`). Antes esto resultaba en 4 errores 500 y 1 éxito. Ahora, con la implementación del patrón **Idempotent Receiver** (documentado en `ANALISIS_PATRONES.md §2.8`, commit `4f1b100`), la plataforma maneja correctamente las peticiones concurrentes, resultando en 5 respuestas 200 consistentes para el mismo ID.
 - **Double URL encoding en invite:** Confirmamos que al enviar un correo doblemente codificado como `bruno%2540demo.cl` hacia `ms-users`, el sistema fallaba devolviendo un 404. Este comportamiento fue corregido en el commit `50732f9`.
+- **Exposición de puertos internos:** Antes de la mitigación, ejecutamos `nmap -p 5432-5438,8081-8086 <ip-lan>` desde otro equipo de la red y los puertos respondían. Tras bindear a `127.0.0.1` en `docker-compose.yml`, el mismo escaneo desde la LAN ya no detecta los puertos abiertos; solo persisten `80`, `8080` y `15672`, que son los entry points autorizados (P0.1 ✅).
 - **Pentesting y Auditorías Automáticas:** Declaramos explícitamente que **NO** se realizaron pruebas formales de pentesting utilizando herramientas como OWASP ZAP o Burp Suite, dado que dicho nivel de análisis excede el alcance académico de la entrega actual.
 
 ---
