@@ -8,6 +8,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.Instant;
 import java.util.stream.Collectors;
@@ -36,6 +37,12 @@ public class GlobalExceptionHandler {
         String msg = "Parámetro inválido: " + ex.getName();
         return ResponseEntity.badRequest()
                 .body(new ErrorResponse(400, "INVALID_PARAMETER", msg, Instant.now()));
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNotFound(NoResourceFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponse(404, "NOT_FOUND", "Recurso no encontrado: " + ex.getResourcePath(), Instant.now()));
     }
 
     @ExceptionHandler(Exception.class)
