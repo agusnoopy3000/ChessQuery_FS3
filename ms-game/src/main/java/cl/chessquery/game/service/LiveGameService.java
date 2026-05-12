@@ -167,7 +167,9 @@ public class LiveGameService {
 
     @Transactional
     public LiveGameResponse move(Long id, MoveRequest req) {
-        LiveGameSession s = findOrThrow(id);
+        // Lock pesimista: serializa moves concurrentes sobre la misma sesión
+        // (evita duplicate-key cuando llegan 2 requests en paralelo).
+        LiveGameSession s = findForUpdateOrThrow(id);
         LiveGameResponse idempotentRetry = idempotentMoveRetry(s, req);
         if (idempotentRetry != null) {
             return idempotentRetry;
@@ -408,6 +410,14 @@ public class LiveGameService {
 
     private LiveGameSession findOrThrow(Long id) {
         return sessionRepo.findById(id)
+                .orElseThrow(() -> new ApiException(404, "SESSION_NOT_FOUND",
+                        "Sesión live " + id + " no encontrada"));
+    }
+
+    /** Igual que findOrThrow pero adquiere lock pesimista (SELECT ... FOR UPDATE)
+     *  para serializar moves concurrentes sobre la misma sesion. */
+    private LiveGameSession findForUpdateOrThrow(Long id) {
+        return sessionRepo.findByIdForUpdate(id)
                 .orElseThrow(() -> new ApiException(404, "SESSION_NOT_FOUND",
                         "Sesión live " + id + " no encontrada"));
     }
