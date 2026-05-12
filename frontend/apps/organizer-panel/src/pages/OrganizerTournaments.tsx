@@ -189,15 +189,20 @@ export const OrganizerTournamentsPage = () => {
       <section className="page-header">
         <div>
           <div className="eyebrow">Gestión de torneos</div>
-          <h1 className="page-title">Sigue el estado de tus eventos y administra rondas.</h1>
+          <h1 className="page-title">Crea, gestiona e impulsa tus torneos.</h1>
           <p className="page-copy">
-            Esta vista junta el catálogo del organizador con standings y emparejamientos. Si el backend del torneo ya
-            expone la ronda, puedes registrar resultados desde aquí.
+            Tus torneos en un solo lugar: revisa el estado de cada uno, aprueba inscripciones,
+            genera emparejamientos ronda por ronda y registra los resultados a medida que se juegan.
           </p>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'flex-end' }}>
-          <Button onClick={() => setShowCreateModal(true)} variant="primary">
-            + Crear torneo
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'flex-end' }}>
+          <Button
+            onClick={() => setShowCreateModal(true)}
+            variant="primary"
+            size="lg"
+            style={{ minWidth: 200, gap: 8, fontWeight: 700, letterSpacing: '0.01em' }}
+          >
+            <span style={{ fontSize: 18, lineHeight: 1 }}>＋</span> Crear torneo
           </Button>
           <div className="metric-inline-row">
             <div className="metric-inline-card">
@@ -232,11 +237,11 @@ export const OrganizerTournamentsPage = () => {
         }
       />
 
-      <div className="panel-grid" style={{ gridTemplateColumns: '0.95fr 1.05fr' }}>
+      <div className="panel-grid" style={{ gridTemplateColumns: 'minmax(340px, 0.85fr) minmax(420px, 1.15fr)', gap: 18 }}>
         <Card
           header={
             <div className="card-header-row">
-              <span>Mis torneos</span>
+              <span style={{ fontSize: 15, fontWeight: 700 }}>Mis torneos</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Badge variant="info">{tournamentRows.length} registrados</Badge>
                 <button
@@ -281,9 +286,9 @@ export const OrganizerTournamentsPage = () => {
           }
         >
           {tournaments.isLoading ? (
-            <div style={{ display: 'grid', gap: 10 }}>
+            <div style={{ display: 'grid', gap: 12 }}>
               {Array.from({ length: 4 }).map((_, index) => (
-                <Skeleton key={index} height={110} />
+                <Skeleton key={index} height={120} />
               ))}
             </div>
           ) : tournaments.isError ? (
@@ -291,16 +296,21 @@ export const OrganizerTournamentsPage = () => {
           ) : tournamentRows.length === 0 ? (
             <EmptyState
               title="Aún no hay torneos creados"
-              description="Crea tu primer torneo y los jugadores podrán inscribirse desde su portal."
+              description="Crea tu primer torneo y los jugadores podrán inscribirse desde su cuenta."
               icon="♜"
               action={
-                <Button onClick={() => setShowCreateModal(true)} variant="primary">
-                  + Crear torneo
+                <Button
+                  onClick={() => setShowCreateModal(true)}
+                  variant="primary"
+                  size="lg"
+                  style={{ gap: 8 }}
+                >
+                  <span style={{ fontSize: 18, lineHeight: 1 }}>＋</span> Crear torneo
                 </Button>
               }
             />
           ) : (
-            <div style={{ display: 'grid', gap: 10 }}>
+            <div style={{ display: 'grid', gap: 12 }}>
               {tournamentRows.map((tournament) => {
                 const canDelete =
                   tournament.status === 'DRAFT' || tournament.status === 'OPEN';
@@ -316,13 +326,13 @@ export const OrganizerTournamentsPage = () => {
                       className="surface-button"
                       data-active={selectedTournamentId === tournament.id}
                       onClick={() => setSelectedTournamentId(tournament.id)}
-                      style={{ paddingRight: canDelete ? 48 : undefined }}
+                      style={{ paddingRight: canDelete ? 52 : 18, paddingLeft: 18, paddingTop: 14, paddingBottom: 14 }}
                     >
-                      <div style={{ display: 'grid', gap: 8 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
-                          <div style={{ textAlign: 'left' }}>
-                            <div style={{ fontWeight: 700 }}>{tournament.name}</div>
-                            <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                      <div style={{ display: 'grid', gap: 10 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+                          <div style={{ textAlign: 'left', minWidth: 0, flex: 1 }}>
+                            <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tournament.name}</div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 3, letterSpacing: '0.02em' }}>
                               {tournament.format} · {formatDate(tournament.startDate)}
                             </div>
                           </div>
@@ -334,8 +344,9 @@ export const OrganizerTournamentsPage = () => {
                           <div className="track-segment" data-active={tournament.status === 'IN_PROGRESS'} />
                           <div className="track-segment" data-active={tournament.status === 'FINISHED'} />
                         </div>
-                        <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-                          {tournament.registered}/{tournament.maxPlayers} jugadores · {tournament.rounds} rondas
+                        <div style={{ display: 'flex', gap: 14, fontSize: 11, color: 'var(--text-muted)' }}>
+                          <span><strong style={{ color: 'var(--text, #e8ead4)' }}>{tournament.registered}/{tournament.maxPlayers}</strong> jugadores</span>
+                          <span><strong style={{ color: 'var(--text, #e8ead4)' }}>{tournament.rounds}</strong> rondas</span>
                         </div>
                       </div>
                     </button>
@@ -400,7 +411,7 @@ export const OrganizerTournamentsPage = () => {
             }
           >
             {!selectedTournament ? (
-              <EmptyState title="Sin torneo seleccionado" description="Elige un torneo del panel izquierdo para revisar su estado." icon="♔" />
+              <EmptyState title="Sin torneo seleccionado" description="Elige un torneo de la lista para ver su detalle y administrarlo." icon="♔" />
             ) : (
               <div style={{ display: 'grid', gap: 16 }}>
                 <div className="metric-grid">
@@ -422,7 +433,7 @@ export const OrganizerTournamentsPage = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'end' }}>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'end' }}>
                   <Select
                     label="Ronda"
                     value={String(selectedRound)}
@@ -437,8 +448,11 @@ export const OrganizerTournamentsPage = () => {
                     onClick={() => generateRound.mutate()}
                     loading={generateRound.isPending}
                     disabled={selectedTournament.status === 'DRAFT' || selectedTournament.status === 'FINISHED'}
+                    size="lg"
+                    variant="primary"
+                    style={{ minWidth: 220, gap: 8, fontWeight: 700 }}
                   >
-                    Generar emparejamientos
+                    <span style={{ fontSize: 16, lineHeight: 1 }}>♞</span> Generar emparejamientos
                   </Button>
                 </div>
 
@@ -455,32 +469,38 @@ export const OrganizerTournamentsPage = () => {
                 ) : null}
 
                 {/* Acciones de transición de estado del torneo */}
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 4 }}>
                   {selectedTournament.status === 'DRAFT' && (
                     <Button
                       variant="primary"
+                      size="lg"
                       onClick={() => patchStatus.mutate({ id: selectedTournament.id, status: 'OPEN' })}
                       loading={patchStatus.isPending}
+                      style={{ minWidth: 200, gap: 8, fontWeight: 700 }}
                     >
-                      Abrir inscripciones
+                      <span style={{ fontSize: 15, lineHeight: 1 }}>📝</span> Abrir inscripciones
                     </Button>
                   )}
                   {selectedTournament.status === 'OPEN' && (
                     <Button
                       variant="primary"
+                      size="lg"
                       onClick={() => patchStatus.mutate({ id: selectedTournament.id, status: 'IN_PROGRESS' })}
                       loading={patchStatus.isPending}
+                      style={{ minWidth: 200, gap: 8, fontWeight: 700 }}
                     >
-                      Iniciar torneo
+                      <span style={{ fontSize: 15, lineHeight: 1 }}>▶</span> Iniciar torneo
                     </Button>
                   )}
                   {selectedTournament.status === 'IN_PROGRESS' && (
                     <Button
                       variant="secondary"
+                      size="lg"
                       onClick={() => patchStatus.mutate({ id: selectedTournament.id, status: 'FINISHED' })}
                       loading={patchStatus.isPending}
+                      style={{ minWidth: 200, gap: 8, fontWeight: 700 }}
                     >
-                      Finalizar torneo
+                      <span style={{ fontSize: 15, lineHeight: 1 }}>🏁</span> Finalizar torneo
                     </Button>
                   )}
                 </div>
@@ -518,13 +538,13 @@ export const OrganizerTournamentsPage = () => {
 
           <Card header="Standings">
             {!selectedTournamentId ? (
-              <EmptyState title="Sin clasificación" description="Selecciona un torneo para ver la tabla." icon="♟" />
+              <EmptyState title="Sin clasificación" description="Elige un torneo para ver su tabla de posiciones." icon="♟" />
             ) : standings.isLoading ? (
               <Skeleton height={220} />
             ) : standings.isError ? (
               <ErrorAlert title="No se pudo cargar la clasificación" onRetry={() => standings.refetch()} />
             ) : !standings.data || standings.data.length === 0 ? (
-              <EmptyState title="Aún no hay standings" description="Los puntos aparecerán cuando existan rondas o resultados." icon="♞" />
+              <EmptyState title="Aún no hay clasificación" description="Los puntos aparecerán cuando se carguen los resultados de la primera ronda." icon="♞" />
             ) : (
               <StandingsTable entries={standings.data} />
             )}
@@ -532,11 +552,11 @@ export const OrganizerTournamentsPage = () => {
 
           <Card header="Emparejamientos de ronda">
             {!selectedTournamentId ? (
-              <EmptyState title="Sin ronda" description="Selecciona un torneo para revisar o registrar resultados." icon="♜" />
+              <EmptyState title="Sin ronda" description="Elige un torneo para ver y administrar sus rondas." icon="♜" />
             ) : round.isLoading ? (
               <Skeleton height={240} />
             ) : round.isError ? (
-              <EmptyState title={`La ronda ${selectedRound} aún no existe`} description="Usa el botón de generar emparejamientos cuando el torneo ya esté listo." icon="♘" />
+              <EmptyState title={`La ronda ${selectedRound} aún no existe`} description="Cuando el torneo esté listo para comenzar, genera los emparejamientos con el botón de arriba." icon="♘" />
             ) : !round.data || round.data.pairings.length === 0 ? (
               <EmptyState title="Sin pairings" description="Todavía no hay mesas generadas para esta ronda." icon="♙" />
             ) : (

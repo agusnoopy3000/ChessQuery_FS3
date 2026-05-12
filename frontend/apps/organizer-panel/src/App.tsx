@@ -46,7 +46,7 @@ export const App = () => {
 
   return (
     <Shell
-      subtitle="organizer workspace"
+      subtitle="Tu panel del organizador"
       items={buildNav(location.pathname, navigate)}
       user={{ name: (user.name && user.name.trim()) || user.email.split('@')[0], role: user.role, email: user.email }}
       onLogout={() => logout().then(() => navigate('/login'))}

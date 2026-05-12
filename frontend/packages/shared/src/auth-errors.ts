@@ -17,10 +17,10 @@ const PATTERNS: Array<{ regex: RegExp; spanish: string }> = [
   { regex: /signup requires a valid password/i, spanish: 'La contraseña no es válida' },
   { regex: /weak password/i, spanish: 'La contraseña es muy débil' },
   { regex: /invalid email|invalid format.*email|unable to validate email/i, spanish: 'Formato de email inválido' },
-  { regex: /email rate limit exceeded|over_email_send_rate_limit/i, spanish: 'Demasiados intentos. Esperá unos minutos e intentá de nuevo' },
-  { regex: /rate limit exceeded|too many requests/i, spanish: 'Demasiados intentos. Esperá un momento' },
-  { regex: /network error|fetch failed|network request failed/i, spanish: 'No se pudo conectar con el servidor. Revisá tu conexión' },
-  { regex: /timeout|timed? out/i, spanish: 'La operación tardó demasiado. Intentá de nuevo' },
+  { regex: /email rate limit exceeded|over_email_send_rate_limit/i, spanish: 'Demasiados intentos. Espera unos minutos e intenta de nuevo' },
+  { regex: /rate limit exceeded|too many requests/i, spanish: 'Demasiados intentos. Espera un momento' },
+  { regex: /network error|fetch failed|network request failed/i, spanish: 'No se pudo conectar con el servidor. Revisa tu conexión' },
+  { regex: /timeout|timed? out/i, spanish: 'La operación tardó demasiado. Intenta de nuevo' },
   { regex: /signups? (are )?disabled|signup is disabled/i, spanish: 'El registro está temporalmente deshabilitado' },
 ];
 

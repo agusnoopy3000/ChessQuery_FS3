@@ -34,9 +34,9 @@ export const PlayerMatchmakingPage = () => {
           <div className="eyebrow">Portal de Juego</div>
           <h1 className="page-title">Empezar partida</h1>
           <p className="page-copy">
-            Crea una sesión nueva y comparte la URL con tu rival. Al entrar,
-            jugarán 1 vs 1 en tiempo real con cada jugada validada en el servidor.
-            La partida se guarda automáticamente al terminar (mate, rendición, tablas).
+            Crea una partida y comparte el enlace con tu rival. En cuanto entre, juegan
+            1 vs 1 en tiempo real con su reloj. Al terminar la partida queda guardada y
+            tu rating se actualiza automáticamente.
           </p>
         </div>
       </section>

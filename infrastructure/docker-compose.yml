@@ -565,11 +565,16 @@ services:
   # -------------------------------------------------------------------------
   # PROXY – Nginx (reverse proxy + frontend estático)
   # -------------------------------------------------------------------------
+  # En la demo el frontend corre directo con Vite (npm run dev), asi que nginx
+  # no se usa. Lo dejamos opt-in con el profile 'proxy' para que `make up` no
+  # lo levante por defecto. Para iniciarlo:
+  #   docker compose --profile proxy up -d nginx
 
   nginx:
     image: nginx:1.27-alpine
     container_name: chessquery_nginx
     restart: unless-stopped
+    profiles: ["proxy"]
     ports:
       - "80:80"
     volumes:

@@ -123,7 +123,7 @@ export const MyDashboardPage = () => {
         {!p.lichessUsername ? (
           <EmptyState
             title="Sin cuenta Lichess vinculada"
-            description="Ingresa tu usuario de Lichess en el registro para ver el resumen."
+            description="Agrega tu usuario de Lichess al registrarte para ver tu rating de cada modalidad."
             icon="♖"
           />
         ) : lichess.isLoading ? (
@@ -135,7 +135,7 @@ export const MyDashboardPage = () => {
         ) : !lichess.data?.found ? (
           <EmptyState
             title={`Usuario @${p.lichessUsername} no encontrado en Lichess`}
-            description={lichess.data?.error ?? 'La API Lichess devolvió 404.'}
+            description={lichess.data?.error ?? 'No encontramos esa cuenta en Lichess. Revisa el nombre de usuario en tu perfil.'}
             icon="⚠"
           />
         ) : platformRatings.length === 0 ? (

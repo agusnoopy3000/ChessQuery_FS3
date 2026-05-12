@@ -18,7 +18,7 @@ export const HomePage = () => {
             </h1>
             <p className="page-copy" style={{ marginTop: 0, marginBottom: 16, fontSize: 13 }}>
               Jugadores, organizadores y federaciones en un solo lugar:
-              partidas en vivo, gestión de torneos y rating sincronizado con FIDE.
+              partidas en vivo, torneos completos y tu rating siempre actualizado.
             </p>
             <div className="hero-actions" style={{ gap: 12 }}>
               <Button size="md" variant="primary" onClick={() => navigate('/register')}>
@@ -42,7 +42,7 @@ export const HomePage = () => {
             ♞ Partidas en vivo
           </h3>
           <p className="page-copy" style={{ fontSize: 12, margin: 0 }}>
-            Emparejamiento 1 vs 1, validación de jugadas y PGN guardado.
+            Juega 1 vs 1 en tiempo real con tu reloj y la partida queda guardada.
             Tu rating se actualiza al terminar.
           </p>
         </Card>
@@ -53,7 +53,7 @@ export const HomePage = () => {
             ♜ Torneos suizos
           </h3>
           <p className="page-copy" style={{ fontSize: 12, margin: 0 }}>
-            Crea torneos, genera rondas y publica standings con Buchholz y Sonneborn-Berger.
+            Crea torneos, genera rondas y muestra la clasificación oficial con desempates Buchholz y Sonneborn-Berger.
           </p>
         </Card>
 
@@ -63,7 +63,7 @@ export const HomePage = () => {
             ♕ Rating oficial
           </h3>
           <p className="page-copy" style={{ fontSize: 12, margin: 0 }}>
-            Sincronización con FIDE, AJEFECH y Lichess. Perfiles enriquecidos automáticamente.
+            Tus ratings de FIDE, AJEFECH y Lichess en un solo perfil, siempre al día.
           </p>
         </Card>
       </section>
@@ -71,7 +71,7 @@ export const HomePage = () => {
       <section style={{ textAlign: 'center', padding: '12px 0' }}>
         <h2 className="page-title" style={{ fontSize: 20, margin: 0 }}>¿Listo para empezar?</h2>
         <p className="page-copy" style={{ maxWidth: 480, margin: '4px auto 12px', fontSize: 13 }}>
-          Crea tu cuenta gratis y entra al portal del jugador.
+          Crea tu cuenta gratis y empieza a jugar en segundos.
         </p>
         <Button size="md" variant="primary" onClick={() => navigate('/register')}>
           Registrarme

@@ -57,7 +57,7 @@ const OrganizerRedirect = () => {
         <div className="spin" style={{ fontSize: 36, color: 'var(--accent)', marginBottom: 14 }}>⟳</div>
         <h2 style={{ marginTop: 0 }}>Llevándote al panel del organizador…</h2>
         <p style={{ color: 'var(--text-muted)', marginBottom: 16, fontSize: 13 }}>
-          Si la redirección no ocurre automáticamente, hacé click abajo.
+          Si la redirección no ocurre automáticamente, haz click abajo.
         </p>
         <Button size="md" onClick={() => window.location.assign(organizerPanelUrl())}>
           Abrir panel ahora →
@@ -121,21 +121,12 @@ export const App = () => {
 
   return (
     <Shell
-      subtitle={user?.role ? `${user.role.toLowerCase()} workspace` : 'portal público'}
+      subtitle={user?.role === 'PLAYER' ? 'Tu portal de jugador' : user?.role === 'ORGANIZER' ? 'Tu panel del organizador' : 'Bienvenido a ChessQuery'}
       items={items}
       user={user ? { name: (user.name && user.name.trim()) || user.email.split('@')[0], role: user.role, email: user.email } : undefined}
       onLogout={user ? () => logout().then(() => navigate('/')) : undefined}
     >
-      {!user ? (
-        <div className="public-topbar">
-          <Button variant="ghost" onClick={() => navigate('/register')}>
-            Crear cuenta
-          </Button>
-          <Button onClick={() => navigate('/login')}>Iniciar sesión</Button>
-        </div>
-      ) : user.role === 'PLAYER' ? (
-        <NotificationBell />
-      ) : null}
+      {user?.role === 'PLAYER' && <NotificationBell />}
 
       <Routes>
         <Route
