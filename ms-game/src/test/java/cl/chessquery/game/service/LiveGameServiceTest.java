@@ -71,6 +71,7 @@ class LiveGameServiceTest {
             return s;
         });
         when(sessionRepo.findById(any())).thenAnswer(inv -> Optional.ofNullable(persistedSession));
+        when(sessionRepo.findByIdForUpdate(any())).thenAnswer(inv -> Optional.ofNullable(persistedSession));
 
         when(moveRepo.save(any(LiveGameMove.class))).thenAnswer(inv -> {
             LiveGameMove m = inv.getArgument(0);
