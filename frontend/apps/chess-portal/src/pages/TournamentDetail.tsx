@@ -139,6 +139,14 @@ export const TournamentDetailPage = () => {
     enabled: !!id && tab === 'standings',
   });
 
+  const [selectedRound, setSelectedRound] = useState<number>(1);
+  const round = useQuery({
+    queryKey: ['tournament', id, 'round', selectedRound],
+    queryFn: () => tournamentApi.round(id!, selectedRound),
+    enabled: !!id && tab === 'rounds',
+    retry: false,
+  });
+
   if (detail.isLoading) {
     return (
       <div style={{ padding: 28, display: 'grid', gap: 12 }}>
@@ -261,11 +269,65 @@ export const TournamentDetailPage = () => {
 
       {tab === 'rounds' && (
         <Card header="Rondas">
-          <EmptyState
-            title="Pendiente"
-            description="La vista de pareos por ronda estará disponible próximamente"
-            icon="♞"
-          />
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Mostrar ronda:</span>
+            {Array.from({ length: Math.max(1, t.rounds || 1) }).map((_, i) => {
+              const n = i + 1;
+              const active = n === selectedRound;
+              return (
+                <button
+                  key={n}
+                  onClick={() => setSelectedRound(n)}
+                  style={{
+                    padding: '4px 12px', borderRadius: 18,
+                    border: `1px solid ${active ? '#6abf74' : 'var(--border, #2a2d27)'}`,
+                    background: active ? 'rgba(106,191,116,0.15)' : 'transparent',
+                    color: active ? '#6abf74' : 'var(--text, #e8ead4)',
+                    fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  }}
+                >
+                  Ronda {n}
+                </button>
+              );
+            })}
+          </div>
+
+          {round.isLoading ? (
+            <Skeleton height={180} />
+          ) : round.isError || !round.data ? (
+            <EmptyState
+              title={`Ronda ${selectedRound} aún no generada`}
+              description="El organizador todavía no creó los emparejamientos para esta ronda."
+              icon="♞"
+            />
+          ) : round.data.pairings.length === 0 ? (
+            <EmptyState title="Sin pareos" description="La ronda existe pero no tiene mesas registradas." icon="♙" />
+          ) : (
+            <Table
+              rows={round.data.pairings}
+              rowKey={(row) => row.id}
+              columns={[
+                { key: 'board', header: 'Mesa', width: 64, render: (row) => row.boardNumber },
+                {
+                  key: 'white',
+                  header: 'Blancas',
+                  render: (row) =>
+                    `${row.whitePlayerName ?? `#${row.whitePlayerId ?? '—'}`}${row.whitePlayerRating ? ` (${row.whitePlayerRating})` : ''}`,
+                },
+                {
+                  key: 'black',
+                  header: 'Negras',
+                  render: (row) =>
+                    `${row.blackPlayerName ?? `#${row.blackPlayerId ?? '—'}`}${row.blackPlayerRating ? ` (${row.blackPlayerRating})` : ''}`,
+                },
+                {
+                  key: 'result',
+                  header: 'Resultado',
+                  render: (row) => row.result ?? '—',
+                },
+              ] as TableColumn<typeof round.data.pairings[number]>[]}
+            />
+          )}
         </Card>
       )}
     </div>

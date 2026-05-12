@@ -489,10 +489,8 @@ export const tournamentApi = {
   detail: (id: string | number): Promise<Tournament> =>
     api.get(`/api/player/tournaments/${id}`).then((r) => normalizeTournament(r.data)),
 
-  // Las rondas y emparejamientos no las consume el portal del jugador en este flujo.
-  // Se mantiene la ruta antigua para no romper imports legacy si los hubiera.
   round: (id: string | number, roundNumber: number): Promise<Round> =>
-    api.get(`/api/organizer/tournaments/${id}/round/${roundNumber}`).then((r) => normalizeRound(r.data)),
+    api.get(`/api/player/tournaments/${id}/round/${roundNumber}`).then((r) => normalizeRound(r.data)),
 
   standings: async (id: string | number): Promise<Standing[]> => {
     const response = await api.get(`/api/player/tournaments/${id}/standings`);

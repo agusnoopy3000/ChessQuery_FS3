@@ -186,6 +186,11 @@ export class PlayerController {
     return this.playerService.getTournamentStandings(id);
   }
 
+  @Get('tournaments/:id/round/:n')
+  async tournamentRound(@Param('id') id: string, @Param('n') n: string) {
+    return this.playerService.getEnrichedRound(id, n);
+  }
+
   @Get('tournaments/:id/my-registration')
   async myRegistration(@Req() req: Request, @Param('id') id: string) {
     const userId = getUserId(req);

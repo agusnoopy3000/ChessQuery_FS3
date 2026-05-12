@@ -375,6 +375,50 @@ export class PlayerService {
     return this.http.get<unknown>(`${msTournament}/tournaments/${tournamentId}/standings`);
   }
 
+  /**
+   * Devuelve la ronda enriquecida con nombres y ratings de cada jugador,
+   * para que el jugador pueda ver sus pareos en el detalle del torneo.
+   * Read-only; no requiere rol organizer.
+   */
+  async getEnrichedRound(tournamentId: string, roundNumber: string): Promise<unknown> {
+    const { msTournament, msUsers } = this.http.urls;
+    const round = await this.http.get<{
+      id: number; tournamentId: number; roundNumber: number; status: string;
+      pairings: Array<{ id: number; whitePlayerId?: number | null; blackPlayerId?: number | null; [k: string]: unknown }>;
+    }>(`${msTournament}/tournaments/${tournamentId}/rounds/${roundNumber}`);
+
+    const playerIds = new Set<number>();
+    for (const p of round.pairings ?? []) {
+      if (p.whitePlayerId != null) playerIds.add(p.whitePlayerId);
+      if (p.blackPlayerId != null) playerIds.add(p.blackPlayerId);
+    }
+
+    const profiles = await Promise.all(
+      Array.from(playerIds).map((id) =>
+        this.http
+          .get<{ id: number; firstName?: string; lastName?: string; eloFideStandard?: number; eloNational?: number }>(
+            `${msUsers}/users/${id}/profile`,
+          )
+          .catch(() => ({ id })),
+      ),
+    );
+    const byId = new Map<number, { id: number; firstName?: string; lastName?: string; eloFideStandard?: number; eloNational?: number }>();
+    for (const p of profiles) byId.set(p.id, p);
+
+    const enriched = (round.pairings ?? []).map((p) => {
+      const w = p.whitePlayerId != null ? byId.get(p.whitePlayerId) : undefined;
+      const b = p.blackPlayerId != null ? byId.get(p.blackPlayerId) : undefined;
+      return {
+        ...p,
+        whitePlayerName: w ? `${w.firstName ?? ''} ${w.lastName ?? ''}`.trim() || undefined : undefined,
+        whitePlayerRating: w?.eloFideStandard ?? w?.eloNational,
+        blackPlayerName: b ? `${b.firstName ?? ''} ${b.lastName ?? ''}`.trim() || undefined : undefined,
+        blackPlayerRating: b?.eloFideStandard ?? b?.eloNational,
+      };
+    });
+    return { ...round, pairings: enriched };
+  }
+
   async getMyRegistration(tournamentId: string, userId: string): Promise<unknown> {
     const { msTournament } = this.http.urls;
     const all = await this.http.get<Array<Record<string, unknown>>>(
