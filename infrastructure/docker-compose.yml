@@ -104,6 +104,7 @@ services:
     image: postgres:16-alpine
     container_name: chessquery_analytics_db
     restart: unless-stopped
+    profiles: ["analytics"]
     environment:
       POSTGRES_USER: ${DB_USER:-chessquery}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-chessquery_dev}
@@ -140,10 +141,13 @@ services:
       timeout: 5s
       retries: 5
 
+  # ms-etl + etl_db quedan opt-in via profile 'etl'. No se usan en el flujo
+  # principal de la demo. Para levantarlos: docker compose --profile etl up -d
   etl_db:
     image: postgres:16-alpine
     container_name: chessquery_etl_db
     restart: unless-stopped
+    profiles: ["etl"]
     environment:
       POSTGRES_USER: ${DB_USER:-chessquery}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-chessquery_dev}
@@ -270,6 +274,7 @@ services:
       dockerfile: Dockerfile
     container_name: chessquery_ms_analytics
     restart: unless-stopped
+    profiles: ["analytics"]
     environment:
       DB_URL: jdbc:postgresql://analytics_db:5432/analytics_db
       DB_USER: ${DB_USER:-chessquery}
@@ -339,6 +344,7 @@ services:
       dockerfile: Dockerfile
     container_name: chessquery_ms_etl
     restart: unless-stopped
+    profiles: ["etl"]
     environment:
       DATABASE_URL: postgresql://${DB_USER:-chessquery}:${DB_PASSWORD:-chessquery_dev}@etl_db:5432/etl_db
       RABBITMQ_HOST: rabbitmq
@@ -399,7 +405,6 @@ services:
     depends_on:
       - ms-users
       - ms-game
-      - ms-analytics
       - ms-notifications
     networks:
       - chessquery-net
@@ -430,6 +435,7 @@ services:
       dockerfile: Dockerfile
     container_name: chessquery_bff_admin
     restart: unless-stopped
+    profiles: ["admin"]
     environment:
       PORT: "3003"
       MS_USERS_URL: http://ms-users:8081
@@ -443,8 +449,6 @@ services:
       - ms-users
       - ms-tournament
       - ms-game
-      - ms-analytics
-      - ms-etl
     networks:
       - chessquery-net
 
@@ -482,7 +486,6 @@ services:
     depends_on:
       - bff-player
       - bff-organizer
-      - bff-admin
       - redis
       - ms-users
     networks:

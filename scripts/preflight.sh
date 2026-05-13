@@ -36,10 +36,16 @@ check_http "ms-users"          "http://localhost:8081/actuator/health"
 check_http "ms-tournament"     "http://localhost:8082/actuator/health"
 check_http "ms-game"           "http://localhost:8083/actuator/health"
 check_http "ms-notifications"  "http://localhost:8085/actuator/health"
-check_http "ms-etl"            "http://localhost:8086/health"
 check_http "api-gateway"       "http://localhost:8080/actuator/health"
 check_http "bff-player"        "http://localhost:3001/health"
 check_http "bff-organizer"     "http://localhost:3002/health"
+
+ETL_CODE=$(curl -s -o /dev/null -m 3 -w "%{http_code}" "http://localhost:8086/health" 2>/dev/null)
+if [ "$ETL_CODE" = "200" ]; then
+  c_ok "ms-etl → http://localhost:8086/health ($ETL_CODE)"
+else
+  c_warn "ms-etl apagado (OK para demo, está fuera de scope)"
+fi
 
 # ── 2. Supabase ──────────────────────────────────────────────────────────
 section "Supabase"
@@ -97,7 +103,11 @@ check_db "user_db"       chessquery_user_db        user_db
 check_db "tournament_db" chessquery_tournament_db  tournament_db
 check_db "game_db"       chessquery_game_db        game_db
 check_db "notif_db"      chessquery_notif_db       notif_db
-check_db "etl_db"        chessquery_etl_db         etl_db
+if docker ps --format '{{.Names}}' | grep -qx "chessquery_etl_db"; then
+  check_db "etl_db"      chessquery_etl_db         etl_db
+else
+  c_warn "etl_db apagada (OK para demo, está fuera de scope)"
+fi
 
 # ── 5. Frontends ─────────────────────────────────────────────────────────
 section "Frontends"

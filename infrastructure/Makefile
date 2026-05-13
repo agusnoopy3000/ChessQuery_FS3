@@ -6,7 +6,7 @@ COMPOSE  = docker compose
 ENV_FILE = .env
 DC_FILE  = docker-compose.yml
 
-.PHONY: help up down logs reset ps clean-setup check-env build demo-reset demo-prebuild demo-up demo-down preflight
+.PHONY: help up down logs reset ps clean-setup check-env build demo-reset demo-prebuild demo-up demo-down demo-supabase-trim demo-m1-up preflight
 
 # ---------------------------------------------------------------------------
 # Ayuda por defecto
@@ -19,6 +19,8 @@ help:
 	@echo "  make build       Reconstruye imágenes Docker sin levantar (--no-cache)"
 	@echo "  make demo-prebuild  Build SOLO scope demo (correr la noche antes)"
 	@echo "  make demo-up        Up scope demo con heap reducido (M1 8GB ready)"
+	@echo "  make demo-supabase-trim  Apaga contenedores Supabase no esenciales"
+	@echo "  make demo-m1-up     Arranque completo recomendado para demo en M1"
 	@echo "  make demo-down      Detener scope demo"
 	@echo "  make preflight      Check 5 min antes de demo"
 	@echo "  make demo-reset  Limpia datos de demo conservando los seeds"
@@ -110,10 +112,10 @@ demo-reset:
 # demo-prebuild: buildea SOLO los servicios de scope demo (la noche
 # anterior). Saca de la ruta crítica el `--no-cache` del día de demo.
 # ---------------------------------------------------------------------------
-DEMO_SERVICES = ms-users ms-tournament ms-game ms-notifications \
+DEMO_SERVICES = ms-users ms-tournament ms-game ms-analytics ms-notifications \
                 bff-player bff-organizer api-gateway
 
-DEMO_INFRA    = user_db tournament_db game_db notif_db \
+DEMO_INFRA    = user_db tournament_db game_db analytics_db notif_db \
                 rabbitmq redis
 
 DEMO_COMPOSE  = -f $(DC_FILE) -f docker-compose.demo.yml
@@ -129,17 +131,40 @@ demo-prebuild: check-env
 demo-up: check-env
 	@echo "[make] Levantando stack de demo (heap reducido)..."
 	$(COMPOSE) --env-file $(ENV_FILE) $(DEMO_COMPOSE) up -d --wait --no-build \
-	    $(DEMO_INFRA) $(DEMO_SERVICES) nginx
+	    $(DEMO_INFRA) $(DEMO_SERVICES)
 	@echo ""
 	@echo "  Demo lista. Si login devuelve 504/502 tras restart de Supabase:"
 	@echo "    docker restart supabase_kong_ChessQuery_FS3"
+
+# ---------------------------------------------------------------------------
+# demo-supabase-trim: apaga contenedores pesados de Supabase que no se usan
+# durante la demo en M1 8GB, pero preserva Studio para poder mostrar
+# Auth users y Storage/PGN. Se puede ejecutar repetidamente sin problema.
+# ---------------------------------------------------------------------------
+demo-supabase-trim:
+	@echo "[make] Apagando contenedores Supabase no esenciales para la demo..."
+	-@docker stop supabase_analytics_ChessQuery_FS3 >/dev/null 2>&1 || true
+	-@docker stop supabase_edge_runtime_ChessQuery_FS3 >/dev/null 2>&1 || true
+	-@docker stop supabase_vector_ChessQuery_FS3 >/dev/null 2>&1 || true
+	@echo "[make] Supabase recortado. Studio se mantiene encendido para la demo."
+
+# ---------------------------------------------------------------------------
+# demo-m1-up: secuencia recomendada para la demo en MacBook Air M1 8GB.
+# Requiere que Supabase ya haya sido iniciado con `supabase start`.
+# ---------------------------------------------------------------------------
+demo-m1-up: demo-supabase-trim demo-up
+	@echo ""
+	@echo "  Stack M1 listo:"
+	@echo "    API Gateway      → http://localhost:8080"
+	@echo "    Chess Portal     → http://localhost:5173  (levantar con npm run dev:portal)"
+	@echo "    Organizer Panel  → http://localhost:5174  (levantar con npm run dev:organizer)"
 
 # ---------------------------------------------------------------------------
 # demo-down: detiene solo los contenedores de scope demo.
 # ---------------------------------------------------------------------------
 demo-down:
 	$(COMPOSE) --env-file $(ENV_FILE) $(DEMO_COMPOSE) stop \
-	    $(DEMO_INFRA) $(DEMO_SERVICES) nginx
+	    $(DEMO_INFRA) $(DEMO_SERVICES)
 
 # ---------------------------------------------------------------------------
 # preflight: corre el check de 5 min antes de demo

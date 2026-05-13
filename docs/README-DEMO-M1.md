@@ -9,9 +9,9 @@ El stack completo (todos los microservicios + Supabase + frontend + Docker Deskt
 
 Este flujo:
 
-- Apaga servicios fuera de scope (`ms-etl`, `ms-analytics`, `bff-admin`, `analytics_db`)
+- Apaga servicios fuera de scope (`ms-etl`, `bff-admin`)
 - Reduce heap JVM de cada microservicio a 256 MB (default ~1 GB)
-- Mantiene apagados containers no esenciales de Supabase (studio, pg_meta, edge_runtime, vector, analytics)
+- Mantiene apagados containers no esenciales de Supabase (`analytics`, `edge_runtime`, `vector`) pero deja **Studio** disponible para mostrar usuarios autenticados y PGN en Storage
 - Resultado: **~3 GB** en idle, **~4 GB** bajo demo activa → margen cómodo
 
 ## Antes del día de demo
@@ -41,31 +41,29 @@ cd /ruta/al/repo
 supabase start
 ```
 
-Tras eso, **apagar los containers de Supabase que no se usan** (saca otros ~600 MB):
+Tras eso, **apagar los containers de Supabase que no se usan** (saca RAM sin perder Studio):
 
 ```bash
-docker stop supabase_analytics_ChessQuery_FS3 \
-            supabase_studio_ChessQuery_FS3 \
-            supabase_pg_meta_ChessQuery_FS3 \
-            supabase_edge_runtime_ChessQuery_FS3 \
-            supabase_vector_ChessQuery_FS3
+cd infrastructure
+make demo-supabase-trim
 ```
 
-Si necesitas Studio (raro en demo), prendelo solo cuando lo vayas a mostrar:
-```bash
-docker start supabase_studio_ChessQuery_FS3
-```
+Studio queda encendido para poder mostrar:
+- `Authentication > Users`
+- `Storage > chessquery-pgn`
 
 ### 2. Levantar stack ChessQuery (modo demo)
 
 ```bash
 cd infrastructure
-make demo-up
+make demo-m1-up
 ```
 
 Este target usa `docker-compose.demo.yml` que aplica:
 - `JAVA_TOOL_OPTIONS=-Xms128m -Xmx256m -XX:+UseSerialGC -XX:TieredStopAtLevel=1`
-- Solo los 7 servicios de scope demo + 4 BDs + RabbitMQ + Redis + Nginx
+- Mantiene `ms-analytics` y `analytics_db` activos para que el perfil del jugador siga mostrando métricas reales
+- Solo deja fuera `ms-etl` y `bff-admin`
+- Recorta automáticamente los contenedores pesados de Supabase que no entran en escena
 
 Sale cuando todos los healthchecks pasen (~30–60s).
 
@@ -150,7 +148,9 @@ docker volume prune -f      # ¡cuidado! borra TODOS los volumes de Docker
 ## Cheatsheet de comandos memorizables
 
 ```bash
-make demo-up         # levantar
+make demo-m1-up      # levantar demo en M1
+make demo-up         # levantar solo el scope app si Supabase ya está recortado
+make demo-supabase-trim  # apagar Supabase no esencial
 make demo-down       # apagar
 make preflight       # check 5min antes
 make demo-reset      # limpiar datos entre dry-runs
