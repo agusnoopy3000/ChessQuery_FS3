@@ -127,6 +127,5 @@ Documentos clave para la defensa oral (Parcial N°2)
 ============================================================
 
 - docs/ANALISIS_PATRONES.md  → 8 patrones diseño + 6 arquitectónicos
-- docs/PLAN_BRANCHING.md     → estrategia + PRs + ejemplo conflictos
-- docs/CHEATSHEET_DEFENSA.md → distribución de temas por integrante
+- docs/PLAN_BRANCHING.md     → estrategia + PRs + reparto por integrante
 - archetypes/chessquery-ms-archetype/README.md → uso del arquetipo

@@ -348,5 +348,5 @@ ingreso de nuevos microservicios.
 |---|---|---|
 | 1. ≥3 patrones de diseño justificados | 10% | §2 (8 patrones documentados) |
 | 2. Arquetipos + patrones arquitectónicos coherentes | 10% | §3 + §4 |
-| 5. Defensa: explica patrones diseño | 20% | `CHEATSHEET_DEFENSA.md` |
-| 6. Defensa: explica arquetipos + arquitectura | 20% | `CHEATSHEET_DEFENSA.md` |
+| 5. Defensa: explica patrones diseño | 20% | §2 + §6 (tabla patrón × indicador) |
+| 6. Defensa: explica arquetipos + arquitectura | 20% | §3 + §4 |
