@@ -43,8 +43,8 @@ make preflight
 | Doc | Contenido | Indicador rúbrica |
 |---|---|---|
 | [`docs/ANALISIS_PATRONES.md`](./docs/ANALISIS_PATRONES.md) | 8 patrones diseño + 6 arquitectónicos + arquetipo Maven | 1, 2, 5, 6 |
-| [`docs/PLAN_BRANCHING.md`](./docs/PLAN_BRANCHING.md) | Estrategia branching + PRs + ejemplos conflictos | 3, 7 |
-| [`docs/CHEATSHEET_DEFENSA.md`](./docs/CHEATSHEET_DEFENSA.md) | Distribución temas defensa por integrante | 5, 6, 7, 8 |
+| [`docs/PLAN_BRANCHING.md`](./docs/PLAN_BRANCHING.md) | Estrategia branching + PRs + reparto por integrante | 3, 7 |
+| [`docs/TESTING_STRATEGY.md`](./docs/TESTING_STRATEGY.md) | Estrategia de tests + cobertura JaCoCo | 4, 8 |
 | [`repositorios.txt`](./repositorios.txt) | Enlaces a c/repositorio con descripción | Requisito entrega |
 | [`CONTEXT.md`](./CONTEXT.md) | ERD completo, contratos REST, eventos | — |
 | [`PLAN_DEMO.md`](./PLAN_DEMO.md) | Guion de la demo (4 flujos E2E) | — |
