@@ -8,6 +8,7 @@ import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 
 /**
  * Configuración de RabbitMQ para MS-Users.
@@ -24,6 +25,7 @@ import org.springframework.context.annotation.Configuration;
  *     La solución correcta es una cola dedicada por microservicio consumidor.
  */
 @Configuration
+@Profile("!test")
 public class RabbitMQConfig {
 
     public static final String EXCHANGE                  = "ChessEvents";

@@ -8,6 +8,7 @@ import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 
 /**
  * Configuración de RabbitMQ para MS-Notifications.
@@ -19,6 +20,7 @@ import org.springframework.context.annotation.Configuration;
  *   - etl.events               → binding "etl.*"
  */
 @Configuration
+@Profile("!test")
 public class RabbitMQConfig {
 
     public static final String EXCHANGE                = "ChessEvents";
