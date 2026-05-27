@@ -89,6 +89,109 @@ class NotificationServiceTest {
     }
 
     @Test
+    void notifyRegistration_persistsEmailAndInAppLog() {
+        when(notificationLogRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        notificationService.notifyRegistration(Map.of(
+                "playerId", 5, "tournamentId", 1,
+                "tournamentName", "Magistral", "seedRating", 1500));
+        verify(notificationLogRepo, times(2)).save(any());
+        verify(mockEmailService).sendEmail(eq(5L), anyString(), anyString(), anyString());
+    }
+
+
+    @Test
+    void notifyRegistrationPending_validPayload_savesInAppToOrganizer() {
+        when(notificationLogRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(playerNameResolver.resolve(eq(5L))).thenReturn("Ana Soto");
+        notificationService.notifyRegistrationPending(Map.of(
+                "tournamentId", 1, "playerId", 5,
+                "organizerId", 9, "tournamentName", "Open"));
+        ArgumentCaptor<NotificationLog> cap = ArgumentCaptor.forClass(NotificationLog.class);
+        verify(notificationLogRepo).save(cap.capture());
+        assertThat(cap.getValue().getRecipientId()).isEqualTo(9L);
+        assertThat(cap.getValue().getSubject()).contains("Ana Soto");
+    }
+
+
+    @Test
+    void notifyRegistrationApproved_validPayload_sendsEmailAndInApp() {
+        when(notificationLogRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        notificationService.notifyRegistrationApproved(Map.of(
+                "playerId", 5, "tournamentName", "Magistral"));
+        verify(notificationLogRepo, times(2)).save(any());
+        verify(mockEmailService).sendEmail(eq(5L), anyString(),
+                contains("aprobada"), anyString());
+    }
+
+    @Test
+    void notifyRegistrationRejected_withReason_includesReasonInBody() {
+        when(notificationLogRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        notificationService.notifyRegistrationRejected(Map.of(
+                "playerId", 5, "tournamentName", "X", "reason", "ELO bajo"));
+        ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
+        verify(mockEmailService).sendEmail(eq(5L), anyString(), anyString(), body.capture());
+        assertThat(body.getValue()).contains("ELO bajo");
+    }
+
+    @Test
+    void notifyGameInvitation_validPayload_savesInAppLog() {
+        when(notificationLogRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        notificationService.notifyGameInvitation(Map.of(
+                "gameId", 42, "playerId", 7, "inviterName", "Magnus"));
+        ArgumentCaptor<NotificationLog> cap = ArgumentCaptor.forClass(NotificationLog.class);
+        verify(notificationLogRepo).save(cap.capture());
+        assertThat(cap.getValue().getRecipientId()).isEqualTo(7L);
+        assertThat(cap.getValue().getSubject()).contains("Magnus").contains("42");
+    }
+
+
+    @Test
+    void notifyGameFinished_notifiesBothPlayers() {
+        when(notificationLogRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(playerNameResolver.resolve(any())).thenReturn("Rival X");
+        notificationService.notifyGameFinished(Map.of(
+                "whitePlayerId", 1, "blackPlayerId", 2,
+                "result", "1-0", "finalizedGameId", 99));
+        // 2 saves por jugador × 2 jugadores = 4
+        verify(notificationLogRepo, times(4)).save(any());
+        verify(mockEmailService, times(2)).sendEmail(any(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void notifyGameFinished_drawResult_describesAsTablas() {
+        when(notificationLogRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(playerNameResolver.resolve(any())).thenReturn("R");
+        notificationService.notifyGameFinished(Map.of(
+                "whitePlayerId", 1, "blackPlayerId", 2,
+                "result", "1/2-1/2", "finalizedGameId", 1));
+        ArgumentCaptor<String> subj = ArgumentCaptor.forClass(String.class);
+        verify(mockEmailService, times(2)).sendEmail(any(), anyString(), subj.capture(), anyString());
+        assertThat(subj.getAllValues().get(0)).contains("Tablas");
+    }
+
+    @Test
+    void notifyTournamentCreated_validPayload_savesInAppForOrganizer() {
+        when(notificationLogRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        notificationService.notifyTournamentCreated(Map.of(
+                "organizerId", 9, "tournamentId", 1, "name", "Open"));
+        ArgumentCaptor<NotificationLog> cap = ArgumentCaptor.forClass(NotificationLog.class);
+        verify(notificationLogRepo).save(cap.capture());
+        assertThat(cap.getValue().getRecipientId()).isEqualTo(9L);
+        assertThat(cap.getValue().getSubject()).contains("Open");
+    }
+
+
+    @Test
+    void notifyRoundStarting_persistsLogAndEmail() {
+        when(notificationLogRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        notificationService.notifyRoundStarting(Map.of(
+                "tournamentId", 1, "roundNumber", 3, "pairingsCount", 7));
+        verify(notificationLogRepo, times(1)).save(any());
+        verify(mockEmailService).sendEmail(eq(1L), anyString(),
+                contains("ronda"), anyString());
+    }
+
+    @Test
     void notifySyncFailed_alertsAdminWithRecipientIdZero() {
         // Arrange
         Map<String, Object> payload = Map.of(

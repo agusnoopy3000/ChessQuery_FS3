@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chessquery-config
+  namespace: chessquery
+data:
+  # URLs internas (DNS de cluster)
+  MS_USERS_URL:         "http://ms-users-service.chessquery.svc.cluster.local:8081"
+  MS_TOURNAMENT_URL:    "http://ms-tournament-service.chessquery.svc.cluster.local:8082"
+  MS_GAME_URL:          "http://ms-game-service.chessquery.svc.cluster.local:8083"
+  MS_ANALYTICS_URL:     "http://ms-analytics-service.chessquery.svc.cluster.local:8084"
+  MS_NOTIFICATIONS_URL: "http://ms-notifications-service.chessquery.svc.cluster.local:8085"
+  MS_ETL_URL:           "http://ms-etl-service.chessquery.svc.cluster.local:8086"
+  API_GATEWAY_URL:      "http://api-gateway-service.chessquery.svc.cluster.local:8080"
+
+  # Infra interna
+  RABBITMQ_HOST:  "rabbitmq-service.chessquery.svc.cluster.local"
+  RABBITMQ_PORT:  "5672"
+  RABBITMQ_USER:  "chessquery"
+  REDIS_HOST:     "redis-service.chessquery.svc.cluster.local"
+  REDIS_PORT:     "6379"
+
+  # PostgreSQL (una DB por servicio; el host puede ser RDS o un PG interno)
+  DB_HOST: "<DB_HOST_HERE>"
+  DB_PORT: "5432"
+
+  # Supabase
+  SUPABASE_URL: "<SUPABASE_URL_HERE>"
+
+  # Spring Boot perfiles
+  SPRING_PROFILES_ACTIVE: "prod"

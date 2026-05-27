@@ -72,6 +72,20 @@ describe('RegisterPage', () => {
     expect(registerMock).not.toHaveBeenCalled();
   });
 
+  it('muestra el error del servidor cuando el email ya está en uso', async () => {
+    registerMock.mockRejectedValue({ message: 'User already registered' });
+    render(<RegisterPage />);
+    fillBaseFields();
+    toggleTerms();
+    fireEvent.click(screen.getByRole('button', { name: /Crear cuenta jugador/i }));
+    await waitFor(() => {
+      // El traductor de auth-errors devuelve raw cuando no hay match conocido
+      // (en el mock translateAuthError devuelve el raw tal cual).
+      expect(screen.getByText(/User already registered/i)).toBeInTheDocument();
+    });
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
   it('llama a register y navega cuando los datos son válidos', async () => {
     registerMock.mockResolvedValue({});
     render(<RegisterPage />);

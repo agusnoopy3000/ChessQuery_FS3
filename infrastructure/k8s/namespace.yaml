@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: chessquery
+  labels:
+    name: chessquery
+    app.kubernetes.io/part-of: chessquery
