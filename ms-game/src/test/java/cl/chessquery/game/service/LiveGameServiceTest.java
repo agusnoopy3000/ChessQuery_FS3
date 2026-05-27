@@ -333,6 +333,65 @@ class LiveGameServiceTest {
     }
 
     @Nested
+    @DisplayName("Detección de terminales en move()")
+    class TerminalDetection {
+
+        @Test
+        @DisplayName("checkmate (Fool's Mate) — termina sesión con resultado del bando que dio mate")
+        void move_foolsMate_finishesAsCheckmate() {
+            createAndJoin();
+            play("f2f3", 1L); play("e7e5", 2L);
+            play("g2g4", 1L); play("d8h4", 2L); // mate de las negras
+
+            assertThat(persistedSession.getStatus()).isEqualTo(SessionStatus.FINISHED);
+            assertThat(persistedSession.getEndReason()).isEqualTo("CHECKMATE");
+            assertThat(persistedSession.getResult()).isEqualTo("0-1");
+        }
+
+        @Test
+        @DisplayName("stalemate — empate 1/2-1/2 con endReason STALEMATE")
+        void move_stalemate_resultsInDraw() {
+            createAndJoin();
+            // Pre-stalemate: tras Qg6, el rey negro en h8 queda sin movidas legales.
+            persistedSession.setCurrentFen("7k/5K2/8/8/8/8/8/6Q1 w - - 0 1");
+            persistedSession.setTurn("w");
+            play("g1g6", 1L);
+
+            assertThat(persistedSession.getStatus()).isEqualTo(SessionStatus.FINISHED);
+            assertThat(persistedSession.getEndReason()).isEqualTo("STALEMATE");
+            assertThat(persistedSession.getResult()).isEqualTo("1/2-1/2");
+        }
+
+        @Test
+        @DisplayName("material insuficiente — empate cuando solo queda K vs K+B")
+        void move_insufficientMaterial_resultsInDraw() {
+            createAndJoin();
+            // Tras Bxe4 quedan negras con K+B y blancas solo con K: material insuficiente.
+            persistedSession.setCurrentFen("4k3/8/8/3b4/4P3/8/8/4K3 b - - 0 1");
+            persistedSession.setTurn("b");
+            play("d5e4", 2L);
+
+            assertThat(persistedSession.getStatus()).isEqualTo(SessionStatus.FINISHED);
+            assertThat(persistedSession.getEndReason()).isEqualTo("DRAW_INSUFFICIENT");
+            assertThat(persistedSession.getResult()).isEqualTo("1/2-1/2");
+        }
+
+        @Test
+        @DisplayName("regla de las 50 movidas — empate cuando halfmove counter llega a 100")
+        void move_fiftyMoveRule_resultsInDraw() {
+            createAndJoin();
+            // Posición con halfmove=99: cualquier movida no-captura no-peón lleva a 100.
+            persistedSession.setCurrentFen("4k3/8/8/8/8/8/8/R3K3 w Q - 99 50");
+            persistedSession.setTurn("w");
+            play("a1a2", 1L);
+
+            assertThat(persistedSession.getStatus()).isEqualTo(SessionStatus.FINISHED);
+            assertThat(persistedSession.getEndReason()).isEqualTo("DRAW_50MOVE");
+            assertThat(persistedSession.getResult()).isEqualTo("1/2-1/2");
+        }
+    }
+
+    @Nested
     @DisplayName("Rematch")
     class Rematch {
 

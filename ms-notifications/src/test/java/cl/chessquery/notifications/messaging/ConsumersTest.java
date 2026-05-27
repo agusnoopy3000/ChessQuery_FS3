@@ -169,4 +169,131 @@ class ConsumersTest {
         tour.onTournamentEvent(event("player.registered", Map.of()), ch, 1L);
         verify(ch).basicAck(eq(1L), eq(false));
     }
+
+    @Test
+    @DisplayName("onTournamentEvent_playerRegistered_routesToNotifyRegistration")
+    void onTournamentEvent_playerRegistered_routesToNotifyRegistration() throws IOException {
+        tour.onTournamentEvent(event("player.registered", Map.of("playerId", 1)), ch, 1L);
+        verify(notif).notifyRegistration(any());
+        verify(ch).basicAck(eq(1L), eq(false));
+    }
+
+    @Test
+    @DisplayName("onTournamentEvent_roundStarting_routesToNotifyRoundStarting")
+    void onTournamentEvent_roundStarting_routesToNotifyRoundStarting() throws IOException {
+        tour.onTournamentEvent(event("tournament.round.starting", Map.of()), ch, 1L);
+        verify(notif).notifyRoundStarting(any());
+    }
+
+    @Test
+    @DisplayName("onTournamentEvent_registrationPending_routesToNotifyPending")
+    void onTournamentEvent_registrationPending_routesToNotifyPending() throws IOException {
+        tour.onTournamentEvent(event("registration.pending", Map.of()), ch, 1L);
+        verify(notif).notifyRegistrationPending(any());
+    }
+
+    @Test
+    @DisplayName("onTournamentEvent_registrationApproved_routesToNotifyApproved")
+    void onTournamentEvent_registrationApproved_routesToNotifyApproved() throws IOException {
+        tour.onTournamentEvent(event("registration.approved", Map.of()), ch, 1L);
+        verify(notif).notifyRegistrationApproved(any());
+    }
+
+    @Test
+    @DisplayName("onTournamentEvent_registrationRejected_routesToNotifyRejected")
+    void onTournamentEvent_registrationRejected_routesToNotifyRejected() throws IOException {
+        tour.onTournamentEvent(event("registration.rejected", Map.of()), ch, 1L);
+        verify(notif).notifyRegistrationRejected(any());
+    }
+
+    @Test
+    @DisplayName("onTournamentEvent_tournamentCreated_logsAndAcks")
+    void onTournamentEvent_tournamentCreated_logsAndAcks() throws IOException {
+        tour.onTournamentEvent(event("tournament.created", Map.of("name", "Open")), ch, 1L);
+        verify(notif, never()).notifyRegistration(any());
+        verify(ch).basicAck(eq(1L), eq(false));
+    }
+
+    @Test
+    @DisplayName("onTournamentEvent_unknownType_isIgnoredAndAcked")
+    void onTournamentEvent_unknownType_isIgnoredAndAcked() throws IOException {
+        tour.onTournamentEvent(event("other.tournament", Map.of()), ch, 1L);
+        verify(ch).basicAck(eq(1L), eq(false));
+    }
+
+    @Test
+    @DisplayName("onTournamentEvent_serviceThrows_nacksWithoutRequeue")
+    void onTournamentEvent_serviceThrows_nacksWithoutRequeue() throws IOException {
+        doThrow(new RuntimeException("DB down")).when(notif).notifyRegistration(any());
+        tour.onTournamentEvent(event("player.registered", Map.of()), ch, 5L);
+        verify(ch).basicNack(eq(5L), eq(false), eq(false));
+    }
+
+    @Test
+    @DisplayName("onTournamentEvent_dataIntegrityViolation_acksAsIdempotenceRace")
+    void onTournamentEvent_dataIntegrityViolation_acksAsIdempotenceRace() throws IOException {
+        doThrow(new DataIntegrityViolationException("dup pk"))
+                .when(notif).notifyRegistration(any());
+        tour.onTournamentEvent(event("player.registered", Map.of()), ch, 6L);
+        verify(ch).basicAck(eq(6L), eq(false));
+    }
+
+    // ── GameEventsConsumer: branches faltantes ───────────────────────────────
+
+    @Test
+    @DisplayName("onGameEvent_alreadyProcessed_acksWithoutDispatch")
+    void onGameEvent_alreadyProcessed_acksWithoutDispatch() throws IOException {
+        when(processedRepo.existsById(any())).thenReturn(true);
+        game.onGameEvent(event("game.finished", Map.of()), ch, 7L);
+        verify(notif, never()).notifyGameFinished(any());
+        verify(ch).basicAck(eq(7L), eq(false));
+    }
+
+    @Test
+    @DisplayName("onGameEvent_dataIntegrityViolation_acksAsIdempotenceRace")
+    void onGameEvent_dataIntegrityViolation_acksAsIdempotenceRace() throws IOException {
+        doThrow(new DataIntegrityViolationException("dup"))
+                .when(notif).notifyEloUpdated(any());
+        game.onGameEvent(event("elo.updated", Map.of()), ch, 8L);
+        verify(ch).basicAck(eq(8L), eq(false));
+    }
+
+    @Test
+    @DisplayName("onGameEvent_serviceThrows_nacksWithoutRequeue")
+    void onGameEvent_serviceThrows_nacksWithoutRequeue() throws IOException {
+        doThrow(new RuntimeException("boom")).when(notif).notifyEloUpdated(any());
+        game.onGameEvent(event("elo.updated", Map.of()), ch, 9L);
+        verify(ch).basicNack(eq(9L), eq(false), eq(false));
+    }
+
+    // ── EtlEventsConsumer: branches faltantes ────────────────────────────────
+
+    @Test
+    @DisplayName("onEtlEvent_alreadyProcessed_acksWithoutDispatch")
+    void onEtlEvent_alreadyProcessed_acksWithoutDispatch() throws IOException {
+        when(processedRepo.existsById(any())).thenReturn(true);
+        etl.onEtlEvent(event("sync.completed",
+                Map.of("status", "FAILED", "source", "FIDE")), ch, 10L);
+        verify(notif, never()).notifySyncFailed(any());
+        verify(ch).basicAck(eq(10L), eq(false));
+    }
+
+    @Test
+    @DisplayName("onEtlEvent_serviceThrows_nacksWithoutRequeue")
+    void onEtlEvent_serviceThrows_nacksWithoutRequeue() throws IOException {
+        doThrow(new RuntimeException("smtp down")).when(notif).notifySyncFailed(any());
+        etl.onEtlEvent(event("sync.completed",
+                Map.of("status", "FAILED", "source", "FIDE")), ch, 11L);
+        verify(ch).basicNack(eq(11L), eq(false), eq(false));
+    }
+
+    @Test
+    @DisplayName("onEtlEvent_dataIntegrityViolation_acksAsIdempotenceRace")
+    void onEtlEvent_dataIntegrityViolation_acksAsIdempotenceRace() throws IOException {
+        doThrow(new DataIntegrityViolationException("dup"))
+                .when(notif).notifySyncFailed(any());
+        etl.onEtlEvent(event("sync.completed",
+                Map.of("status", "FAILED", "source", "FIDE")), ch, 12L);
+        verify(ch).basicAck(eq(12L), eq(false));
+    }
 }

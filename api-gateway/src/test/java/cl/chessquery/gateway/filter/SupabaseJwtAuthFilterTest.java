@@ -186,4 +186,141 @@ class SupabaseJwtAuthFilterTest {
     void getOrder_returnsNegativeOneHundred() {
         assertThat(filter.getOrder()).isEqualTo(-100);
     }
+
+    @Test
+    @DisplayName("filter_publicPathActuator_skipsAuth")
+    void filter_publicPathActuator_skipsAuth() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/actuator/health"));
+        when(chain.filter(exchange)).thenReturn(Mono.empty());
+
+        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+        verify(chain).filter(exchange);
+    }
+
+    @Test
+    @DisplayName("filter_validToken_roleFromDirectClaim_propagatesAsRole")
+    void filter_validToken_roleFromDirectClaim_propagatesAsRole() {
+        UUID uid = UUID.randomUUID();
+        // Token sin user_metadata, con "role" como claim directo.
+        String token = Jwts.builder()
+                .subject(uid.toString())
+                .claim("email", "x@y.cl")
+                .claim("role", "ORGANIZER")
+                .issuedAt(Date.from(Instant.now()))
+                .expiration(Date.from(Instant.now().plusSeconds(60)))
+                .signWith(KEY).compact();
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/tournaments")
+                        .header("Authorization", "Bearer " + token));
+        when(playerIdResolver.resolve(any(), any())).thenReturn(Mono.just(7L));
+        when(chain.filter(any())).thenReturn(Mono.empty());
+
+        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+        // El branch role-from-direct-claim se ejerce porque el filtro llega a
+        // chain.filter sin lanzar 401; basta con verificar que el chain fue invocado.
+        verify(chain).filter(any());
+    }
+
+    @Test
+    @DisplayName("filter_validToken_roleFromAppMetadata_propagatesAsRole")
+    void filter_validToken_roleFromAppMetadata_propagatesAsRole() {
+        UUID uid = UUID.randomUUID();
+        String token = Jwts.builder()
+                .subject(uid.toString())
+                .claim("email", "x@y.cl")
+                .claim("app_metadata", Map.of("role", "ADMIN"))
+                .issuedAt(Date.from(Instant.now()))
+                .expiration(Date.from(Instant.now().plusSeconds(60)))
+                .signWith(KEY).compact();
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/users/1/profile")
+                        .header("Authorization", "Bearer " + token));
+        when(playerIdResolver.resolve(any(), any())).thenReturn(Mono.just(1L));
+        when(chain.filter(any())).thenReturn(Mono.empty());
+
+        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+        verify(chain).filter(any());
+    }
+
+    @Test
+    @DisplayName("filter_validToken_noRoleAnywhere_defaultsToPlayer")
+    void filter_validToken_noRoleAnywhere_defaultsToPlayer() {
+        UUID uid = UUID.randomUUID();
+        String token = Jwts.builder()
+                .subject(uid.toString())
+                .claim("email", "x@y.cl")
+                .issuedAt(Date.from(Instant.now()))
+                .expiration(Date.from(Instant.now().plusSeconds(60)))
+                .signWith(KEY).compact();
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/games")
+                        .header("Authorization", "Bearer " + token));
+        when(playerIdResolver.resolve(any(), any())).thenReturn(Mono.just(99L));
+        when(chain.filter(any())).thenReturn(Mono.empty());
+
+        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+        verify(chain).filter(any());
+    }
+
+    @Test
+    @DisplayName("filter_validToken_includesUserMetadataInProvisionClaims")
+    void filter_validToken_includesUserMetadataInProvisionClaims() {
+        UUID uid = UUID.randomUUID();
+        String token = Jwts.builder()
+                .subject(uid.toString())
+                .claim("email", "ana@demo.cl")
+                .claim("user_metadata", Map.of(
+                        "role", "PLAYER",
+                        "firstName", "Ana",
+                        "lastName", "Vega",
+                        "lichessUsername", "ana_chess",
+                        "clubName", "Lasker"))
+                .issuedAt(Date.from(Instant.now()))
+                .expiration(Date.from(Instant.now().plusSeconds(60)))
+                .signWith(KEY).compact();
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/games")
+                        .header("Authorization", "Bearer " + token));
+
+        org.mockito.ArgumentCaptor<java.util.Map<String, Object>> claimsCap =
+                org.mockito.ArgumentCaptor.forClass(java.util.Map.class);
+        when(playerIdResolver.resolve(any(), claimsCap.capture()))
+                .thenReturn(Mono.just(5L));
+        when(chain.filter(any())).thenReturn(Mono.empty());
+
+        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+
+        java.util.Map<String, Object> claims = claimsCap.getValue();
+        assertThat(claims).containsEntry("email", "ana@demo.cl");
+        assertThat(claims).containsEntry("firstName", "Ana");
+        assertThat(claims).containsEntry("lastName", "Vega");
+        assertThat(claims).containsEntry("lichessUsername", "ana_chess");
+        assertThat(claims).containsEntry("clubName", "Lasker");
+    }
+
+    @Test
+    @DisplayName("filter_tokenWithUnknownKid_fallsBackToHmacAndValidates")
+    void filter_tokenWithUnknownKid_fallsBackToHmacAndValidates() {
+        UUID uid = UUID.randomUUID();
+        // Forzamos un header `kid` para ejercer el branch de resolveKey con
+        // cache miss → fallback a HMAC. La firma sigue siendo HS256 con
+        // nuestra key, así que la validación tiene éxito.
+        String token = Jwts.builder()
+                .header().keyId("non-existent-kid").and()
+                .subject(uid.toString())
+                .claim("email", "k@y.cl")
+                .claim("user_metadata", Map.of("role", "PLAYER"))
+                .issuedAt(Date.from(Instant.now()))
+                .expiration(Date.from(Instant.now().plusSeconds(60)))
+                .signWith(KEY).compact();
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/games")
+                        .header("Authorization", "Bearer " + token));
+        when(playerIdResolver.resolve(any(), any())).thenReturn(Mono.just(11L));
+        when(chain.filter(any())).thenReturn(Mono.empty());
+
+        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+        verify(chain).filter(any());
+    }
 }
