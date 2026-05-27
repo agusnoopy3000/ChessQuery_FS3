@@ -261,6 +261,8 @@ services:
         condition: service_healthy
     networks:
       - chessquery-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8083/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"]
       interval: 15s
@@ -490,6 +492,8 @@ services:
       - ms-users
     networks:
       - chessquery-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"]
       interval: 15s

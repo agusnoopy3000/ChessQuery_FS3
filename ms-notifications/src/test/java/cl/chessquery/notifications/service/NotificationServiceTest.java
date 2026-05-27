@@ -16,6 +16,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -61,6 +62,35 @@ class NotificationServiceTest {
         assertThat(savedEmail.getEventType()).isEqualTo("user.registered");
         assertThat(savedEmail.getRecipientId()).isEqualTo(12L);
         assertThat(savedEmail.getSentAt()).isNotNull();
+    }
+
+    @Test
+    void notifyWelcome_withSupabaseUuid_savesEmailLogWithNullRecipientAndSkipsInApp() {
+        // Regression bug #3: en el flujo Supabase Auth el userId llega como
+        // UUID antes de que el Player numérico exista. El email sigue siendo
+        // entregable; el log queda con recipient_id=NULL y la fila in-app se
+        // omite (no hay destinatario al que la campana le sirva).
+        Map<String, Object> payload = Map.of(
+                "userId",    "550e8400-e29b-41d4-a716-446655440000",
+                "email",     "nuevo@email.com",
+                "firstName", "Pedro",
+                "lastName",  "Soto",
+                "role",      "PLAYER"
+        );
+        when(notificationLogRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        notificationService.notifyWelcome(payload);
+
+        verify(mockEmailService).sendEmail(
+                isNull(), eq("nuevo@email.com"),
+                eq("¡Bienvenido a ChessQuery!"), anyString());
+
+        ArgumentCaptor<NotificationLog> captor = ArgumentCaptor.forClass(NotificationLog.class);
+        verify(notificationLogRepo, times(1)).save(captor.capture());
+        NotificationLog saved = captor.getValue();
+        assertThat(saved.getRecipientId()).isNull();
+        assertThat(saved.getEventType()).isEqualTo("user.registered");
+        assertThat(saved.getStatus()).isEqualTo(NotifStatus.SENT);
     }
 
     @Test

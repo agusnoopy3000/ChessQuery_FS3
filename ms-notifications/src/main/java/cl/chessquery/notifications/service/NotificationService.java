@@ -30,7 +30,11 @@ public class NotificationService {
      */
     @Transactional
     public void notifyWelcome(Map<String, Object> payload) {
-        Long   recipientId = toLong(payload.get("userId"));
+        // En el flujo Supabase Auth, userId llega como UUID y el Player
+        // numérico aún no existe. tryToLong devuelve null en ese caso;
+        // el log queda con recipient_id=NULL y la fila in-app se omite
+        // (no hay destinatario al que la campana le sirva).
+        Long   recipientId = tryToLong(payload.get("userId"));
         String email       = (String) payload.get("email");
         String firstName   = (String) payload.get("firstName");
 
@@ -41,8 +45,10 @@ public class NotificationService {
 
         mockEmailService.sendEmail(recipientId, email, subject, body);
         saveLog(recipientId, Channel.EMAIL, "user.registered", subject, payload, NotifStatus.SENT);
-        saveLog(recipientId, Channel.IN_APP, "user.registered",
-                "¡Bienvenido a ChessQuery!", payload, NotifStatus.SENT);
+        if (recipientId != null) {
+            saveLog(recipientId, Channel.IN_APP, "user.registered",
+                    "¡Bienvenido a ChessQuery!", payload, NotifStatus.SENT);
+        }
     }
 
     /**
@@ -297,5 +303,17 @@ public class NotificationService {
     private static Long toLong(Object v) {
         if (v instanceof Number n) return n.longValue();
         return Long.parseLong(v.toString());
+    }
+
+    /**
+     * Variante tolerante: devuelve null si {@code v} no es numérico (típicamente
+     * cuando llega un UUID de Supabase en vez del Player id). El caller decide
+     * si persistir el log con recipientId null o saltarlo.
+     */
+    private static Long tryToLong(Object v) {
+        if (v == null) return null;
+        if (v instanceof Number n) return n.longValue();
+        try { return Long.parseLong(v.toString()); }
+        catch (NumberFormatException ignored) { return null; }
     }
 }

@@ -20,7 +20,7 @@ public class NotificationLog {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "recipient_id", nullable = false)
+    @Column(name = "recipient_id")
     private Long recipientId;
 
     @Enumerated(EnumType.STRING)
