@@ -13,7 +13,7 @@ concurrency:
 jobs:
   java-tests:
     name: Tests Java (${{ matrix.module }})
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     strategy:
       fail-fast: false
       matrix:
@@ -34,6 +34,11 @@ jobs:
           java-version: '17'
           cache: maven
 
+      - name: Setup Maven 3.9
+        uses: stCarolas/setup-maven@v5
+        with:
+          maven-version: '3.9.9'
+
       - name: Run mvn test (${{ matrix.module }})
         working-directory: ${{ matrix.module }}
         run: mvn -B -DskipITs test
@@ -48,7 +53,7 @@ jobs:
 
   frontend-tests:
     name: Tests frontend (${{ matrix.app }})
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     strategy:
       fail-fast: false
       matrix:
@@ -81,7 +86,7 @@ jobs:
 
   bff-tests:
     name: Tests BFF (${{ matrix.bff }})
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     strategy:
       fail-fast: false
       matrix:
