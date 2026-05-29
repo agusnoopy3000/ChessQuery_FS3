@@ -7,7 +7,7 @@ test del proyecto, para que cualquiera que retome el desarrollo entienda el porq
 > todo tras un `git clone`. Este documento es el *de fondo*: la teoría, el diseño y la cobertura.
 > Si solo querés ejecutar los tests, andá a `TESTING.md`.
 
-Última verificación de la suite: **555 tests, 0 fallos, 0 errores** (corrida local sobre Arch Linux,
+Última verificación de la suite: **568 tests, 0 fallos, 0 errores** (corrida local sobre Arch Linux,
 Maven 3.9.16 + JDK 17 + Node 26).
 
 ---
@@ -16,7 +16,7 @@ Maven 3.9.16 + JDK 17 + Node 26).
 
 | Capa | Servicio | Framework | Tests | Tipo |
 |---|---|---|---:|---|
-| Backend Java | `api-gateway` | JUnit 5 + Mockito + WebTestClient | 31 | Unit + slice de filtro |
+| Backend Java | `api-gateway` | JUnit 5 + Mockito + WebTestClient | 44 | Unit + slice de filtro |
 | Backend Java | `ms-users` | JUnit 5 + Mockito + `@SpringBootTest` | 110 | Unit + Integración H2 |
 | Backend Java | `ms-tournament` | JUnit 5 + Mockito + `@SpringBootTest` | 94 | Unit + Integración H2 |
 | Backend Java | `ms-game` | JUnit 5 + Mockito + `@SpringBootTest` | 91 | Unit + Integración H2 |
@@ -26,7 +26,7 @@ Maven 3.9.16 + JDK 17 + Node 26).
 | BFF | `bff-organizer` | Jest (NestJS) | 28 | Unit (service + http) |
 | Frontend | `chess-portal` | Vitest + RTL + jsdom | 37 | Component/page specs |
 | Frontend | `organizer-panel` | Vitest + RTL + jsdom | 38 | Component/page specs |
-| | | **TOTAL** | **555** | |
+| | | **TOTAL** | **568** | |
 
 **Pirámide de pruebas aplicada:** base ancha de **unitarias** rápidas (mockean dependencias),
 una capa de **integración** por microservicio que valida el wiring real HTTP→Service→JPA contra
@@ -50,11 +50,18 @@ dependencias mockeadas**. No tocan red, broker ni base de datos. Son las más nu
 
 ### 2.2 Cobertura por módulo Java
 
-**`api-gateway` (31 tests)** — el borde de seguridad del sistema:
-- `SupabaseJwtAuthFilterTest` — filtro JWT: rutas públicas (`/actuator`), `extractRole` (claim
-  directo, `app_metadata.role`, fallback `PLAYER`), propagación de `provisionClaims`
-  (firstName/lastName/lichessUsername/clubName del `user_metadata`), validación de tokens HS256
-  reales y branch de `kid` desconocido en el cache JWKS → fallback HMAC + refresh en background.
+**`api-gateway` (44 tests)** — el borde de seguridad del sistema:
+- `SupabaseJwtAuthFilterTest` (16) — filtro JWT, flujo **HS256**: rutas públicas (`/actuator`),
+  `extractRole` (claim directo, `app_metadata.role`, fallback `PLAYER`), propagación de
+  `provisionClaims` (firstName/lastName/lichessUsername/clubName del `user_metadata`), validación
+  de tokens HS256 reales y branch de `kid` desconocido en el cache JWKS → fallback HMAC + refresh
+  en background.
+- `SupabaseJwtAuthFilterJwksTest` (13) — flujo **ES256 / JWKS**: `refreshJwks` contra un
+  `com.sun.net.httpserver.HttpServer` local (sin dependencias nuevas) cubriendo 200/404/keys-no-array/
+  conexión-rechazada; `ecKeyFromJwk` por curva (P-256/384/521, curva no soportada, coordenadas
+  corruptas); validación ES256 con hit de clave EC en cache (inyectada por reflexión); el `catch`
+  de `extractRole` (claim `role` no convertible → default `PLAYER`); y el ciclo `start/stop` del
+  scheduler de refresh. Subió el filtro de **60% → 97% líneas**.
 - `PlayerIdResolverTest` — resolución `UUID Supabase → player.id` vía WebClient (stub).
 - `SupabaseWebhookControllerTest` — endpoint `user-registered`.
 - `SupabaseAuthHealthIndicatorTest` — health del proveedor de auth.
@@ -233,7 +240,7 @@ datos) y **navegación** (post-mutate, links).
 |---|---:|---|---|
 | `ms-game` | ≥85% líneas | ~90% | ✅ |
 | `ms-users` / `ms-tournament` / `ms-notifications` | ≥85% líneas | en rango | ✅ |
-| `api-gateway` | ≥80% líneas | en rango | ✅ |
+| `api-gateway` | ≥80% líneas | 97.9% (`SupabaseJwtAuthFilter` 60%→97%) | ✅ |
 | `ms-analytics` | ≥75% líneas | en rango | ✅ |
 | `chess-portal` | — | 76% líneas / 72.5% stmts | ✅ |
 | `organizer-panel` | ≥75% líneas | 75.3% (`OrganizerTournaments.tsx` 84%) | ✅ |

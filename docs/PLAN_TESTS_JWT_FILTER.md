@@ -101,11 +101,15 @@ El problema central: el filtro hace `httpClient.send(...)` a una URL real. Para 
 
 ## 5. Criterio de "hecho" (Definition of Done)
 
-- [ ] `cd api-gateway && mvn clean test` → BUILD SUCCESS, 0 fallos.
-- [ ] JaCoCo muestra **`SupabaseJwtAuthFilter` ≥ 80% líneas** (hoy 60.1%).
-- [ ] Cobertura global de `api-gateway` **≥ 80% líneas** (hoy 76.6%).
-- [ ] Actualizar la tabla de cobertura en `docs/PRUEBAS.md` §5.2 y en `TESTING.md` §1.
-- [ ] CI (`java-tests` matriz `api-gateway`) verde en el PR.
+- [x] `cd api-gateway && mvn clean test` → BUILD SUCCESS, 0 fallos (44 tests).
+- [x] JaCoCo muestra **`SupabaseJwtAuthFilter` 96.8% líneas** (≥80% ✅, era 60.1%).
+- [x] Cobertura global de `api-gateway` **97.9% líneas** (≥80% ✅, era 76.6%).
+- [x] Actualizar la tabla de cobertura en `docs/PRUEBAS.md` §5.2 y en `TESTING.md` §1.
+- [ ] CI (`java-tests` matriz `api-gateway`) verde en el PR. *(pendiente: abrir PR)*
+
+> **Nota de implementación:** se eligió el **camino (A) sin dependencias nuevas** usando
+> `com.sun.net.httpserver.HttpServer` del JDK en lugar de WireMock/MockWebServer, combinado con
+> reflexión (camino B) para la rama ES256-con-hit y los métodos privados. No se tocó el `pom.xml`.
 
 ## 6. Fuera de alcance (a propósito)
 - El `ScheduledExecutorService` real corriendo cada 4 min (no es testeable de forma

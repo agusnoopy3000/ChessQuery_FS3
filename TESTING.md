@@ -95,7 +95,7 @@ Los microservicios Java descargan dependencias automáticamente la primera vez q
 
 | Servicio | Framework | Tipos de prueba | Total tests | Cobertura objetivo |
 |---|---|---|---:|---:|
-| `api-gateway` | JUnit 5 + Mockito + WebTestClient | Unit + Filter slice | 31 | 80% |
+| `api-gateway` | JUnit 5 + Mockito + WebTestClient | Unit + Filter slice | 44 | 80% |
 | `ms-users` | JUnit 5 + Mockito + `@SpringBootTest` | Unit + Integration H2 | 110 | 85% |
 | `ms-tournament` | JUnit 5 + Mockito + `@SpringBootTest` | Unit + Integration H2 | 94 | 85% |
 | `ms-game` | JUnit 5 + Mockito + `@SpringBootTest` | Unit + Integration H2 | 91 | 85% |
@@ -105,7 +105,7 @@ Los microservicios Java descargan dependencias automáticamente la primera vez q
 | `bff-organizer` | Jest (NestJS) | Unit service + http | 28 | 94% líneas |
 | `chess-portal` (frontend) | Vitest + RTL + jsdom | Page specs | 37 | 76% líneas |
 | `organizer-panel` (frontend) | Vitest + RTL + jsdom | Page specs | 38 | 75% líneas |
-| **Total** | — | — | **555** | — |
+| **Total** | — | — | **568** | — |
 
 **Patrones aplicados:**
 - **Unit**: servicios + controllers con dependencias mockeadas (Mockito / Jest mocks / `vi.mock`).
@@ -237,7 +237,7 @@ done
 (cd frontend/apps/chess-portal && npm test)
 (cd frontend/apps/organizer-panel && npm test)
 
-echo "✅ 555 tests pasaron"
+echo "✅ 568 tests pasaron"
 ```
 
 Este script **ya está en el repo** como `scripts/test-all.sh`. Corré toda la suite con:
@@ -248,7 +248,7 @@ bash scripts/test-all.sh
 
 > ⚠️ Asume que ya hiciste `npm install` en `frontend/`, `bff-player/` y `bff-organizer/` (ver §0).
 > La **primera** corrida de Maven baja dependencias (~5-10 min); las siguientes, ~2 min.
-> Última corrida verificada: **555 tests, 0 fallos, 0 errores**.
+> Última corrida verificada: **568 tests, 0 fallos, 0 errores**.
 
 ---
 
