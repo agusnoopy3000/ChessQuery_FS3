@@ -1,0 +1,96 @@
+name: Build & push images to ECR
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag adicional para las imágenes (además de sha-XXXXXXX)'
+        required: false
+        default: ''
+
+permissions:
+  id-token: write   # necesario si se usa OIDC en lugar de access keys
+  contents: read
+
+jobs:
+  build-push:
+    name: Build & push (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: api-gateway
+            dockerfile: infrastructure/docker/api-gateway/Dockerfile
+          - service: ms-users
+            dockerfile: infrastructure/docker/ms-users/Dockerfile
+          - service: ms-tournament
+            dockerfile: infrastructure/docker/ms-tournament/Dockerfile
+          - service: ms-game
+            dockerfile: infrastructure/docker/ms-game/Dockerfile
+          - service: ms-notifications
+            dockerfile: infrastructure/docker/ms-notifications/Dockerfile
+          - service: ms-analytics
+            dockerfile: infrastructure/docker/ms-analytics/Dockerfile
+          - service: bff-player
+            dockerfile: infrastructure/docker/bff-player/Dockerfile
+          - service: bff-organizer
+            dockerfile: infrastructure/docker/bff-organizer/Dockerfile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        if: env.USE_OIDC == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.GH_OIDC_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+        env:
+          USE_OIDC: ${{ secrets.GH_OIDC_ROLE_ARN != '' && 'true' || 'false' }}
+
+      - name: Configure AWS credentials (access keys, fallback Academy)
+        if: env.USE_OIDC != 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+        env:
+          USE_OIDC: ${{ secrets.GH_OIDC_ROLE_ARN != '' && 'true' || 'false' }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tags
+        id: tags
+        run: |
+          SHA_TAG="sha-${GITHUB_SHA::7}"
+          EXTRA_TAG="${{ github.event.inputs.tag }}"
+          echo "sha_tag=${SHA_TAG}" >> $GITHUB_OUTPUT
+          echo "extra_tag=${EXTRA_TAG}" >> $GITHUB_OUTPUT
+          echo "ecr_uri=${{ steps.ecr-login.outputs.registry }}/chessquery/${{ matrix.service }}" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: |
+            ${{ steps.tags.outputs.ecr_uri }}:${{ steps.tags.outputs.sha_tag }}
+            ${{ steps.tags.outputs.ecr_uri }}:latest
+            ${{ steps.tags.outputs.extra_tag != '' && format('{0}:{1}', steps.tags.outputs.ecr_uri, steps.tags.outputs.extra_tag) || '' }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+      - name: Output image URI
+        run: |
+          echo "::notice title=Image pushed::${{ steps.tags.outputs.ecr_uri }}:${{ steps.tags.outputs.sha_tag }}"

@@ -18,6 +18,8 @@ export const OrganizerTournamentsPage = () => {
   const [selectedTournamentId, setSelectedTournamentId] = useState<number | null>(null);
   const [selectedRound, setSelectedRound] = useState(1);
   const [draftResults, setDraftResults] = useState<Record<number, string>>({});
+  const [statusFilter, setStatusFilter] = useState<'ALL' | Tournament['status']>('ALL');
+  const [search, setSearch] = useState('');
 
   const tournaments = useQuery({
     queryKey: ['organizer', 'tournaments', 'list'],
@@ -171,10 +173,75 @@ export const OrganizerTournamentsPage = () => {
     [tournamentRows],
   );
 
+  const visibleTournaments = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return tournamentRows.filter((tournament) => {
+      const matchesStatus = statusFilter === 'ALL' || tournament.status === statusFilter;
+      const matchesSearch =
+        !term ||
+        tournament.name.toLowerCase().includes(term) ||
+        tournament.format.toLowerCase().includes(term) ||
+        (tournament.location ?? '').toLowerCase().includes(term);
+      return matchesStatus && matchesSearch;
+    });
+  }, [search, statusFilter, tournamentRows]);
+
+  const filterTabs: Array<{ key: 'ALL' | Tournament['status']; label: string; count: number }> = [
+    { key: 'ALL', label: 'Todos', count: tournamentRows.length },
+    { key: 'DRAFT', label: 'Borrador', count: tournamentRows.filter((t) => t.status === 'DRAFT').length },
+    { key: 'OPEN', label: 'Inscripciones', count: kpis.open },
+    { key: 'IN_PROGRESS', label: 'En curso', count: kpis.active },
+    { key: 'FINISHED', label: 'Finalizados', count: kpis.finished },
+  ];
+
   return (
     <div style={{ padding: 28, display: 'grid', gap: 20 }}>
       <style>{`
         @keyframes cq-spin { to { transform: rotate(360deg); } }
+        .cq-filter-row {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+          margin-bottom: 14px;
+        }
+        .cq-filter-chip {
+          border: 1px solid var(--border, #2a2d27);
+          border-radius: 999px;
+          background: rgba(255,255,255,0.03);
+          color: var(--text-muted, #7a7d6e);
+          padding: 7px 11px;
+          font: inherit;
+          font-size: 12px;
+          cursor: pointer;
+        }
+        .cq-filter-chip[data-active='true'] {
+          background: rgba(106,191,116,0.12);
+          border-color: rgba(106,191,116,0.42);
+          color: #6abf74;
+        }
+        .cq-list-tools {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: 10px;
+          margin-bottom: 12px;
+        }
+        .cq-search-input {
+          width: 100%;
+          height: 36px;
+          border: 1px solid var(--border, #2a2d27);
+          border-radius: 10px;
+          background: rgba(14,16,13,0.72);
+          color: var(--text, #e8ead4);
+          padding: 0 12px;
+          outline: none;
+        }
+        .cq-search-input:focus {
+          border-color: rgba(106,191,116,0.45);
+          box-shadow: 0 0 0 3px rgba(106,191,116,0.12);
+        }
+        @media (max-width: 720px) {
+          .cq-list-tools { grid-template-columns: 1fr; }
+        }
       `}</style>
       {deleteTournament.isError && (
         <ErrorAlert
@@ -310,8 +377,39 @@ export const OrganizerTournamentsPage = () => {
               }
             />
           ) : (
-            <div style={{ display: 'grid', gap: 12 }}>
-              {tournamentRows.map((tournament) => {
+            <>
+              <div className="cq-list-tools">
+                <input
+                  className="cq-search-input"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Buscar por nombre, formato o sede"
+                  aria-label="Buscar torneos"
+                />
+                <Badge variant="neutral">{visibleTournaments.length} visibles</Badge>
+              </div>
+              <div className="cq-filter-row" aria-label="Filtrar torneos por estado">
+                {filterTabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    className="cq-filter-chip"
+                    data-active={statusFilter === tab.key}
+                    onClick={() => setStatusFilter(tab.key)}
+                  >
+                    {tab.label} ({tab.count})
+                  </button>
+                ))}
+              </div>
+              {visibleTournaments.length === 0 ? (
+                <EmptyState
+                  title="Sin torneos para este filtro"
+                  description="Ajusta el estado o la búsqueda para volver a ver torneos."
+                  icon="♜"
+                />
+              ) : (
+                <div style={{ display: 'grid', gap: 12 }}>
+                  {visibleTournaments.map((tournament) => {
                 const canDelete =
                   tournament.status === 'DRAFT' || tournament.status === 'OPEN';
                 const isDeleting =
@@ -394,8 +492,10 @@ export const OrganizerTournamentsPage = () => {
                     )}
                   </div>
                 );
-              })}
-            </div>
+                  })}
+                </div>
+              )}
+            </>
           )}
         </Card>
 

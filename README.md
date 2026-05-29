@@ -43,13 +43,14 @@ make preflight
 | Doc | Contenido | Indicador rúbrica |
 |---|---|---|
 | [`docs/ANALISIS_PATRONES.md`](./docs/ANALISIS_PATRONES.md) | 8 patrones diseño + 6 arquitectónicos + arquetipo Maven | 1, 2, 5, 6 |
-| [`docs/PLAN_BRANCHING.md`](./docs/PLAN_BRANCHING.md) | Estrategia branching + PRs + reparto por integrante | 3, 7 |
+| [`TESTING.md`](./TESTING.md) | Comandos para correr 530 tests (Java + BFFs + Frontend) | 4, 8 |
 | [`docs/TESTING_STRATEGY.md`](./docs/TESTING_STRATEGY.md) | Estrategia de tests + cobertura JaCoCo | 4, 8 |
-| [`repositorios.txt`](./repositorios.txt) | Enlaces a c/repositorio con descripción | Requisito entrega |
-| [`CONTEXT.md`](./CONTEXT.md) | ERD completo, contratos REST, eventos | — |
-| [`PLAN_DEMO.md`](./PLAN_DEMO.md) | Guion de la demo (4 flujos E2E) | — |
+| [`docs/repositorios.txt`](./docs/repositorios.txt) | Enlaces a c/repositorio con descripción | Requisito entrega |
+| [`docs/CONTEXT.md`](./docs/CONTEXT.md) | ERD completo, contratos REST, eventos | — |
+| [`docs/specs/HISTORIAS_USUARIO.md`](./docs/specs/HISTORIAS_USUARIO.md) | Historias de usuario | — |
+| [`docs/specs/SPEC_LEY21719.md`](./docs/specs/SPEC_LEY21719.md) | Cumplimiento Ley 21.719 | — |
+| [`infrastructure/aws/RUNBOOK_ECS.md`](./infrastructure/aws/RUNBOOK_ECS.md) | Despliegue AWS ECS Fargate paso a paso | — |
 | [`docs/README-WINDOWS.md`](./docs/README-WINDOWS.md) | Setup Windows con setup.ps1 | — |
-| [`docs/README-DEMO-M1.md`](./docs/README-DEMO-M1.md) | Demo en MacBook Air M1 8GB | — |
 
 ## Desarrollo
 

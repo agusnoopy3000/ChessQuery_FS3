@@ -639,28 +639,74 @@ export const LiveGamePage = () => {
       <style>{`
         .cq-live-grid {
           display: grid;
-          grid-template-columns: minmax(0, 1fr) 340px;
+          grid-template-columns: minmax(0, 1fr) 380px;
           gap: 24px;
           padding: 24px;
-          max-width: 1100px;
+          max-width: 1280px;
           margin: 0 auto;
           align-items: start;
         }
-        .cq-live-board { width: min(560px, 100%); aspect-ratio: 1 / 1; }
+        .cq-live-stage {
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 12px;
+          padding: 18px;
+          border: 1px solid var(--border, #2a2d27);
+          border-radius: 18px;
+          background:
+            linear-gradient(180deg, rgba(25, 27, 22, 0.92), rgba(14, 15, 13, 0.9));
+          box-shadow: 0 18px 52px rgba(0,0,0,0.28);
+        }
+        .cq-live-board {
+          width: min(620px, 100%);
+          aspect-ratio: 1 / 1;
+          border-radius: 10px;
+          overflow: hidden;
+          box-shadow: 0 18px 42px rgba(0,0,0,0.38);
+        }
+        .cq-live-side { position: sticky; top: 18px; }
+        .cq-live-status-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 8px;
+          margin: 12px 0 16px;
+        }
+        .cq-live-status-cell {
+          padding: 10px;
+          border: 1px solid var(--border, #2a2d27);
+          border-radius: 10px;
+          background: rgba(255,255,255,0.03);
+        }
+        .cq-live-status-label {
+          color: var(--text-muted, #7a7d6e);
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+        }
+        .cq-live-status-value {
+          margin-top: 5px;
+          font-weight: 700;
+          font-size: 13px;
+        }
         @media (max-width: 900px) {
           .cq-live-grid {
             grid-template-columns: minmax(0, 1fr);
             gap: 12px;
             padding: 12px;
           }
+          .cq-live-stage { padding: 10px; border-radius: 14px; }
+          .cq-live-side { position: static; }
           .cq-live-board { width: min(560px, 100vw); max-width: calc(100vw - 24px); }
         }
         @media (max-width: 600px) {
           .cq-live-board { width: calc(100vw - 16px); max-width: 480px; }
+          .cq-live-status-grid { grid-template-columns: 1fr; }
         }
       `}</style>
       {/* Columna del tablero — centrado vertical y horizontal */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+      <div className="cq-live-stage">
         <style>{`
           @keyframes cq-pulse-dot { 0%, 100% { transform: scale(1); opacity: 1 } 50% { transform: scale(1.4); opacity: 0.6 } }
           .cq-turn-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
@@ -768,7 +814,7 @@ export const LiveGamePage = () => {
       </div>
 
       {/* Panel lateral */}
-      <Card>
+      <Card className="cq-live-side">
         <h2 style={{ marginTop: 0 }}>Partida #{state.id}</h2>
         <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 12 }}>
           {state.status === 'ACTIVE' && <>Turno de <strong>{turnLabel}</strong></>}
@@ -780,6 +826,21 @@ export const LiveGamePage = () => {
             </>
           )}
         </p>
+
+        <div className="cq-live-status-grid">
+          <div className="cq-live-status-cell">
+            <div className="cq-live-status-label">Estado</div>
+            <div className="cq-live-status-value">{state.status}</div>
+          </div>
+          <div className="cq-live-status-cell">
+            <div className="cq-live-status-label">Turno</div>
+            <div className="cq-live-status-value">{turnLabel}</div>
+          </div>
+          <div className="cq-live-status-cell">
+            <div className="cq-live-status-label">Jugadas</div>
+            <div className="cq-live-status-value">{state.moves.length}</div>
+          </div>
+        </div>
 
         <div style={{ display: 'grid', gap: 6, fontSize: 14, marginBottom: 16 }}>
           <div>⚪ <strong>{whiteName}</strong>{myColor === 'white' && ' (tú)'}</div>

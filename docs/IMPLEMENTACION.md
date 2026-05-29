@@ -413,13 +413,13 @@ Standings con desempate FIDE: puntos → Buchholz → Sonneborn-Berger.
 
 ## 13. Documentos relacionados
 
-- `CONTEXT.md` — ERD completo, contratos detallados.
-- `SECURITY_PLAN.md` — auditoría de seguridad y plan priorizado.
-- `PLAN_DEMO.md` — guion de la demo.
-- `HISTORIAS_USUARIO.md` — historias de usuario.
-- `SPEC_LEY21719.md` — cumplimiento de Ley de Protección de Datos Chile.
-- `SPEC_BRECHAS.md` — brechas conocidas.
-- `docs/PLAN_MIGRACION_CLOUD.md` — migración a Supabase + AWS.
+- `docs/CONTEXT.md` — ERD completo, contratos detallados.
+- `docs/SECURITY_PLAN.md` — auditoría de seguridad y plan priorizado.
+- `docs/specs/HISTORIAS_USUARIO.md` — historias de usuario.
+- `docs/specs/SPEC_LEY21719.md` — cumplimiento de Ley de Protección de Datos Chile.
+- `docs/specs/SPEC_BRECHAS.md` — brechas conocidas.
+- `infrastructure/aws/RUNBOOK_ECS.md` — despliegue AWS ECS Fargate.
+- `TESTING.md` — comandos para correr la suite completa de pruebas.
 
 ---
 

@@ -16,5 +16,6 @@
     "esModuleInterop": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "../chess-portal/src/pages", "../chess-portal/src/api.ts", "../chess-portal/src/portal-utils.ts"]
+  "include": ["src", "../chess-portal/src/pages", "../chess-portal/src/api.ts", "../chess-portal/src/portal-utils.ts"],
+  "exclude": ["../chess-portal/src/**/*.spec.ts", "../chess-portal/src/**/*.spec.tsx"]
 }

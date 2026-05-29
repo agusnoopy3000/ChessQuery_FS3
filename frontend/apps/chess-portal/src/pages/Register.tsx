@@ -372,17 +372,47 @@ export const RegisterPage = () => {
 
   return (
     <div
+      className="cq-register-page"
       style={{
         display: 'flex',
-        height: '100vh',
-        overflow: 'hidden',
+        minHeight: '100vh',
         background: '#111210',
         color: '#e8ead4',
         fontFamily: fontStack,
       }}
     >
+      <style>{`
+        .cq-register-page { overflow: hidden; }
+        .cq-register-left { flex: 0 0 480px; }
+        .cq-register-right { flex: 1; }
+        @media (max-width: 980px) {
+          .cq-register-page {
+            display: grid !important;
+            overflow: auto;
+          }
+          .cq-register-left,
+          .cq-register-right {
+            flex: none !important;
+            width: 100%;
+          }
+          .cq-register-left {
+            border-right: 0 !important;
+            border-bottom: 1px solid #2a2d27;
+            padding: 28px 22px !important;
+          }
+          .cq-register-right {
+            padding: 28px 22px 36px !important;
+          }
+        }
+        @media (max-width: 560px) {
+          .cq-register-left h1 { font-size: 28px !important; }
+          .cq-register-right h2 { font-size: 26px !important; }
+          .cq-register-role-grid { gap: 12px !important; }
+        }
+      `}</style>
       {/* ── LEFT PANEL ── */}
       <div
+        className="cq-register-left"
         style={{
           flex: '0 0 480px',
           background: '#181a17',
@@ -430,7 +460,7 @@ export const RegisterPage = () => {
           </p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="cq-register-role-grid" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <RoleCard
             selected={role === 'PLAYER'}
             title="Jugador"
@@ -465,6 +495,7 @@ export const RegisterPage = () => {
 
       {/* ── RIGHT PANEL ── */}
       <div
+        className="cq-register-right"
         style={{
           flex: 1,
           background: '#141614',

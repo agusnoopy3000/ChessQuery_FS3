@@ -1,0 +1,113 @@
+name: Deploy to ECS Fargate
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Tag de imagen a desplegar (ej: sha-abc1234 o latest)'
+        required: true
+        default: 'latest'
+      service:
+        description: 'Servicio a desplegar (todos | api-gateway | ms-users | ...)'
+        required: true
+        default: 'todos'
+      cluster:
+        description: 'Cluster ECS objetivo'
+        required: true
+        default: 'chessquery'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - ms-users
+          - ms-tournament
+          - ms-game
+          - ms-notifications
+    steps:
+      - name: Skip si el input filtra otro servicio
+        if: github.event.inputs.service != 'todos' && github.event.inputs.service != matrix.service
+        run: |
+          echo "Saltando ${{ matrix.service }} — input pidió ${{ github.event.inputs.service }}"
+          exit 0
+
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        if: env.USE_OIDC == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.GH_OIDC_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+        env:
+          USE_OIDC: ${{ secrets.GH_OIDC_ROLE_ARN != '' && 'true' || 'false' }}
+
+      - name: Configure AWS credentials (access keys, fallback Academy)
+        if: env.USE_OIDC != 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+        env:
+          USE_OIDC: ${{ secrets.GH_OIDC_ROLE_ARN != '' && 'true' || 'false' }}
+
+      - name: Render task definition
+        id: render
+        run: |
+          export ECR_REGISTRY="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com"
+          export IMAGE_TAG="${{ github.event.inputs.image_tag }}"
+          export DB_HOST="${{ secrets.DB_HOST }}"
+          export DB_PASSWORD_ARN="${{ secrets.DB_PASSWORD_ARN }}"
+          export JWT_SECRET_ARN="${{ secrets.JWT_SECRET_ARN }}"
+          export RABBITMQ_HOST="${{ secrets.RABBITMQ_HOST }}"
+          export RABBITMQ_PASSWORD_ARN="${{ secrets.RABBITMQ_PASSWORD_ARN }}"
+          export SUPABASE_URL="${{ secrets.SUPABASE_URL }}"
+          export SUPABASE_SERVICE_KEY_ARN="${{ secrets.SUPABASE_SERVICE_KEY_ARN }}"
+          export SUPABASE_WEBHOOK_SECRET_ARN="${{ secrets.SUPABASE_WEBHOOK_SECRET_ARN }}"
+          export TASK_EXECUTION_ROLE_ARN="${{ secrets.TASK_EXECUTION_ROLE_ARN }}"
+          export AWS_REGION="${{ secrets.AWS_REGION }}"
+
+          template="infrastructure/aws/task-definitions/${{ matrix.service }}.template.json"
+          rendered="task-def-${{ matrix.service }}.json"
+          envsubst < "$template" > "$rendered"
+          echo "task_def=$rendered" >> $GITHUB_OUTPUT
+          echo "::group::Task definition rendered"
+          cat "$rendered"
+          echo "::endgroup::"
+
+      - name: Register new task definition revision
+        id: register
+        run: |
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://${{ steps.render.outputs.task_def }} \
+            --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "task_def_arn=$TASK_DEF_ARN" >> $GITHUB_OUTPUT
+          echo "::notice title=Registered::$TASK_DEF_ARN"
+
+      - name: Update ECS service (force new deployment)
+        run: |
+          aws ecs update-service \
+            --cluster ${{ github.event.inputs.cluster }} \
+            --service ${{ matrix.service }} \
+            --task-definition ${{ steps.register.outputs.task_def_arn }} \
+            --force-new-deployment \
+            > /dev/null
+          echo "::notice title=Service updated::${{ matrix.service }} → ${{ steps.register.outputs.task_def_arn }}"
+
+      - name: Wait for service to stabilize
+        run: |
+          aws ecs wait services-stable \
+            --cluster ${{ github.event.inputs.cluster }} \
+            --services ${{ matrix.service }}
+          echo "::notice title=Service stable::${{ matrix.service }} desplegado"

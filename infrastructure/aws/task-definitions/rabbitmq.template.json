@@ -1,0 +1,41 @@
+{
+  "family": "chessquery-rabbitmq",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "${TASK_EXECUTION_ROLE_ARN}",
+  "containerDefinitions": [
+    {
+      "name": "rabbitmq",
+      "image": "rabbitmq:3.12-management",
+      "essential": true,
+      "portMappings": [
+        { "containerPort": 5672, "protocol": "tcp" },
+        { "containerPort": 15672, "protocol": "tcp" }
+      ],
+      "environment": [
+        { "name": "RABBITMQ_DEFAULT_USER", "value": "chessquery" }
+      ],
+      "secrets": [
+        { "name": "RABBITMQ_DEFAULT_PASS", "valueFrom": "${RABBITMQ_PASSWORD_ARN}" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/chessquery/rabbitmq",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "ecs",
+          "awslogs-create-group": "true"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "rabbitmqctl status > /dev/null || exit 1"],
+        "interval": 30,
+        "timeout": 10,
+        "retries": 5,
+        "startPeriod": 60
+      }
+    }
+  ]
+}

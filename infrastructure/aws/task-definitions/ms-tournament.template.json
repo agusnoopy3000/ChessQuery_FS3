@@ -1,0 +1,43 @@
+{
+  "family": "chessquery-ms-tournament",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "1024",
+  "executionRoleArn": "${TASK_EXECUTION_ROLE_ARN}",
+  "containerDefinitions": [
+    {
+      "name": "ms-tournament",
+      "image": "${ECR_REGISTRY}/chessquery/ms-tournament:${IMAGE_TAG}",
+      "essential": true,
+      "portMappings": [{ "containerPort": 8082, "protocol": "tcp" }],
+      "environment": [
+        { "name": "SPRING_PROFILES_ACTIVE", "value": "aws" },
+        { "name": "DB_URL",        "value": "jdbc:postgresql://${DB_HOST}:5432/tournament_db" },
+        { "name": "DB_USER",       "value": "chessquery" },
+        { "name": "RABBITMQ_HOST", "value": "${RABBITMQ_HOST}" },
+        { "name": "MS_USERS_URL",  "value": "http://ms-users.chessquery.local:8081" }
+      ],
+      "secrets": [
+        { "name": "DB_PASSWORD",       "valueFrom": "${DB_PASSWORD_ARN}" },
+        { "name": "RABBITMQ_PASSWORD", "valueFrom": "${RABBITMQ_PASSWORD_ARN}" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/chessquery/ms-tournament",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "ecs",
+          "awslogs-create-group": "true"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 90
+      }
+    }
+  ]
+}

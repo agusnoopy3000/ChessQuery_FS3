@@ -1,0 +1,105 @@
+name: CI — build & test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  java-tests:
+    name: Tests Java (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - api-gateway
+          - ms-users
+          - ms-tournament
+          - ms-game
+          - ms-notifications
+          - ms-analytics
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Run mvn test (${{ matrix.module }})
+        working-directory: ${{ matrix.module }}
+        run: mvn -B -DskipITs test
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-${{ matrix.module }}
+          path: ${{ matrix.module }}/target/site/jacoco/
+          retention-days: 7
+
+  frontend-tests:
+    name: Tests frontend (${{ matrix.app }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [chess-portal, organizer-panel]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install workspace deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run Vitest (${{ matrix.app }})
+        working-directory: frontend
+        run: npm --prefix apps/${{ matrix.app }} test
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-${{ matrix.app }}
+          path: frontend/apps/${{ matrix.app }}/coverage/
+          retention-days: 7
+
+  bff-tests:
+    name: Tests BFF (${{ matrix.bff }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        bff: [bff-player, bff-organizer]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: ${{ matrix.bff }}/package-lock.json
+
+      - name: Install deps
+        working-directory: ${{ matrix.bff }}
+        run: npm ci
+
+      - name: Run unit tests
+        working-directory: ${{ matrix.bff }}
+        run: npm test -- --watchAll=false

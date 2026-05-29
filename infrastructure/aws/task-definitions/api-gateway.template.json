@@ -1,0 +1,49 @@
+{
+  "family": "chessquery-api-gateway",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "${TASK_EXECUTION_ROLE_ARN}",
+  "containerDefinitions": [
+    {
+      "name": "api-gateway",
+      "image": "${ECR_REGISTRY}/chessquery/api-gateway:${IMAGE_TAG}",
+      "essential": true,
+      "portMappings": [
+        { "containerPort": 8080, "protocol": "tcp" }
+      ],
+      "environment": [
+        { "name": "SPRING_PROFILES_ACTIVE", "value": "aws" },
+        { "name": "SUPABASE_URL", "value": "${SUPABASE_URL}" },
+        { "name": "RABBITMQ_HOST", "value": "${RABBITMQ_HOST}" },
+        { "name": "MS_USERS_URL",        "value": "http://ms-users.chessquery.local:8081" },
+        { "name": "MS_TOURNAMENT_URL",   "value": "http://ms-tournament.chessquery.local:8082" },
+        { "name": "MS_GAME_URL",         "value": "http://ms-game.chessquery.local:8083" },
+        { "name": "MS_NOTIFICATIONS_URL","value": "http://ms-notifications.chessquery.local:8085" }
+      ],
+      "secrets": [
+        { "name": "SUPABASE_JWT_SECRET",     "valueFrom": "${JWT_SECRET_ARN}" },
+        { "name": "SUPABASE_SERVICE_KEY",    "valueFrom": "${SUPABASE_SERVICE_KEY_ARN}" },
+        { "name": "SUPABASE_WEBHOOK_SECRET", "valueFrom": "${SUPABASE_WEBHOOK_SECRET_ARN}" },
+        { "name": "RABBITMQ_PASSWORD",       "valueFrom": "${RABBITMQ_PASSWORD_ARN}" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/chessquery/api-gateway",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "ecs",
+          "awslogs-create-group": "true"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      }
+    }
+  ]
+}

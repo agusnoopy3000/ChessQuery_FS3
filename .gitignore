@@ -2,12 +2,47 @@
 .env
 infrastructure/.env
 
-# Build artifacts
+# Build artifacts (Java)
 **/target/
+
+# Build artifacts (Node)
+**/node_modules/
+**/dist/
+**/build/
+**/.next/
+**/.turbo/
+
+# Coverage reports (regenerados por cada CI)
+**/coverage/
+**/coverage-*/
+**/jacoco-report/
+**/*.lcov
+*-coverage.log
+
+# Logs
+*.log
+**/logs/
+
+# IDE / OS
 .DS_Store
+.idea/
+*.iml
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.swp
+*.swo
+
+# IDE/agent caches (Kiro, Claude, etc.)
+.kiro/
+.claude/
 
 # Python
 **/.venv/
 **/__pycache__/
 **/*.pyc
 **/.pytest_cache/
+
+# Vite / Vitest cache
+**/.vite/
+**/.vitest-cache/

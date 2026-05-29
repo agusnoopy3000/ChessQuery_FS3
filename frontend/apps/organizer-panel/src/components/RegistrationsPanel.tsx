@@ -92,6 +92,7 @@ export const RegistrationsPanel = ({ registrations, loading, error, onApprove, o
             return (
               <div
                 key={r.id}
+                className="registration-row"
                 style={{
                   display: 'grid',
                   gridTemplateColumns: '1fr auto',
@@ -113,7 +114,7 @@ export const RegistrationsPanel = ({ registrations, loading, error, onApprove, o
                     {r.registeredAt ? new Date(r.registeredAt).toLocaleDateString() : '—'}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <div className="registration-actions" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   {r.status === 'PENDING' && !isRejecting && (
                     <>
                       <Button size="sm" variant="primary" onClick={() => onApprove(r.id)} loading={isBusy}>
@@ -125,7 +126,7 @@ export const RegistrationsPanel = ({ registrations, loading, error, onApprove, o
                     </>
                   )}
                   {isRejecting && (
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <div className="registration-reject" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       <input
                         autoFocus
                         value={rejectReason}
@@ -177,6 +178,25 @@ export const RegistrationsPanel = ({ registrations, loading, error, onApprove, o
           background: rgba(106,191,116,0.1);
           border-color: #4a7c59;
           color: #6abf74;
+        }
+        .registration-row:hover {
+          border-color: rgba(106,191,116,0.28) !important;
+          background: rgba(106,191,116,0.045) !important;
+        }
+        @media (max-width: 720px) {
+          .registration-row {
+            grid-template-columns: 1fr !important;
+            align-items: stretch !important;
+          }
+          .registration-actions,
+          .registration-reject {
+            width: 100%;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+          }
+          .registration-reject input {
+            flex: 1 1 180px;
+          }
         }
       `}</style>
     </Card>

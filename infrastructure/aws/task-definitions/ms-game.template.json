@@ -1,0 +1,45 @@
+{
+  "family": "chessquery-ms-game",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "${TASK_EXECUTION_ROLE_ARN}",
+  "containerDefinitions": [
+    {
+      "name": "ms-game",
+      "image": "${ECR_REGISTRY}/chessquery/ms-game:${IMAGE_TAG}",
+      "essential": true,
+      "portMappings": [{ "containerPort": 8083, "protocol": "tcp" }],
+      "environment": [
+        { "name": "SPRING_PROFILES_ACTIVE", "value": "aws" },
+        { "name": "DB_URL",          "value": "jdbc:postgresql://${DB_HOST}:5432/game_db" },
+        { "name": "DB_USER",         "value": "chessquery" },
+        { "name": "RABBITMQ_HOST",   "value": "${RABBITMQ_HOST}" },
+        { "name": "SUPABASE_URL",    "value": "${SUPABASE_URL}" },
+        { "name": "STORAGE_PROVIDER","value": "supabase" }
+      ],
+      "secrets": [
+        { "name": "DB_PASSWORD",          "valueFrom": "${DB_PASSWORD_ARN}" },
+        { "name": "RABBITMQ_PASSWORD",    "valueFrom": "${RABBITMQ_PASSWORD_ARN}" },
+        { "name": "SUPABASE_SERVICE_KEY", "valueFrom": "${SUPABASE_SERVICE_KEY_ARN}" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/chessquery/ms-game",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "ecs",
+          "awslogs-create-group": "true"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "wget -qO- http://localhost:8083/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 90
+      }
+    }
+  ]
+}
