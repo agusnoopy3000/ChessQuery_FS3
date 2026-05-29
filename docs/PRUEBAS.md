@@ -234,6 +234,8 @@ datos) y **navegación** (post-mutate, links).
 | `ms-analytics` | ≥75% líneas | en rango | ✅ |
 | `chess-portal` | — | 76% líneas / 72.5% stmts | ✅ |
 | `organizer-panel` | — | 52% líneas | ⚠️ en progreso |
+| `bff-player` | — | 96% líneas / 71.8% ramas | ✅ |
+| `bff-organizer` | — | 94% líneas / 83.6% ramas | ✅ |
 
 > Los umbrales **no bloquean el build aún** (no hay `check` de JaCoCo que falle el `mvn verify`).
 > El punto más flojo es `organizer-panel`: `OrganizerTournaments.tsx` queda en ~35% de líneas.

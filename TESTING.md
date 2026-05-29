@@ -101,8 +101,8 @@ Los microservicios Java descargan dependencias automáticamente la primera vez q
 | `ms-game` | JUnit 5 + Mockito + `@SpringBootTest` | Unit + Integration H2 | 91 | 85% |
 | `ms-notifications` | JUnit 5 + Mockito + `@SpringBootTest` | Unit + Integration H2 | 65 | 85% |
 | `ms-analytics` | JUnit 5 + Mockito + `@SpringBootTest` | Unit + Integration H2 | 14 | 75% |
-| `bff-player` | Jest (NestJS) | Unit service + http | 47 | — |
-| `bff-organizer` | Jest (NestJS) | Unit service + http | 28 | — |
+| `bff-player` | Jest (NestJS) | Unit service + http | 47 | 96% líneas |
+| `bff-organizer` | Jest (NestJS) | Unit service + http | 28 | 94% líneas |
 | `chess-portal` (frontend) | Vitest + RTL + jsdom | Page specs | 37 | 76% líneas |
 | `organizer-panel` (frontend) | Vitest + RTL + jsdom | Page specs | 13 | 52% líneas |
 | **Total** | — | — | **530** | — |

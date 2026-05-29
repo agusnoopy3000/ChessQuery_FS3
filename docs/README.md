@@ -22,6 +22,8 @@ desde el [README raíz](../README.md).
 | Doc | Contenido |
 |---|---|
 | [PRUEBAS.md](./PRUEBAS.md) | Estrategia y detalle de pruebas unitarias e integración, cobertura JaCoCo y pasos futuros. |
+| [PLAN_TESTS_ORGANIZER_TOURNAMENTS.md](./PLAN_TESTS_ORGANIZER_TOURNAMENTS.md) | Plan (Prioridad 1) para subir `organizer-panel` de 52% a ≥75% cubriendo `OrganizerTournaments.tsx`. |
+| [PLAN_TESTS_JWT_FILTER.md](./PLAN_TESTS_JWT_FILTER.md) | Plan (Prioridad 2) para subir `api-gateway` a ≥80% cubriendo la maquinaria ES256/JWKS de `SupabaseJwtAuthFilter`. |
 
 > Para los **comandos** de ejecución de tests ver [`TESTING.md`](../TESTING.md) en la raíz.
 
