@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChessQuery — Contexto · Demo Fullstack III</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,700;1,900&family=DM+Mono:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,800;1,9..144,400;1,9..144,600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream: #F5F0E8;
+    --cream-deep: #EDE4D2;
+    --ink: #1A1612;
+    --amber: #C8892A;
+    --amber-light: #E8B84B;
+    --rust: #8B3A2A;
+    --sage: #4A5E52;
+    --board-dark: #2C1810;
+    --board-darker: #1F1108;
+    --board-light: #D4A96A;
+    --muted: #7A7060;
+    --card-bg: #FDFAF4;
+    --border: #D8CEB8;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--board-darker);
+    font-family: 'DM Mono', monospace;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+  }
+
+  /* ───────────────────────────────────────── */
+  /*  DECK                                      */
+  /* ───────────────────────────────────────── */
+  .deck {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  .slide {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    padding: 6vh 7vw;
+    overflow: hidden;
+  }
+
+  .slide.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .slide.active .reveal {
+    animation: fadeUp 0.7s ease both;
+  }
+  .slide.active .reveal-1 { animation-delay: 0.15s; }
+  .slide.active .reveal-2 { animation-delay: 0.30s; }
+  .slide.active .reveal-3 { animation-delay: 0.45s; }
+  .slide.active .reveal-4 { animation-delay: 0.60s; }
+  .slide.active .reveal-5 { animation-delay: 0.75s; }
+  .slide.active .reveal-6 { animation-delay: 0.90s; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── BACKGROUND VARIANTS ── */
+  .slide.dark {
+    background: var(--board-dark);
+    color: var(--cream);
+  }
+
+  .slide.dark::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: repeating-conic-gradient(
+      rgba(212,169,106,0.06) 0% 25%,
+      transparent 0% 50%
+    );
+    background-size: 90px 90px;
+    pointer-events: none;
+  }
+
+  .slide.cream {
+    background: var(--cream);
+    color: var(--ink);
+  }
+
+  .slide.cream::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      radial-gradient(circle at 10% 90%, rgba(200,137,42,0.06) 0%, transparent 40%),
+      radial-gradient(circle at 90% 10%, rgba(74,94,82,0.05) 0%, transparent 35%);
+    pointer-events: none;
+  }
+
+  /* ───────────────────────────────────────── */
+  /*  SHARED ELEMENTS                           */
+  /* ───────────────────────────────────────── */
+  .slide-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: clamp(0.75rem, 0.95vw, 1rem);
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--amber);
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    position: relative;
+    z-index: 2;
+  }
+
+  .slide-tag::before {
+    content: '♟';
+    font-size: 1.2em;
+  }
+
+  .slide.dark .slide-tag { color: var(--amber-light); }
+
+  .slide h1,
+  .slide h2 {
+    font-family: 'Playfair Display', serif;
+    line-height: 1.02;
+    letter-spacing: -0.015em;
+    position: relative;
+    z-index: 2;
+  }
+
+  .slide-title {
+    font-size: clamp(2.6rem, 5.5vw, 5rem);
+    font-weight: 900;
+    color: var(--board-dark);
+  }
+
+  .slide.dark .slide-title { color: var(--cream); }
+
+  .slide-title em {
+    font-style: italic;
+    color: var(--amber);
+    font-weight: 900;
+  }
+
+  .slide.dark .slide-title em { color: var(--amber-light); }
+
+  /* ───────────────────────────────────────── */
+  /*  SLIDE 1 — PORTADA                         */
+  /* ───────────────────────────────────────── */
+  #slide-1 {
+    justify-content: space-between;
+  }
+
+  #slide-1 .cover-head {
+    position: relative;
+    z-index: 3;
+  }
+
+  #slide-1 .cover-title {
+    font-family: 'Playfair Display', serif;
+    font-weight: 900;
+    font-size: clamp(5rem, 11vw, 10.5rem);
+    line-height: 0.9;
+    color: var(--cream);
+    margin-top: 2.5vh;
+    letter-spacing: -0.03em;
+  }
+
+  #slide-1 .cover-title span {
+    display: block;
+    font-style: italic;
+    color: var(--amber-light);
+    font-weight: 900;
+  }
+
+  #slide-1 .cover-pitch {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: clamp(1.3rem, 1.9vw, 2rem);
+    color: rgba(212,169,106,0.9);
+    margin-top: 2.5vh;
+    max-width: 720px;
+    line-height: 1.35;
+  }
+
+  #slide-1 .cover-meta {
+    position: relative;
+    z-index: 3;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 3vw;
+    border-top: 1.5px solid rgba(212,169,106,0.3);
+    padding-top: 2vh;
+    font-size: clamp(0.7rem, 0.85vw, 0.95rem);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(212,169,106,0.7);
+  }
+
+  #slide-1 .cover-meta-block {
+    line-height: 2;
+  }
+
+  #slide-1 .cover-meta-block strong {
+    color: var(--cream);
+    font-weight: 500;
+    letter-spacing: 0.15em;
+    display: block;
+    margin-bottom: 0.3rem;
+  }
+
+  #slide-1 .knight-decor {
+    position: absolute;
+    right: -3vw;
+    bottom: -8vh;
+    font-size: clamp(20rem, 38vw, 42rem);
+    color: rgba(212,169,106,0.06);
+    line-height: 0.8;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* ───────────────────────────────────────── */
+  /*  SLIDE 2 — HOOK GLOBAL                     */
+  /* ───────────────────────────────────────── */
+  #slide-2 .slide-title {
+    max-width: 16ch;
+    margin-top: 1.5vh;
+    margin-bottom: 4vh;
+  }
+
+  .global-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2vw;
+    margin-top: auto;
+    position: relative;
+    z-index: 2;
+  }
+
+  .gstat {
+    border-top: 3px solid var(--amber);
+    padding-top: 1.2vh;
+  }
+
+  .gstat-num {
+    font-family: 'Playfair Display', serif;
+    font-weight: 900;
+    font-size: clamp(2.8rem, 5.5vw, 5rem);
+    line-height: 1;
+    color: var(--board-dark);
+    letter-spacing: -0.02em;
+  }
+
+  .gstat-num small {
+    font-size: 0.5em;
+    font-weight: 700;
+    color: var(--amber);
+  }
+
+  .gstat-label {
+    font-size: clamp(0.85rem, 1vw, 1.1rem);
+    color: var(--muted);
+    margin-top: 0.6vh;
+    line-height: 1.4;
+    letter-spacing: 0.02em;
+  }
+
+  .gstat-source {
+    font-size: clamp(0.7rem, 0.78vw, 0.85rem);
+    color: var(--muted);
+    margin-top: 0.6vh;
+    opacity: 0.7;
+    font-style: italic;
+  }
+
+  #slide-2 .market-growth {
+    position: absolute;
+    top: 6vh;
+    right: 7vw;
+    text-align: right;
+    z-index: 2;
+  }
+
+  #slide-2 .growth-num {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-weight: 900;
+    font-size: clamp(2rem, 3.2vw, 3rem);
+    color: var(--rust);
+    line-height: 1;
+  }
+
+  #slide-2 .growth-label {
+    font-size: clamp(0.75rem, 0.9vw, 0.95rem);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 0.6vh;
+  }
+
+  /* ───────────────────────────────────────── */
+  /*  SLIDE 3 — CHILE                           */
+  /* ───────────────────────────────────────── */
+  #slide-3 .chile-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 5vw;
+    margin-top: 3vh;
+    flex: 1;
+    align-items: center;
+    position: relative;
+    z-index: 2;
+  }
+
+  #slide-3 .chile-lead {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(1.3rem, 1.7vw, 1.8rem);
+    line-height: 1.45;
+    color: var(--ink);
+  }
+
+  #slide-3 .chile-lead strong {
+    color: var(--rust);
+    font-weight: 600;
+  }
+
+  #slide-3 .chile-lead .since {
+    display: inline-block;
+    margin-top: 1.2vh;
+    font-size: 0.7em;
+    color: var(--muted);
+    font-style: italic;
+    border-top: 1px solid var(--border);
+    padding-top: 1vh;
+  }
+
+  #slide-3 .chile-numbers {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5vw;
+  }
+
+  .cnum {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--amber);
+    padding: 2vh 1.8vw;
+  }
+
+  .cnum-value {
+    font-family: 'Playfair Display', serif;
+    font-weight: 900;
+    font-size: clamp(2.4rem, 4.2vw, 3.8rem);
+    color: var(--board-dark);
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+
+  .cnum-value small {
+    font-size: 0.5em;
+    color: var(--amber);
+  }
+
+  .cnum-label {
+    font-size: clamp(0.78rem, 0.92vw, 1rem);
+    color: var(--muted);
+    margin-top: 0.8vh;
+    line-height: 1.35;
+  }
+
+  /* ───────────────────────────────────────── */
+  /*  SLIDE 4 — TAM SAM SOM                     */
+  /* ───────────────────────────────────────── */
+  #slide-4 .funnel-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1.8vh;
+    margin-top: 2vh;
+    position: relative;
+    z-index: 2;
+  }
+
+  .fnl {
+    display: grid;
+    grid-template-columns: 90px 1fr 2.2fr;
+    align-items: center;
+    gap: 3vw;
+    padding: 2.5vh 2vw;
+    border: 1.5px solid var(--border);
+    background: var(--card-bg);
+    border-radius: 3px;
+  }
+
+  .fnl-tam { background: rgba(44,24,16,0.08); }
+  .fnl-sam { background: rgba(200,137,42,0.10); }
+  .fnl-som { background: rgba(74,94,82,0.10); border-color: var(--sage); }
+
+  .fnl-label {
+    font-family: 'DM Mono', monospace;
+    font-size: clamp(1rem, 1.3vw, 1.4rem);
+    font-weight: 500;
+    letter-spacing: 0.25em;
+    color: var(--amber);
+  }
+
+  .fnl-som .fnl-label { color: var(--sage); }
+
+  .fnl-num {
+    font-family: 'Playfair Display', serif;
+    font-weight: 900;
+    font-size: clamp(2rem, 3.6vw, 3.5rem);
+    color: var(--board-dark);
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+
+  .fnl-desc {
+    font-size: clamp(0.92rem, 1.05vw, 1.15rem);
+    color: var(--ink);
+    line-height: 1.5;
+  }
+
+  #slide-4 .funnel-caption {
+    position: absolute;
+    top: 7vh;
+    right: 7vw;
+    text-align: right;
+    z-index: 2;
+    max-width: 28ch;
+  }
+
+  #slide-4 .funnel-caption p {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: clamp(1rem, 1.2vw, 1.3rem);
+    color: var(--muted);
+    line-height: 1.4;
+  }
+
+  /* ───────────────────────────────────────── */
+  /*  SLIDE 5 — EL GAP                          */
+  /* ───────────────────────────────────────── */
+  #slide-5 .slide-title {
+    margin-top: 1.5vh;
+    margin-bottom: 4vh;
+    max-width: 22ch;
+  }
+
+  #slide-5 .gap-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5vw;
+    flex: 1;
+    position: relative;
+    z-index: 2;
+  }
+
+  .gap-card {
+    background: var(--card-bg);
+    border: 1.5px solid var(--border);
+    padding: 2.5vh 1.5vw;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  .gap-card.us {
+    background: var(--board-dark);
+    color: var(--cream);
+    border-color: var(--board-dark);
+  }
+
+  .gap-card-name {
+    font-family: 'Playfair Display', serif;
+    font-weight: 700;
+    font-size: clamp(1.4rem, 1.8vw, 1.9rem);
+    margin-bottom: 0.4vh;
+    color: var(--board-dark);
+  }
+
+  .gap-card.us .gap-card-name { color: var(--amber-light); }
+
+  .gap-card-type {
+    font-size: clamp(0.7rem, 0.82vw, 0.9rem);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 2vh;
+  }
+
+  .gap-card.us .gap-card-type { color: rgba(212,169,106,0.7); }
+
+  .gap-features {
+    display: flex;
+    flex-direction: column;
+    gap: 1.1vh;
+    margin-top: auto;
+  }
+
+  .gap-feat {
+    display: flex;
+    align-items: center;
+    gap: 0.6vw;
+    font-size: clamp(0.85rem, 1vw, 1.05rem);
+    line-height: 1.3;
+  }
+
+  .gap-feat .dot {
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+  }
+
+  .dot-yes { background: var(--sage); }
+  .dot-no { background: rgba(139,58,42,0.4); }
+  .dot-partial { background: var(--amber); }
+
+  .gap-card.us .dot-yes { background: var(--amber-light); }
+
+  #slide-5 .gap-conclusion {
+    margin-top: 4vh;
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: clamp(1.1rem, 1.4vw, 1.5rem);
+    color: var(--rust);
+    text-align: center;
+    line-height: 1.4;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* ───────────────────────────────────────── */
+  /*  SLIDE 6 — SEGMENTOS                       */
+  /* ───────────────────────────────────────── */
+  #slide-6 .seg-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3vw;
+    flex: 1;
+    margin-top: 3vh;
+    position: relative;
+    z-index: 2;
+  }
+
+  .seg-col {
+    display: flex;
+    flex-direction: column;
+    gap: 2vh;
+    padding: 3vh 2.5vw;
+    background: var(--card-bg);
+    border: 1.5px solid var(--border);
+    border-top: 4px solid var(--amber);
+  }
+
+  .seg-col.organizer {
+    border-top-color: var(--rust);
+    background: linear-gradient(180deg, rgba(139,58,42,0.06) 0%, var(--card-bg) 40%);
+  }
+
+  .seg-piece {
+    font-size: clamp(3rem, 5vw, 4.5rem);
+    line-height: 1;
+    color: var(--amber);
+    margin-bottom: 1vh;
+  }
+
+  .seg-col.organizer .seg-piece { color: var(--rust); }
+
+  .seg-name {
+    font-family: 'Playfair Display', serif;
+    font-weight: 900;
+    font-size: clamp(2rem, 2.8vw, 2.8rem);
+    color: var(--board-dark);
+    line-height: 1;
+  }
+
+  .seg-tag {
+    font-size: clamp(0.75rem, 0.88vw, 0.95rem);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-top: 0.6vh;
+  }
+
+  .seg-col.organizer .seg-tag { color: var(--rust); }
+
+  .seg-desc {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(1.05rem, 1.2vw, 1.3rem);
+    line-height: 1.5;
+    color: var(--ink);
+    margin-top: 1vh;
+  }
+
+  .seg-size {
+    margin-top: auto;
+    padding-top: 2vh;
+    border-top: 1px solid var(--border);
+    font-size: clamp(0.85rem, 1vw, 1.1rem);
+    color: var(--muted);
+  }
+
+  .seg-size strong {
+    color: var(--board-dark);
+    font-size: 1.25em;
+    font-family: 'Playfair Display', serif;
+    font-weight: 700;
+  }
+
+  /* ───────────────────────────────────────── */
+  /*  SLIDE 7 — CHESSQUERY                      */
+  /* ───────────────────────────────────────── */
+  #slide-7 .pitch-title {
+    font-family: 'Playfair Display', serif;
+    font-weight: 900;
+    font-size: clamp(3.2rem, 6vw, 5.5rem);
+    line-height: 1;
+    color: var(--cream);
+    margin-top: 2vh;
+    max-width: 18ch;
+    position: relative;
+    z-index: 2;
+  }
+
+  #slide-7 .pitch-title em {
+    font-style: italic;
+    color: var(--amber-light);
+  }
+
+  #slide-7 .pillars {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2.5vw;
+    margin-top: 5vh;
+    margin-bottom: 3vh;
+    position: relative;
+    z-index: 2;
+  }
+
+  .pillar {
+    border-top: 2px solid rgba(212,169,106,0.4);
+    padding-top: 2vh;
+  }
+
+  .pillar-icon {
+    font-size: clamp(2.8rem, 4.5vw, 4rem);
+    color: var(--amber-light);
+    line-height: 1;
+    margin-bottom: 1.5vh;
+  }
+
+  .pillar-name {
+    font-family: 'Playfair Display', serif;
+    font-weight: 700;
+    font-size: clamp(1.5rem, 2vw, 2rem);
+    color: var(--cream);
+    margin-bottom: 0.8vh;
+  }
+
+  .pillar-desc {
+    font-size: clamp(0.9rem, 1.05vw, 1.15rem);
+    color: rgba(245,240,232,0.65);
+    line-height: 1.5;
+  }
+
+  #slide-7 .pitch-foot {
+    margin-top: auto;
+    padding-top: 3vh;
+    border-top: 1px solid rgba(212,169,106,0.25);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 3vw;
+    position: relative;
+    z-index: 2;
+  }
+
+  #slide-7 .pitch-stack {
+    font-size: clamp(0.78rem, 0.95vw, 1.05rem);
+    color: rgba(212,169,106,0.7);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    line-height: 1.9;
+  }
+
+  #slide-7 .pitch-stack strong {
+    color: var(--cream);
+    font-weight: 500;
+  }
+
+  #slide-7 .made-in {
+    text-align: right;
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: clamp(1.1rem, 1.4vw, 1.5rem);
+    color: var(--amber-light);
+    line-height: 1.3;
+  }
+
+  #slide-7 .made-in span {
+    display: block;
+    font-size: 0.6em;
+    color: rgba(212,169,106,0.6);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    font-style: normal;
+    margin-top: 0.5vh;
+  }
+
+  /* ───────────────────────────────────────── */
+  /*  SLIDE 8 — DEMO                            */
+  /* ───────────────────────────────────────── */
+  #slide-8 .slide-title {
+    margin-top: 1.5vh;
+    margin-bottom: 4vh;
+  }
+
+  #slide-8 .scene-list {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2vw;
+    flex: 1;
+    position: relative;
+    z-index: 2;
+  }
+
+  .scene {
+    display: flex;
+    flex-direction: column;
+    padding: 3vh 1.5vw;
+    background: var(--card-bg);
+    border: 1.5px solid var(--border);
+    position: relative;
+  }
+
+  .scene-num {
+    font-family: 'Playfair Display', serif;
+    font-weight: 900;
+    font-style: italic;
+    font-size: clamp(3.5rem, 6vw, 5.5rem);
+    line-height: 0.9;
+    color: var(--amber);
+    margin-bottom: 1.5vh;
+  }
+
+  .scene-title {
+    font-family: 'Playfair Display', serif;
+    font-weight: 700;
+    font-size: clamp(1.3rem, 1.7vw, 1.7rem);
+    color: var(--board-dark);
+    line-height: 1.1;
+    margin-bottom: 1vh;
+  }
+
+  .scene-desc {
+    font-size: clamp(0.85rem, 1vw, 1.05rem);
+    color: var(--muted);
+    line-height: 1.5;
+    flex: 1;
+  }
+
+  .scene-time {
+    margin-top: 2vh;
+    padding-top: 1.5vh;
+    border-top: 1px solid var(--border);
+    font-size: clamp(0.75rem, 0.85vw, 0.92rem);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--amber);
+  }
+
+  #slide-8 .demo-cta {
+    margin-top: 4vh;
+    text-align: center;
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: clamp(1.4rem, 2vw, 2.2rem);
+    color: var(--rust);
+    position: relative;
+    z-index: 2;
+  }
+
+  #slide-8 .demo-cta::before,
+  #slide-8 .demo-cta::after {
+    content: '—';
+    margin: 0 1.5rem;
+    color: var(--amber);
+    font-style: normal;
+  }
+
+  /* ───────────────────────────────────────── */
+  /*  NAVIGATION                                */
+  /* ───────────────────────────────────────── */
+  .nav-bar {
+    position: fixed;
+    bottom: 2vh;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+    background: rgba(26,22,18,0.85);
+    backdrop-filter: blur(10px);
+    padding: 0.6rem 1.2rem;
+    border: 1px solid rgba(212,169,106,0.2);
+    border-radius: 30px;
+    z-index: 100;
+    transition: opacity 0.3s;
+  }
+
+  .nav-bar.hidden { opacity: 0.15; }
+  .nav-bar:hover { opacity: 1; }
+
+  .nav-btn {
+    background: none;
+    border: none;
+    color: var(--amber-light);
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 0.3rem 0.6rem;
+    transition: color 0.2s, transform 0.15s;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .nav-btn:hover { color: var(--cream); transform: scale(1.15); }
+  .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+  .nav-counter {
+    font-family: 'DM Mono', monospace;
+    color: var(--cream);
+    font-size: 0.8rem;
+    letter-spacing: 0.18em;
+    min-width: 60px;
+    text-align: center;
+  }
+
+  .nav-counter span { color: var(--amber-light); }
+
+  .progress-track {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: rgba(212,169,106,0.1);
+    z-index: 100;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--amber);
+    transition: width 0.5s ease;
+    box-shadow: 0 0 8px rgba(232,184,75,0.5);
+  }
+
+  /* ── HINT ── */
+  .keyboard-hint {
+    position: fixed;
+    bottom: 2vh;
+    right: 2vw;
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(212,169,106,0.4);
+    z-index: 99;
+    pointer-events: none;
+  }
+
+  /* ── RESPONSIVE GUARDS ── */
+  @media (max-width: 1100px) {
+    .global-stats { grid-template-columns: repeat(2, 1fr); gap: 3vh 2vw; }
+    #slide-5 .gap-grid { grid-template-columns: repeat(2, 1fr); gap: 2vh 1.5vw; }
+    #slide-8 .scene-list { grid-template-columns: repeat(2, 1fr); gap: 2vh 2vw; }
+  }
+</style>
+</head>
+<body>
+
+<div class="progress-track">
+  <div class="progress-fill" id="progress"></div>
+</div>
+
+<div class="deck">
+
+  <!-- ══════════════════════════════════════ -->
+  <!--  SLIDE 1 — PORTADA                      -->
+  <!-- ══════════════════════════════════════ -->
+  <section class="slide dark active" id="slide-1">
+    <div class="knight-decor">♞</div>
+    <div class="cover-head reveal reveal-1">
+      <div class="slide-tag">Demo · Fullstack III · DuocUC</div>
+      <h1 class="cover-title">ChessQuery<span><em style="font-style:italic; color:inherit;">la jugada local</em></span></h1>
+      <p class="cover-pitch">Una plataforma chilena para crear torneos, jugar en línea y construir el ecosistema competitivo que al ajedrez nacional le faltaba.</p>
+    </div>
+
+    <div class="cover-meta reveal reveal-3">
+      <div class="cover-meta-block">
+        <strong>Equipo</strong>
+        Martín Mora<br>
+        Agustín Garrido<br>
+        Gabriel Espinoza
+      </div>
+      <div class="cover-meta-block" style="text-align:right;">
+        <strong>DSY1106</strong>
+        Desarrollo Fullstack III<br>
+        Mayo · 2026
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════ -->
+  <!--  SLIDE 2 — HOOK GLOBAL                  -->
+  <!-- ══════════════════════════════════════ -->
+  <section class="slide cream" id="slide-2">
+    <div class="slide-tag reveal reveal-1">01 — El mercado</div>
+
+    <div class="market-growth reveal reveal-2">
+      <div class="growth-num">USD 1.42B → 4.21B</div>
+      <div class="growth-label">2024 — 2033 · CAGR 14.8%</div>
+    </div>
+
+    <h1 class="slide-title reveal reveal-2" style="margin-top:2vh;">
+      El ajedrez<br>nunca había <em>crecido</em><br>tan rápido.
+    </h1>
+
+    <div class="global-stats reveal reveal-4">
+      <div class="gstat">
+        <div class="gstat-num">200<small>M+</small></div>
+        <div class="gstat-label">Miembros registrados<br>en Chess.com</div>
+        <div class="gstat-source">2025</div>
+      </div>
+      <div class="gstat">
+        <div class="gstat-num">~1<small>B</small></div>
+        <div class="gstat-label">Partidas anuales<br>en Lichess</div>
+        <div class="gstat-source">2023–24</div>
+      </div>
+      <div class="gstat">
+        <div class="gstat-num">605<small>M</small></div>
+        <div class="gstat-label">Personas que juegan<br>regularmente</div>
+        <div class="gstat-source">Est. FIDE</div>
+      </div>
+      <div class="gstat">
+        <div class="gstat-num">USD 117<small>M</small></div>
+        <div class="gstat-label">Mercado de ajedrez<br>en América Latina</div>
+        <div class="gstat-source">2024</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════ -->
+  <!--  SLIDE 3 — CHILE                        -->
+  <!-- ══════════════════════════════════════ -->
+  <section class="slide cream" id="slide-3">
+    <div class="slide-tag reveal reveal-1">02 — Chile</div>
+    <h1 class="slide-title reveal reveal-2" style="margin-top:1.5vh;">
+      Un ecosistema<br><em>real</em>, organizado<br>y en expansión.
+    </h1>
+
+    <div class="chile-grid">
+      <div class="chile-lead reveal reveal-3">
+        El ajedrez federado en Chile opera bajo <strong>AJEFECH</strong>, reconocida por el IND y afiliada a FIDE.<br><br>
+        El <strong>Club de Ajedrez de Chile</strong> opera con academia y torneos validados FIDE; clubes regionales sostienen un ciclo competitivo nacional con sede asignada para eventos FIDE 2027.
+        <span class="since">Club de Ajedrez de Chile · fundado en 1924 · 100+ años de tradición</span>
+      </div>
+
+      <div class="chile-numbers reveal reveal-4">
+        <div class="cnum">
+          <div class="cnum-value">24<small>+</small></div>
+          <div class="cnum-label">Torneos clasificatorios<br>en un ciclo anual</div>
+        </div>
+        <div class="cnum">
+          <div class="cnum-value">722</div>
+          <div class="cnum-label">Deportistas en torneos<br>Sub-1800 (2024)</div>
+        </div>
+        <div class="cnum">
+          <div class="cnum-value">563</div>
+          <div class="cnum-label">Participantes Nacional<br>de Menores 2026</div>
+        </div>
+        <div class="cnum">
+          <div class="cnum-value">~80<small>K</small></div>
+          <div class="cnum-label">Jugadores activos online<br>con IP chilena (est.)</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════ -->
+  <!--  SLIDE 4 — TAM SAM SOM                  -->
+  <!-- ══════════════════════════════════════ -->
+  <section class="slide cream" id="slide-4">
+    <div class="slide-tag reveal reveal-1">03 — Dimensión del mercado</div>
+
+    <div class="funnel-caption reveal reveal-2">
+      <p>Cuánto mercado existe.<br>Cuánto podemos servir.<br>Cuánto vamos a capturar.</p>
+    </div>
+
+    <h1 class="slide-title reveal reveal-2" style="margin-top:1.5vh; max-width: 14ch;">
+      TAM <em>·</em> SAM <em>·</em> SOM<br>en Chile.
+    </h1>
+
+    <div class="funnel-wrap">
+      <div class="fnl fnl-tam reveal reveal-3">
+        <div class="fnl-label">TAM</div>
+        <div class="fnl-num">80K – 120K</div>
+        <div class="fnl-desc">Personas en Chile que juegan ajedrez online de forma regular. Toda la base potencial, de casual a federado.</div>
+      </div>
+      <div class="fnl fnl-sam reveal reveal-4">
+        <div class="fnl-label">SAM</div>
+        <div class="fnl-num">15K – 35K</div>
+        <div class="fnl-desc">Jugadores activos en comunidades o torneos. Disponibles para adoptar una plataforma local con funcionalidades competitivas.</div>
+      </div>
+      <div class="fnl fnl-som reveal reveal-5">
+        <div class="fnl-label">SOM</div>
+        <div class="fnl-num">1.5K – 5K</div>
+        <div class="fnl-desc">Objetivo realista a 12–24 meses: federados activos, clubes organizadores y sus comunidades directas. Adopción temprana, alta fidelidad.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════ -->
+  <!--  SLIDE 5 — EL GAP                       -->
+  <!-- ══════════════════════════════════════ -->
+  <section class="slide cream" id="slide-5">
+    <div class="slide-tag reveal reveal-1">04 — El gap competitivo</div>
+    <h1 class="slide-title reveal reveal-2">
+      Nadie cubre todo.<br><em>Y nadie</em> lo hace en Chile.
+    </h1>
+
+    <div class="gap-grid">
+      <div class="gap-card reveal reveal-3">
+        <div class="gap-card-name">Chess.com</div>
+        <div class="gap-card-type">Global · Comercial</div>
+        <div class="gap-features">
+          <div class="gap-feat"><span class="dot dot-yes"></span> Partidas en vivo</div>
+          <div class="gap-feat"><span class="dot dot-partial"></span> Gestión básica</div>
+          <div class="gap-feat"><span class="dot dot-partial"></span> Español parcial</div>
+          <div class="gap-feat"><span class="dot dot-no"></span> Foco local</div>
+        </div>
+      </div>
+
+      <div class="gap-card reveal reveal-3">
+        <div class="gap-card-name">Lichess</div>
+        <div class="gap-card-type">Global · Open source</div>
+        <div class="gap-features">
+          <div class="gap-feat"><span class="dot dot-yes"></span> Partidas en vivo</div>
+          <div class="gap-feat"><span class="dot dot-yes"></span> Torneos Arena/Swiss</div>
+          <div class="gap-feat"><span class="dot dot-yes"></span> Español</div>
+          <div class="gap-feat"><span class="dot dot-no"></span> Solución genérica</div>
+        </div>
+      </div>
+
+      <div class="gap-card reveal reveal-4">
+        <div class="gap-card-name">Swiss Manager</div>
+        <div class="gap-card-type">Software FIDE oficial</div>
+        <div class="gap-features">
+          <div class="gap-feat"><span class="dot dot-no"></span> Partidas en línea</div>
+          <div class="gap-feat"><span class="dot dot-yes"></span> Gestión torneos</div>
+          <div class="gap-feat"><span class="dot dot-partial"></span> Español parcial</div>
+          <div class="gap-feat"><span class="dot dot-no"></span> Sin experiencia online</div>
+        </div>
+      </div>
+
+      <div class="gap-card us reveal reveal-5">
+        <div class="gap-card-name">ChessQuery</div>
+        <div class="gap-card-type">Local · Integrado</div>
+        <div class="gap-features">
+          <div class="gap-feat"><span class="dot dot-yes"></span> Partidas en vivo</div>
+          <div class="gap-feat"><span class="dot dot-yes"></span> Gestión de torneos</div>
+          <div class="gap-feat"><span class="dot dot-yes"></span> Nativo en español</div>
+          <div class="gap-feat"><span class="dot dot-yes"></span> Pensado para Chile</div>
+        </div>
+      </div>
+    </div>
+
+    <p class="gap-conclusion reveal reveal-6">
+      Falta una plataforma que integre <strong>juego en tiempo real</strong> + <strong>gestión de torneos</strong> + <strong>foco local</strong>.<br>Esa pieza es ChessQuery.
+    </p>
+  </section>
+
+  <!-- ══════════════════════════════════════ -->
+  <!--  SLIDE 6 — SEGMENTOS                    -->
+  <!-- ══════════════════════════════════════ -->
+  <section class="slide cream" id="slide-6">
+    <div class="slide-tag reveal reveal-1">05 — Para quién lo construimos</div>
+    <h1 class="slide-title reveal reveal-2">
+      Dos roles.<br>Una <em>misma</em> plataforma.
+    </h1>
+
+    <div class="seg-grid">
+      <div class="seg-col reveal reveal-3">
+        <div class="seg-piece">♟</div>
+        <div>
+          <div class="seg-name">Jugador</div>
+          <div class="seg-tag">Casual + Deportivo</div>
+        </div>
+        <p class="seg-desc">
+          Juega 1vs1 en tiempo real. Quiere competir, ver su ELO subir y participar en torneos sin instalar nada. Desde el que prueba ajedrez por primera vez hasta el federado FIDE Sub-1800.
+        </p>
+        <div class="seg-size">
+          <strong>15K – 35K</strong> jugadores activos<br>en el SAM nacional
+        </div>
+      </div>
+
+      <div class="seg-col organizer reveal reveal-4">
+        <div class="seg-piece">♚</div>
+        <div>
+          <div class="seg-name">Organizador</div>
+          <div class="seg-tag">Clubes · Árbitros · AJEFECH</div>
+        </div>
+        <p class="seg-desc">
+          Hoy gestiona inscripciones en Excel, emparejamientos en Swiss Manager y partidas en Lichess. Tres herramientas, cero integración. Es el nodo de influencia que arrastra a toda su comunidad.
+        </p>
+        <div class="seg-size">
+          <strong>30 – 80</strong> clubes activos<br>bajo AJEFECH
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════ -->
+  <!--  SLIDE 7 — CHESSQUERY                   -->
+  <!-- ══════════════════════════════════════ -->
+  <section class="slide dark" id="slide-7">
+    <div class="slide-tag reveal reveal-1">06 — La propuesta</div>
+
+    <h1 class="pitch-title reveal reveal-2">
+      Una sola plataforma.<br>
+      <em>Tres</em> dolores resueltos.
+    </h1>
+
+    <div class="pillars">
+      <div class="pillar reveal reveal-3">
+        <div class="pillar-icon">♜</div>
+        <div class="pillar-name">Torneos</div>
+        <div class="pillar-desc">Crear, abrir inscripciones, aprobar jugadores, emparejar por Suizo, Round-Robin o Knockout. Standings con desempate FIDE.</div>
+      </div>
+      <div class="pillar reveal reveal-4">
+        <div class="pillar-icon">♞</div>
+        <div class="pillar-name">Partidas en vivo</div>
+        <div class="pillar-desc">Juego en tiempo real con validación legal de cada jugada en el servidor. Optimistic UI en el cliente. Cero instalación.</div>
+      </div>
+      <div class="pillar reveal reveal-5">
+        <div class="pillar-icon">♛</div>
+        <div class="pillar-name">PGN + ELO</div>
+        <div class="pillar-desc">Cada partida persiste como PGN con detección de apertura. Historial inmutable de ELO. La memoria competitiva del jugador.</div>
+      </div>
+    </div>
+
+    <div class="pitch-foot reveal reveal-6">
+      <div class="pitch-stack">
+        <strong>Arquitectura</strong>
+        6 microservicios · Spring Boot + NestJS<br>
+        Supabase · RabbitMQ · React
+      </div>
+      <div class="made-in">
+        Hecho en Chile,<br>para Chile.
+        <span>Ecosistema AJEFECH-ready</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════ -->
+  <!--  SLIDE 8 — DEMO                         -->
+  <!-- ══════════════════════════════════════ -->
+  <section class="slide cream" id="slide-8">
+    <div class="slide-tag reveal reveal-1">07 — Lo que verán ahora</div>
+    <h1 class="slide-title reveal reveal-2">
+      Cuatro escenas.<br><em>Un</em> flujo real.
+    </h1>
+
+    <div class="scene-list">
+      <div class="scene reveal reveal-3">
+        <div class="scene-num">01</div>
+        <div class="scene-title">Registro & onboarding</div>
+        <div class="scene-desc">Alta vía Supabase Auth, provisioning automático del perfil de jugador con ELO inicial.</div>
+        <div class="scene-time">~ 2 min</div>
+      </div>
+      <div class="scene reveal reveal-4">
+        <div class="scene-num">02</div>
+        <div class="scene-title">Torneo end-to-end</div>
+        <div class="scene-desc">Organizador crea torneo, abre inscripciones, aprueba jugadores y genera la primera ronda.</div>
+        <div class="scene-time">~ 4 min</div>
+      </div>
+      <div class="scene reveal reveal-5">
+        <div class="scene-num">03</div>
+        <div class="scene-title">Partida en vivo + PGN</div>
+        <div class="scene-desc">Dos navegadores, jugadas validadas en servidor, broadcast por Supabase Realtime, PGN almacenado.</div>
+        <div class="scene-time">~ 5 min</div>
+      </div>
+      <div class="scene reveal reveal-6">
+        <div class="scene-num">04</div>
+        <div class="scene-title">ELO + notificaciones</div>
+        <div class="scene-desc">Evento <em>game.finished</em>, recálculo de ELO, notificación in-app por bandeja y toast push.</div>
+        <div class="scene-time">~ 2 min</div>
+      </div>
+    </div>
+
+    <p class="demo-cta reveal reveal-6">Pasemos a la demo</p>
+  </section>
+
+</div>
+
+<!-- ── NAVIGATION ── -->
+<div class="nav-bar" id="navBar">
+  <button class="nav-btn" id="prevBtn" aria-label="Anterior">◂</button>
+  <div class="nav-counter"><span id="cur">01</span> / <span id="tot">08</span></div>
+  <button class="nav-btn" id="nextBtn" aria-label="Siguiente">▸</button>
+</div>
+
+<div class="keyboard-hint">← → · Espacio · F = pantalla completa</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  const total = slides.length;
+  const cur = document.getElementById('cur');
+  const tot = document.getElementById('tot');
+  const progress = document.getElementById('progress');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const navBar = document.getElementById('navBar');
+
+  let idx = 0;
+
+  tot.textContent = String(total).padStart(2, '0');
+
+  function go(n) {
+    idx = Math.max(0, Math.min(total - 1, n));
+    slides.forEach((s, i) => s.classList.toggle('active', i === idx));
+    cur.textContent = String(idx + 1).padStart(2, '0');
+    progress.style.width = ((idx + 1) / total * 100) + '%';
+    prevBtn.disabled = idx === 0;
+    nextBtn.disabled = idx === total - 1;
+  }
+
+  prevBtn.addEventListener('click', () => go(idx - 1));
+  nextBtn.addEventListener('click', () => go(idx + 1));
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+      e.preventDefault();
+      go(idx + 1);
+    } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+      e.preventDefault();
+      go(idx - 1);
+    } else if (e.key === 'Home') {
+      go(0);
+    } else if (e.key === 'End') {
+      go(total - 1);
+    } else if (e.key.toLowerCase() === 'f') {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+      } else {
+        document.exitFullscreen();
+      }
+    }
+  });
+
+  // Click anywhere (except nav) to advance
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.nav-bar')) return;
+    // left third → back, right two thirds → forward
+    if (e.clientX < window.innerWidth / 3) {
+      go(idx - 1);
+    } else {
+      go(idx + 1);
+    }
+  });
+
+  // Hide nav after inactivity
+  let navTimer;
+  function showNav() {
+    navBar.classList.remove('hidden');
+    clearTimeout(navTimer);
+    navTimer = setTimeout(() => navBar.classList.add('hidden'), 3000);
+  }
+  document.addEventListener('mousemove', showNav);
+  showNav();
+
+  // Initialize
+  go(0);
+</script>
+
+</body>
+</html>

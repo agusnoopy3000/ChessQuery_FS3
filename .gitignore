@@ -20,6 +20,7 @@ infrastructure/.env
 **/jacoco-report/
 **/*.lcov
 *-coverage.log
+docs/coverage-reports/   # reportes JaCoCo generados; viven en <módulo>/target/site/jacoco/
 
 # Logs
 *.log

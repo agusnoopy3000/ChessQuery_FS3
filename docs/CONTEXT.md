@@ -6,20 +6,15 @@
 > Storage** (en lugar de MinIO). Componentes activos: 8 (no 11).
 >
 > - MS-Auth, `auth_db`, MinIO → **REMOVIDOS** del `docker-compose.yml`.
->   Preservados en `docker-compose.backup.yml` para rollback.
+>   El estado pre-migración es recuperable desde el commit `0fb84d5`.
 > - JWT validation: API Gateway lo hace local con `SUPABASE_JWT_SECRET`
 >   (clase `SupabaseJwtAuthFilter`).
-> - Webhook: Supabase `auth.users` → `POST /webhook/user-registered` →
+> - Webhook: Supabase `auth.users` → `POST /webhooks/supabase/user-registered` →
 >   evento `user.registered` a RabbitMQ → `UserRegisteredConsumer` en
 >   MS-Users crea Player con `supabase_user_id`.
 > - PGN storage: MS-Game inyecta `StorageService` (Supabase impl por
 >   defecto, `storage.provider=minio` para fallback).
-> - Setup: ver [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md).
-> - Rollback: ver [docs/ROLLBACK.md](docs/ROLLBACK.md).
->
-> Las secciones de MS-Auth (`/auth/login`, `/auth/refresh`) y MinIO
-> descritas más abajo están **obsoletas** pero se mantienen como
-> referencia histórica.
+> - Setup: ver [SUPABASE_SETUP.md](./SUPABASE_SETUP.md).
 
 ## Proyecto
 Plataforma de microservicios para ajedrez competitivo en Chile.
@@ -224,9 +219,6 @@ Los microservicios se llaman entre sí via HTTP. Estos son los endpoints que otr
 - GET http://ms-users:8081/users/search?q={query}&limit=20 → lista de jugadores
 - PUT http://ms-users:8081/users/{id}/elo → body: {ratingType, newValue, source}
 
-### MS-Auth (consumido por API Gateway)
-- GET http://ms-auth:9090/auth/validate → header Authorization: Bearer {jwt} → retorna {userId, email, role}
-
 ### MS-Tournament (consumido por BFF-Organizer)
 - Todos los endpoints de tournament con prefijo http://ms-tournament:8082/
 
@@ -241,21 +233,19 @@ Los microservicios se llaman entre sí via HTTP. Estos son los endpoints que otr
 
 ## URLs internas Docker
 Dentro de Docker Compose, los servicios se comunican por nombre de servicio:
-- ms-auth:9090, ms-users:8081, ms-tournament:8082, ms-game:8083
+- ms-users:8081, ms-tournament:8082, ms-game:8083
 - ms-analytics:8084, ms-notifications:8085, ms-etl:8086
 - bff-player:3001, bff-organizer:3002, bff-admin:3003
-- rabbitmq:5672, redis:6379, minio:9000
+- rabbitmq:5672, redis:6379
 
 ## Modelo de datos (v3.1 — 3FN)
 
-Documento visual: ChessQuery_ERD_UML_v3.1.html (en raíz del proyecto).
-15 entidades · 7 bases de datos · 16 relaciones · Normalizado en 3FN.
+Documento visual: ChessQuery_ERD_UML_v3.1.html (en raíz del proyecto) — refleja el modelo previo a la migración (incluía auth_db).
+Tras migrar a Supabase Auth: **6 bases de datos activas** (auth_db removido). Normalizado en 3FN.
 
 ### Entidades por microservicio
 
-**auth_db** (MS-Auth)
-- AUTH_USER: id, email UK, password_hash, role CK(PLAYER|ORGANIZER|ADMIN), is_active, last_login, created_at
-- REFRESH_TOKEN: id, user_id FK→AUTH_USER, token_hash UK, expires_at, is_revoked, device_info, created_at
+> Identidad (usuarios, credenciales, sesiones) la gestiona **Supabase Auth**; el antiguo `auth_db` (AUTH_USER, REFRESH_TOKEN) fue removido.
 
 **user_db** (MS-Users)
 - PLAYER: id, first_name NN, last_name NN, rut UK VARCHAR(12) nullable (jugadores extranjeros), email UK, country_id FK→COUNTRY, region, club_id FK→CLUB, birth_date, gender CK(M/F/O), fide_id UK, federation_id UK, lichess_username UK, elo_national, elo_fide_standard, elo_fide_rapid, elo_fide_blitz, elo_platform, created_at, updated_at
@@ -291,7 +281,7 @@ Documento visual: ChessQuery_ERD_UML_v3.1.html (en raíz del proyecto).
 ### Notas de implementación
 - rut: almacenado como "12345678-9" (con guion, sin puntos). Nullable para extranjeros.
 - player_id en TOURNAMENT y GAME es BIGINT cross-service (no FK real de BD); la integridad se garantiza a nivel de aplicación.
-- organizer_id en TOURNAMENT es cross-service (referencia a AUTH_USER.id o PLAYER.id según rol).
+- organizer_id en TOURNAMENT es cross-service (referencia al `player.id` del organizador, provisionado desde su usuario Supabase).
 
 ---
 
@@ -331,48 +321,36 @@ Valores del campo `format` en TOURNAMENT: `SWISS`, `ROUND_ROBIN`, `KNOCKOUT`.
 
 ---
 
-## Object Storage — PGN en MinIO/S3
+## Object Storage — PGN en Supabase Storage (MinIO como fallback)
 
 - Formato: PGN raw (texto plano, sin parsear), extensión `.pgn`
-- Key en MinIO: `games/{year}/{month}/{gameId}.pgn` → ej: `games/2026/04/4521.pgn`
+- Bucket / key: `chessquery-pgn` con path `games/{year}/{month}/{gameId}.pgn` → ej: `games/2026/04/4521.pgn`
 - Campo en BD: `GAME.pgn_storage_key` almacena exactamente esa key
 - Content-Type: `application/x-chess-pgn`
 - Tamaño máximo: 1MB por archivo (una partida normal pesa 2KB-50KB)
-- Acceso: MS-Game genera presigned URL con expiración de 1 hora. El cliente descarga directo de MinIO/S3, sin pasar por el backend.
+- Acceso: MS-Game genera una signed URL (expiración 1 hora). El cliente descarga directo del Storage, sin pasar por el backend.
+- Provider: `StorageService` con impl Supabase por defecto; `storage.provider=minio` activa el fallback a MinIO/S3 (misma key).
 - Detección de apertura: MS-Game lee los primeros 10 movimientos del PGN antes de subirlo → busca coincidencia en OPENING comparando prefijo contra `pgn_moves` → si no hay match, `opening_id = null`.
 
 ---
 
-## Autenticación — Flujo completo con refresh tokens
+## Autenticación — Flujo con Supabase Auth
 
-**Access token (JWT)**
-- Expiración: 1 hora
-- Claims: `sub` (userId string), `email`, `role`, `iat`, `exp`
-- Header: `Authorization: Bearer {token}`
-- Stateless: no se persiste en BD
-- El API Gateway lo valida en cada request llamando a `GET /auth/validate` en MS-Auth
+La identidad la gestiona **Supabase Auth** (GoTrue); ya no existe MS-Auth ni la tabla REFRESH_TOKEN.
 
-**Refresh token**
-- Expiración: 7 días
-- Generación: UUID v4 hasheado con SHA-256 → persistido en REFRESH_TOKEN.token_hash
-- Un usuario puede tener múltiples refresh tokens activos (uno por dispositivo)
-- `device_info`: user-agent o identificador enviado por el cliente
+**Access token (JWT de Supabase)**
+- Emitido por Supabase al hacer login (email/password o magic link).
+- Claims: `sub` (UUID del usuario Supabase), `email`, `role` (en `app_metadata` / `user_metadata`), `iat`, `exp`.
+- Header: `Authorization: Bearer {token}`.
+- El **API Gateway valida el JWT localmente** (`SupabaseJwtAuthFilter`): ES256 vía JWKS con fallback a HS256 (`SUPABASE_JWT_SECRET`). No llama a ningún servicio externo.
+- El Gateway resuelve `UUID Supabase → player.id` (cache Caffeine) y propaga headers downstream (`X-User-Id`, `X-Supabase-User-Id`, `X-User-Email`, `X-User-Role`).
 
-**Flujo login:**
-1. POST /auth/login → MS-Auth valida credenciales → genera access token (1h) + refresh token (7d)
-2. Persiste hash del refresh token en REFRESH_TOKEN
-3. Retorna ambos tokens al cliente
-4. Cliente guarda: access token en memoria JS, refresh token en localStorage
+**Provisioning del Player**
+- Webhook: Supabase `auth.users` → `POST /webhooks/supabase/user-registered` → evento `user.registered` → `UserRegisteredConsumer` (MS-Users) crea el Player con `supabase_user_id`.
+- Fallback: si el webhook falla, el Gateway auto-provisiona el Player ante el primer request con JWT válido.
 
-**Flujo refresh:**
-- Al recibir 401, cliente llama POST /auth/refresh con el refresh token
-- MS-Auth valida que no esté expirado ni revocado → emite nuevo access token
-- Si el refresh también expiró/revocado → 401 → cliente redirige a login
-
-**Flujo logout:**
-- POST /auth/logout con el refresh token
-- MS-Auth setea `is_revoked = true` en REFRESH_TOKEN
-- El access token sigue válido hasta expirar (máx 1h), cliente lo descarta del frontend
+**Refresh / logout**
+- Los gestiona el cliente de Supabase (`supabase-js`) en el frontend; el backend no mantiene refresh tokens.
 
 ---
 
@@ -383,8 +361,6 @@ Implementación: Spring Cloud Gateway + RedisRateLimiter (`RequestRateLimiterGat
 | Scope | Límite | Endpoints |
 |---|---|---|
 | Autenticados (por IP) | 100 req/min (burst 120) | `/api/*` |
-| Auth endpoints (por IP) | 20 req/min | `/auth/login`, `/auth/register` |
-| Validate (interno) | Sin límite | `/auth/validate` (no expuesto) |
 
 Configuración: `replenishRate=100`, `burstCapacity=120`, `requestedTokens=1`. Key resolver: IP remota.
 Al exceder: `HTTP 429 Too Many Requests` con header `Retry-After` (segundos a esperar).
@@ -394,10 +370,10 @@ Al exceder: `HTTP 429 Too Many Requests` con header `Retry-After` (segundos a es
 ## Datos de prueba para la demo
 
 Orden de seed respetando dependencias de FK:
-1. auth_db → 2. user_db (COUNTRY, CLUB, PLAYER) → 3. tournament_db → 4. game_db (OPENING, GAME) → 5. analytics_db
+1. user_db (COUNTRY, CLUB, PLAYER) → 2. tournament_db → 3. game_db (OPENING, GAME) → 4. analytics_db
 
 Datos requeridos:
-- 3 usuarios auth: admin@chessquery.cl (ADMIN), organizador@chessquery.cl (ORGANIZER), jugador@chessquery.cl (PLAYER). Password para todos: "Chess2026!"
+- 3 usuarios en Supabase Auth: admin@chessquery.cl (ADMIN), organizador@chessquery.cl (ORGANIZER), jugador@chessquery.cl (PLAYER). Password para todos: "Chess2026!"
 - 10 jugadores chilenos con nombres realistas, ratings variados (1200-2200), clubes de Santiago, Valparaíso, Concepción.
 - 2 torneos: uno en estado OPEN con 5 inscritos, otro FINISHED con resultados completos.
 - 20 partidas de ejemplo con resultados y aperturas variadas.

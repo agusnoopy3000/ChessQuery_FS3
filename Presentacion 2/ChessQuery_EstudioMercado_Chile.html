@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChessQuery — Estudio de Mercado Chile 2025</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Mono:wght@300;400;500&family=Fraunces:opsz,wght@9..144,300;9..144,600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream: #F5F0E8;
+    --ink: #1A1612;
+    --amber: #C8892A;
+    --amber-light: #E8B84B;
+    --rust: #8B3A2A;
+    --sage: #4A5E52;
+    --board-dark: #2C1810;
+    --board-light: #D4A96A;
+    --muted: #7A7060;
+    --card-bg: #FDFAF4;
+    --border: #D8CEB8;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background-color: var(--cream);
+    color: var(--ink);
+    font-family: 'DM Mono', monospace;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--board-dark);
+    color: var(--board-light);
+    padding: 3rem 4rem 2.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  header::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: repeating-conic-gradient(
+      rgba(212,169,106,0.07) 0% 25%,
+      transparent 0% 50%
+    );
+    background-size: 60px 60px;
+    pointer-events: none;
+  }
+
+  .header-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .header-tag::before {
+    content: '♟';
+    font-size: 1rem;
+  }
+
+  header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2.2rem, 5vw, 3.8rem);
+    font-weight: 900;
+    line-height: 1.05;
+    color: var(--cream);
+    margin-bottom: 0.5rem;
+  }
+
+  header h1 span {
+    color: var(--amber-light);
+  }
+
+  .header-sub {
+    font-size: 0.8rem;
+    color: rgba(212,169,106,0.7);
+    margin-top: 1.2rem;
+    letter-spacing: 0.1em;
+  }
+
+  .header-meta {
+    position: absolute;
+    top: 3rem;
+    right: 4rem;
+    text-align: right;
+    font-size: 0.65rem;
+    color: rgba(212,169,106,0.5);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    line-height: 1.8;
+  }
+
+  /* ── MAIN ── */
+  main {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 3rem 2rem 5rem;
+  }
+
+  /* ── SECTION TITLES ── */
+  .section-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 0.4rem;
+    margin-top: 3.5rem;
+  }
+
+  h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.7rem;
+    font-weight: 700;
+    color: var(--board-dark);
+    margin-bottom: 1.5rem;
+    border-bottom: 1.5px solid var(--border);
+    padding-bottom: 0.5rem;
+  }
+
+  h3 {
+    font-family: 'Fraunces', serif;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--sage);
+    margin: 1.5rem 0 0.5rem;
+  }
+
+  p {
+    font-size: 0.85rem;
+    line-height: 1.85;
+    color: #3A3228;
+    margin-bottom: 0.8rem;
+  }
+
+  /* ── INTRO BOX ── */
+  .intro-box {
+    background: var(--board-dark);
+    color: var(--board-light);
+    border-radius: 4px;
+    padding: 2rem 2.5rem;
+    margin-bottom: 2.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .intro-box::after {
+    content: '♞';
+    position: absolute;
+    right: 2rem;
+    bottom: -0.5rem;
+    font-size: 6rem;
+    opacity: 0.07;
+    line-height: 1;
+  }
+
+  .intro-box p {
+    color: rgba(212,169,106,0.85);
+    font-size: 0.82rem;
+    line-height: 1.9;
+  }
+
+  .intro-box strong {
+    color: var(--amber-light);
+  }
+
+  /* ── STAT CARDS ── */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0 2rem;
+  }
+
+  .stat-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--amber);
+    padding: 1.25rem 1.5rem;
+    border-radius: 2px;
+    transition: transform 0.2s;
+  }
+
+  .stat-card:hover { transform: translateY(-2px); }
+
+  .stat-value {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem;
+    font-weight: 900;
+    color: var(--board-dark);
+    line-height: 1;
+    margin-bottom: 0.3rem;
+  }
+
+  .stat-value span {
+    font-size: 1.1rem;
+    color: var(--amber);
+  }
+
+  .stat-label {
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+
+  .stat-source {
+    font-size: 0.6rem;
+    color: var(--border);
+    margin-top: 0.5rem;
+  }
+
+  /* ── SEGMENT TABLE ── */
+  .segment-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+    margin: 1.5rem 0;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+  }
+
+  .segment-table th {
+    background: var(--board-dark);
+    color: var(--board-light);
+    padding: 0.7rem 1rem;
+    text-align: left;
+    font-size: 0.62rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    font-weight: 400;
+  }
+
+  .segment-table td {
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--border);
+    color: #3A3228;
+    vertical-align: top;
+    line-height: 1.5;
+  }
+
+  .segment-table tr:last-child td { border-bottom: none; }
+
+  .segment-table tr:nth-child(even) td {
+    background: rgba(200,137,42,0.04);
+  }
+
+  .badge {
+    display: inline-block;
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.2rem 0.5rem;
+    border-radius: 2px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .badge-target { background: rgba(72,94,82,0.15); color: var(--sage); }
+  .badge-secondary { background: rgba(139,58,42,0.1); color: var(--rust); }
+
+  /* ── OPPORTUNITY BOX ── */
+  .opp-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+
+  @media (max-width: 600px) {
+    .opp-grid { grid-template-columns: 1fr; }
+    .header-meta { display: none; }
+    header { padding: 2rem; }
+  }
+
+  .opp-card {
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--sage);
+    padding: 1.1rem 1.3rem;
+    background: var(--card-bg);
+    border-radius: 2px;
+  }
+
+  .opp-card.risk {
+    border-left-color: var(--rust);
+  }
+
+  .opp-card h4 {
+    font-family: 'Fraunces', serif;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--board-dark);
+    margin-bottom: 0.5rem;
+  }
+
+  .opp-card p {
+    font-size: 0.77rem;
+    line-height: 1.7;
+    margin: 0;
+  }
+
+  /* ── COMPETITOR TABLE ── */
+  .comp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.76rem;
+    margin: 1.5rem 0;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+  }
+
+  .comp-table th {
+    background: var(--sage);
+    color: var(--cream);
+    padding: 0.65rem 1rem;
+    text-align: left;
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    font-weight: 400;
+  }
+
+  .comp-table td {
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    line-height: 1.5;
+    color: #3A3228;
+  }
+
+  .comp-table tr:last-child td { border-bottom: none; }
+
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+  .dot-yes { background: var(--sage); }
+  .dot-no { background: var(--rust); }
+  .dot-partial { background: var(--amber); }
+
+  /* ── CONCLUSION ── */
+  .conclusion {
+    background: linear-gradient(135deg, var(--board-dark) 0%, #3D2010 100%);
+    color: var(--board-light);
+    border-radius: 4px;
+    padding: 2.5rem;
+    margin-top: 3rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .conclusion::before {
+    content: '♚';
+    position: absolute;
+    right: 2rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 8rem;
+    opacity: 0.06;
+    line-height: 1;
+  }
+
+  .conclusion h2 {
+    font-family: 'Playfair Display', serif;
+    color: var(--amber-light);
+    border-bottom-color: rgba(200,137,42,0.3);
+    font-size: 1.4rem;
+    margin-top: 0;
+  }
+
+  .conclusion .section-label { color: rgba(200,137,42,0.6); }
+
+  .conclusion p {
+    color: rgba(212,169,106,0.8);
+    font-size: 0.82rem;
+  }
+
+  .conclusion strong { color: var(--amber-light); }
+
+  /* ── TAM SAM SOM ── */
+  .funnel {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 1.5rem 0 2rem;
+  }
+
+  .funnel-tier {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 0.9rem 1.5rem;
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+  }
+
+  .funnel-tier:first-child {
+    border-radius: 3px 3px 0 0;
+    background: rgba(44,24,16,0.06);
+  }
+
+  .funnel-tier:last-child {
+    border-radius: 0 0 3px 3px;
+    border-top: none;
+    background: rgba(72,94,82,0.08);
+  }
+
+  .funnel-tier:not(:first-child):not(:last-child) {
+    border-top: none;
+    background: rgba(200,137,42,0.06);
+  }
+
+  .funnel-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    min-width: 60px;
+  }
+
+  .funnel-number {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.6rem;
+    font-weight: 900;
+    color: var(--board-dark);
+    min-width: 160px;
+  }
+
+  .funnel-desc {
+    font-size: 0.75rem;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* ── SOURCE NOTE ── */
+  .source-note {
+    margin-top: 3rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.65rem;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.03em;
+  }
+
+  .source-note strong { color: var(--ink); }
+
+  /* ── ANIMATION ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .stat-card, .opp-card { animation: fadeUp 0.4s ease both; }
+
+  .stat-grid .stat-card:nth-child(1) { animation-delay: 0.05s; }
+  .stat-grid .stat-card:nth-child(2) { animation-delay: 0.1s; }
+  .stat-grid .stat-card:nth-child(3) { animation-delay: 0.15s; }
+  .stat-grid .stat-card:nth-child(4) { animation-delay: 0.2s; }
+  .stat-grid .stat-card:nth-child(5) { animation-delay: 0.25s; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-meta">
+    Preparado para<br>
+    ChessQuery Platform<br>
+    Mayo 2026
+  </div>
+  <div class="header-tag">Investigación de Mercado</div>
+  <h1>Ajedrez en Chile:<br><span>Segmento Deportivo</span><br>y Casual</h1>
+  <p class="header-sub">Referencia de mercado · ChessQuery · Partidas en tiempo real + Gestión de torneos</p>
+</header>
+
+<main>
+
+  <!-- INTRO -->
+  <div class="intro-box">
+    <p>
+      Este documento ofrece una <strong>referencia de mercado</strong> para ChessQuery, una plataforma de ajedrez orientada a dos roles principales: el <strong>jugador casual/deportivo</strong> (partidas 1vs1 en tiempo real) y el <strong>organizador de torneos</strong>. Los datos cubren el ecosistema local chileno y el contexto global del mercado de ajedrez online, para dimensionar el TAM, SAM y SOM realistas.
+    </p>
+  </div>
+
+  <!-- 1. CONTEXTO GLOBAL -->
+  <div class="section-label">01 — Contexto Global</div>
+  <h2>El ajedrez como mercado en expansión</h2>
+
+  <p>El ajedrez digital experimenta un crecimiento sostenido desde la pandemia de 2020 y la popularización de <em>The Queen's Gambit</em>. El mercado global de plataformas de ajedrez online alcanzó <strong>USD 1.42 mil millones en 2024</strong>, con proyección de crecer a USD 4.21 mil millones hacia 2033 (CAGR 14.8%). El mercado total de ajedrez (incluyendo físico) bordea los USD 3.45 mil millones en 2025.</p>
+
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-value">200<span>M+</span></div>
+      <div class="stat-label">Miembros registrados<br>Chess.com (2025)</div>
+      <div class="stat-source">Fuente: Chess.com / Co-op Board Games 2026</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">~1<span>B</span></div>
+      <div class="stat-label">Partidas anuales en<br>Lichess (2023–24)</div>
+      <div class="stat-source">Fuente: Foros Lichess</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">1.6<span>M</span></div>
+      <div class="stat-label">Jugadores FIDE-rated<br>en el mundo (mayo 2025)</div>
+      <div class="stat-source">Fuente: FIDE / Co-op Board Games</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">605<span>M</span></div>
+      <div class="stat-label">Personas que juegan<br>ajedrez regularmente</div>
+      <div class="stat-source">Fuente: FIDE (estimación global)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">USD 117<span>M</span></div>
+      <div class="stat-label">Mercado de ajedrez<br>en América Latina (2024)</div>
+      <div class="stat-source">Fuente: Cognitive Market Research</div>
+    </div>
+  </div>
+
+  <p>América Latina representa aproximadamente un 5% del mercado global de ajedrez, con un mercado valorado en USD 117.56 millones en 2024 y un CAGR proyectado de 3.4% hacia 2031. La región es considerada un mercado emergente con brechas claras en infraestructura digital local.</p>
+
+  <!-- 2. CHILE LOCAL -->
+  <div class="section-label">02 — Mercado Local</div>
+  <h2>El ecosistema de ajedrez en Chile</h2>
+
+  <h3>Estructura institucional</h3>
+  <p>El ajedrez federado en Chile está organizado bajo la <strong>Federación Deportiva Nacional de Ajedrez Federado de Chile (AJEFECH – FDN)</strong>, reconocida por el Instituto Nacional de Deportes (IND) y afiliada a FIDE. Opera con clubes vigentes en todo el país, quienes organizan torneos clasificatorios reportados a FIDE.</p>
+
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-value">24<span>+</span></div>
+      <div class="stat-label">Torneos clasificatorios<br>en un ciclo anual (2024)</div>
+      <div class="stat-source">Fuente: AJEFECH</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">722</div>
+      <div class="stat-label">Deportistas en torneos<br>Sub-1800 clasificatorios 2024</div>
+      <div class="stat-source">Fuente: AJEFECH</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">563</div>
+      <div class="stat-label">Participantes Campeonato<br>Nacional Menores 2026</div>
+      <div class="stat-source">Fuente: AJEFECH FDN</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">140</div>
+      <div class="stat-label">Aforo máximo<br>Final Absoluta Nacional</div>
+      <div class="stat-source">Fuente: AJEFECH</div>
+    </div>
+  </div>
+
+  <h3>Dimensión online / comunidades</h3>
+  <p>Más allá del ajedrez federado, existe una comunidad activa de jugadores chilenos en plataformas internacionales. En <strong>Lichess</strong>, el equipo "Chess Chile" (creado 2017) agrupa a jugadores nacionales con torneos programados de lunes a viernes. La AJEFECH tiene equipo oficial en Lichess. En <strong>Chess.com</strong>, el "Team Chile" es el grupo oficial para representación en ligas panamericanas y mundiales, con requisito mínimo de 3 meses de antigüedad y 50 partidas jugadas.</p>
+
+  <h3>Clubes y academia</h3>
+  <p>El <strong>Club de Ajedrez de Chile</strong> (fundado 1924) opera en Santiago con academia semanal de cuatro niveles, torneos rápidos, blitz y clásicos con validez FIDE. Es el club más emblemático del país. Otros clubes activos incluyen Chess Viña del Mar (organizador del Nacional de Menores 2025), Club Cordillera (Las Condes), entre otros distribuidos regionalmente. Chile albergó el Campeonato Panamericano Sub-20 en 2024 y tiene asignados eventos internacionales FIDE para 2027.</p>
+
+  <!-- 3. SEGMENTOS -->
+  <div class="section-label">03 — Segmentación</div>
+  <h2>Segmentos de usuario para ChessQuery</h2>
+
+  <table class="segment-table">
+    <thead>
+      <tr>
+        <th>Segmento</th>
+        <th>Descripción</th>
+        <th>Tamaño estimado Chile</th>
+        <th>Relevancia para ChessQuery</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Jugador casual online</strong><br><span class="badge badge-target">TARGET</span></td>
+        <td>Juega en Chess.com o Lichess de forma recreativa. No necesariamente federado. Busca partidas rápidas, blitz o bullet. Motivado por diversión y competencia informal.</td>
+        <td>Estimado 30,000–80,000 usuarios activos mensuales en plataformas globales con IP chilena*</td>
+        <td>Rol <em>Jugador</em>: partidas 1vs1 en tiempo real. Alto volumen potencial.</td>
+      </tr>
+      <tr>
+        <td><strong>Jugador deportivo / federado</strong><br><span class="badge badge-target">TARGET</span></td>
+        <td>Tiene ELO FIDE, participa en torneos presenciales o en línea. Rangos Sub-1800 predominantes. Pertenece a clubes afiliados a AJEFECH.</td>
+        <td>~700–1,500 jugadores activos con ID FIDE en Chile (estimado base ciclos clasificatorios)*</td>
+        <td>Rol <em>Jugador</em> y potencial <em>Organizador</em>. Alta fidelidad. Busca funcionalidad seria.</td>
+      </tr>
+      <tr>
+        <td><strong>Organizador de torneos</strong><br><span class="badge badge-secondary">ROL CLAVE</span></td>
+        <td>Clubes afiliados a AJEFECH, árbitros nacionales o regionales, directivos de clubes, monitores AJEFECH. Gestionan inscritos, emparejamientos (Swiss Manager), reportes FIDE.</td>
+        <td>~30–80 clubes activos con torneos regulares; árbitros certificados en formación continua</td>
+        <td>Rol <em>Organizador</em>: propuesta de valor diferencial. Mercado desatendido localmente.</td>
+      </tr>
+      <tr>
+        <td><strong>Estudiante / academia</strong><br><span class="badge badge-secondary">SECUNDARIO</span></td>
+        <td>Niños y jóvenes en academias (Sub-8 a Sub-18). Sus padres o monitores son los decisores. Alta participación: 563 en Nacional Menores 2026.</td>
+        <td>Miles de niños en programas, con municipios como Santiago apoyando ajedrez escolar</td>
+        <td>Crecimiento de largo plazo. Rol <em>Jugador</em> joven.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p style="font-size:0.7rem; color:var(--muted);">* Estimación metodológica: proporcional al % de Chile en el total FIDE + proyección de ratio online/federado observado globalmente (aprox. 50–100x). No existe dato público oficial de usuarios chilenos en Chess.com/Lichess.</p>
+
+  <!-- 4. TAM SAM SOM -->
+  <div class="section-label">04 — Tamaño de mercado</div>
+  <h2>TAM / SAM / SOM — Chile</h2>
+
+  <div class="funnel">
+    <div class="funnel-tier">
+      <div class="funnel-label">TAM</div>
+      <div class="funnel-number">~80,000–120,000</div>
+      <div class="funnel-desc">Personas en Chile que juegan ajedrez online de manera regular (plataformas globales + local). Incluye toda la base de interesados, desde casuales hasta federados.</div>
+    </div>
+    <div class="funnel-tier">
+      <div class="funnel-label">SAM</div>
+      <div class="funnel-number">~15,000–35,000</div>
+      <div class="funnel-desc">Jugadores que participan activamente en torneos, comunidades organizadas o tienen ELO / perfil activo en plataformas. Disponibles y motivados para adoptar una plataforma local con funcionalidades competitivas.</div>
+    </div>
+    <div class="funnel-tier">
+      <div class="funnel-label">SOM</div>
+      <div class="funnel-number">~1,500–5,000</div>
+      <div class="funnel-desc">Objetivo realista para los primeros 12–24 meses de ChessQuery: jugadores federados activos, organizadores de clubes y sus comunidades directas. Segmento de adopción temprana de alta fidelidad.</div>
+    </div>
+  </div>
+
+  <p>Para el segmento <strong>organizadores</strong>, el mercado es más pequeño pero de alto valor: se estiman entre 30 y 80 clubes activos bajo AJEFECH que realizan torneos anuales. Cada club es un cliente potencial del módulo de gestión.</p>
+
+  <!-- 5. COMPETENCIA -->
+  <div class="section-label">05 — Landscape competitivo</div>
+  <h2>Competidores y referentes</h2>
+
+  <table class="comp-table">
+    <thead>
+      <tr>
+        <th>Plataforma</th>
+        <th>Tipo</th>
+        <th>Partidas en tiempo real</th>
+        <th>Gestión de torneos</th>
+        <th>En español / local</th>
+        <th>Presencia Chile</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Chess.com</strong></td>
+        <td>Global, comercial</td>
+        <td><span class="dot dot-yes"></span> Sí</td>
+        <td><span class="dot dot-partial"></span> Básica</td>
+        <td><span class="dot dot-partial"></span> Parcial</td>
+        <td><span class="dot dot-yes"></span> Team Chile activo</td>
+      </tr>
+      <tr>
+        <td><strong>Lichess</strong></td>
+        <td>Global, open source</td>
+        <td><span class="dot dot-yes"></span> Sí</td>
+        <td><span class="dot dot-yes"></span> Sí (Arena/Swiss)</td>
+        <td><span class="dot dot-yes"></span> Sí</td>
+        <td><span class="dot dot-yes"></span> AJEFECH usa Lichess</td>
+      </tr>
+      <tr>
+        <td><strong>Swiss Manager</strong></td>
+        <td>Software de torneos</td>
+        <td><span class="dot dot-no"></span> No</td>
+        <td><span class="dot dot-yes"></span> Sí (FIDE oficial)</td>
+        <td><span class="dot dot-partial"></span> Parcial</td>
+        <td><span class="dot dot-yes"></span> Estándar nacional</td>
+      </tr>
+      <tr>
+        <td><strong>ChessQuery</strong></td>
+        <td>Local, integrado</td>
+        <td><span class="dot dot-yes"></span> Sí</td>
+        <td><span class="dot dot-yes"></span> Sí</td>
+        <td><span class="dot dot-yes"></span> Nativo</td>
+        <td><span class="dot dot-yes"></span> Propuesta de valor local</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>La principal brecha del mercado es la <strong>ausencia de una plataforma integrada en español, local y con gestión de torneos + partidas en tiempo real orientada al ecosistema chileno/latinoamericano</strong>. Lichess cubre bien el aspecto técnico pero es una solución genérica global. Swiss Manager es el estándar para torneos FIDE pero no tiene experiencia de juego online. Chess.com domina lo casual pero es una plataforma de entretenimiento masivo sin foco local.</p>
+
+  <!-- 6. OPORTUNIDADES Y RIESGOS -->
+  <div class="section-label">06 — Análisis estratégico</div>
+  <h2>Oportunidades y riesgos</h2>
+
+  <div class="opp-grid">
+    <div class="opp-card">
+      <h4>✦ Nicho local desatendido</h4>
+      <p>No existe una plataforma chilena/latinoamericana que integre juego en tiempo real con gestión de torneos. ChessQuery puede posicionarse como la solución nativa para el ecosistema AJEFECH.</p>
+    </div>
+    <div class="opp-card">
+      <h4>✦ Organizadores como palanca</h4>
+      <p>Los clubes organizadores son el nodo de influencia. Cada club con 20–100 jugadores activos es un canal de distribución orgánica. Si ChessQuery resuelve la gestión de torneos mejor que Swiss Manager, se vuelve estándar de facto.</p>
+    </div>
+    <div class="opp-card">
+      <h4>✦ Crecimiento juvenil</h4>
+      <p>563 participantes en el Nacional de Menores 2026 confirman una base juvenil robusta. Las academias y monitores AJEFECH son vectores de adopción entre usuarios 8–18 años.</p>
+    </div>
+    <div class="opp-card">
+      <h4>✦ Integración Lichess (API)</h4>
+      <p>ChessQuery ya integra la API de Lichess. Esto permite coexistir con el ecosistema existente en vez de competir frontalmente, aprovechando datos, partidas y comunidades ya formadas.</p>
+    </div>
+    <div class="opp-card risk">
+      <h4>⚠ Competencia de plataformas globales</h4>
+      <p>Chess.com y Lichess tienen masa crítica masiva. La retención de usuarios casuales es difícil si ChessQuery no ofrece diferencial claro (localización, torneos, comunidad chilena).</p>
+    </div>
+    <div class="opp-card risk">
+      <h4>⚠ Mercado federado pequeño</h4>
+      <p>El segmento FIDE activo en Chile es reducido (~700–1,500 personas). Depender solo de este núcleo limita el crecimiento. La expansión casual es necesaria para escalar.</p>
+    </div>
+    <div class="opp-card risk">
+      <h4>⚠ Adopción por organizadores</h4>
+      <p>Los clubes ya usan Swiss Manager (estándar FIDE). El costo de cambio no es técnico sino de hábito y certificación. ChessQuery debe ofrecer migración fácil y compatibilidad FIDE.</p>
+    </div>
+    <div class="opp-card risk">
+      <h4>⚠ Monetización</h4>
+      <p>La comunidad ajedrecística valora lo gratuito (Lichess es referente). El modelo freemium o SaaS para organizadores es más viable que cobrar a jugadores individuales en etapa temprana.</p>
+    </div>
+  </div>
+
+  <!-- CONCLUSION -->
+  <div class="conclusion">
+    <div class="section-label">07 — Conclusión</div>
+    <h2>Posicionamiento sugerido para ChessQuery</h2>
+    <p>
+      El mercado de ajedrez en Chile tiene un núcleo federado de <strong>700–1,500 jugadores activos con FIDE</strong>, rodeado por una comunidad online estimada de <strong>15,000–35,000 jugadores habituales</strong> (SAM). El segmento deportivo-casual es el de mayor crecimiento y menor atención local.
+    </p>
+    <p>
+      La propuesta de ChessQuery es coherente con una <strong>oportunidad real de mercado</strong>: ninguna plataforma local integra partidas en tiempo real con gestión de torneos en un producto pensado para el ecosistema chileno. La palanca más efectiva de go-to-market es el <strong>rol Organizador</strong>, porque cada club adoptante arrastra su base de jugadores.
+    </p>
+    <p>
+      Con un SOM objetivo de <strong>1,500–5,000 usuarios en los primeros 24 meses</strong>, ChessQuery puede establecerse como referente nacional antes de escalar al resto de Latinoamérica, donde el mercado de ajedrez online crece a CAGR 3.4% y las soluciones localizadas son prácticamente inexistentes.
+    </p>
+  </div>
+
+  <!-- FUENTES -->
+  <div class="source-note">
+    <strong>Fuentes consultadas:</strong><br>
+    AJEFECH – Federación Deportiva Nacional de Ajedrez de Chile (ajefech.cl, federacionchilenadeajedrez.cl) · Club de Ajedrez de Chile (clubdeajedrezchile.cl) · FIDE Ratings Database (ratings.fide.com) · Cognitive Market Research – International Chess Market 2024 · DataIntelo – Online Chess Platform Market 2024–2033 · DataHorizon Research – Chess Software Market · Co-op Board Games – Chess Statistics 2026 · Lichess (lichess.org) comunidades Chess Chile y AJEFECH Chile · Chess.com Team Chile · Verified Market Reports – Chess Market Forecast · Business Research Insights – Online Chess Instruction and Play Market.
+    <br><br>
+    <em>Nota metodológica: Las estimaciones de usuarios online chilenos son derivaciones proporcionales (FIDE + tasas de actividad global) en ausencia de datos públicos oficiales de Chess.com/Lichess por país. Deben tratarse como referencias orientativas, no cifras auditadas.</em>
+  </div>
+
+</main>
+</body>
+</html>

@@ -82,4 +82,4 @@ firma cada request con `X-Webhook-Secret`. En producción:
 
 ## 6. Rollback
 
-Para volver al stack pre-Supabase ver [ROLLBACK.md](./ROLLBACK.md).
+Para volver al stack pre-Supabase, recuperá el estado del commit `0fb84d5` (incluía MS-Auth, `auth_db` y MinIO).

@@ -2,31 +2,75 @@
 
 Este documento explica **qué pruebas existen**, **cómo correrlas**, y **qué cobertura se espera** por cada servicio. Pensado para que cualquier miembro del equipo (o el profesor) pueda validar el proyecto tras un `git clone` limpio.
 
+> 📖 Para el **detalle de diseño** de las pruebas (qué cubre cada clase, el patrón
+> `@SpringBootTest` + H2, exclusiones de cobertura y pasos futuros) ver
+> [`docs/PRUEBAS.md`](./docs/PRUEBAS.md). Este documento es el operativo (cómo correrlas).
+
 ---
 
 ## 0. Pre-requisitos (una sola vez)
+
+> **Importante:** las pruebas **unitarias y de integración NO necesitan Docker ni Supabase.**
+> Los tests de integración usan **H2 en memoria** (perfil `test`), así que corren con el daemon
+> de Docker apagado. Docker solo hace falta para la verificación **E2E manual** del §4.
+
+Verificá lo que ya tenés:
 
 ```bash
 # JDK 17 (obligatorio — los pom.xml exigen Java 17)
 java -version    # debe mostrar 17.x
 
-# Maven 3.9+
+# Maven 3.9+ (necesario para correr los tests Java en tu host)
 mvn -version
 
-# Node 20+ y npm 10+
+# Node 20+ y npm 10+ (para BFFs y frontend)
 node -v
 npm -v
 
-# Docker + Docker Compose v2 (para integración E2E manual)
+# Docker + Docker Compose v2 — SOLO para la E2E manual del §4
 docker --version
 docker compose version
 ```
 
-> 💡 Si tu `java -version` no es 17 (típicamente JDK 25 en Fedora reciente), exporta:
+### Instalar lo que falte, por sistema operativo
+
+> No hay wrapper `mvnw` en los módulos, así que **Maven debe estar instalado en tu host**.
+
+**Arch Linux:**
+```bash
+sudo pacman -S maven jdk17-openjdk      # Maven usa el JDK por defecto del sistema
+archlinux-java status                   # confirmá que el default sea java-17-openjdk
+# si no lo es:  sudo archlinux-java set java-17-openjdk
+```
+
+**Ubuntu / Debian:**
+```bash
+sudo apt update && sudo apt install -y maven openjdk-17-jdk
+```
+
+**Fedora:**
+```bash
+sudo dnf install -y maven java-17-openjdk-devel
+```
+
+**macOS (Homebrew):**
+```bash
+brew install maven openjdk@17
+```
+
+> 💡 **Maven debe usar el JDK 17.** Confirmá con `mvn -version` que la línea `Java version:`
+> diga 17.x. Si tomara otra (JDK 21/25 en Fedora, o varios JDK conviviendo en Arch), forzalo
+> exportando `JAVA_HOME` (dejalo en tu `~/.bashrc` para que persista):
 > ```bash
-> export JAVA_HOME=/ruta/a/jdk-17
+> # Arch:    /usr/lib/jvm/java-17-openjdk
+> # Ubuntu:  /usr/lib/jvm/java-17-openjdk-amd64
+> # Fedora:  /usr/lib/jvm/java-17-openjdk
+> export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
 > export PATH=$JAVA_HOME/bin:$PATH
 > ```
+
+> ℹ️ **Node muy nuevo (22/24/26):** la suite anda igual, pero el CI usa Node 20. Si el frontend o
+> los BFFs tiran errores raros de ESM/Vitest, alineá con `nvm install 20 && nvm use 20`.
 
 ### Setup inicial tras `git clone`
 
@@ -196,7 +240,15 @@ done
 echo "✅ 530 tests pasaron"
 ```
 
-Guárdalo como `scripts/test-all.sh` y ejecútalo con `bash scripts/test-all.sh`.
+Este script **ya está en el repo** como `scripts/test-all.sh`. Corré toda la suite con:
+
+```bash
+bash scripts/test-all.sh
+```
+
+> ⚠️ Asume que ya hiciste `npm install` en `frontend/`, `bff-player/` y `bff-organizer/` (ver §0).
+> La **primera** corrida de Maven baja dependencias (~5-10 min); las siguientes, ~2 min.
+> Última corrida verificada: **530 tests, 0 fallos, 0 errores**.
 
 ---
 
