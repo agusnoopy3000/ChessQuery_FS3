@@ -1,0 +1,55 @@
+# Overrides activos cuando SPRING_PROFILES_ACTIVE=aws
+
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 10000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    validate-on-migrate: true
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST}
+    port: 5672
+    username: chessquery
+    password: ${RABBITMQ_PASSWORD}
+    connection-timeout: 10000
+
+# Supabase Storage (PGN bucket) en cloud
+supabase:
+  url: ${SUPABASE_URL}
+  service-key: ${SUPABASE_SERVICE_KEY}
+  storage:
+    bucket: chessquery-pgn
+storage:
+  provider: ${STORAGE_PROVIDER:supabase}
+
+logging:
+  level:
+    root: INFO
+    org.springframework: WARN
+    cl.chessquery: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true

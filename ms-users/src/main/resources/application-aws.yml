@@ -1,0 +1,56 @@
+# Overrides activos cuando SPRING_PROFILES_ACTIVE=aws
+# Los valores reales vienen de las task definitions ECS (env + secrets).
+
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 5            # RDS db.t4g.micro = max 87 conns
+      minimum-idle: 1
+      connection-timeout: 10000       # RDS latency es mayor que local
+      idle-timeout: 300000
+      max-lifetime: 600000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate              # producción: no auto-modifica el schema
+    show-sql: false
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    validate-on-migrate: true         # fail si las migraciones difieren
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST}
+    port: 5672
+    username: chessquery
+    password: ${RABBITMQ_PASSWORD}
+    connection-timeout: 10000
+    listener:
+      simple:
+        retry:
+          enabled: true
+          max-attempts: 5
+          initial-interval: 5000
+
+logging:
+  level:
+    root: INFO
+    org.springframework: WARN
+    org.hibernate: WARN
+    cl.chessquery: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true

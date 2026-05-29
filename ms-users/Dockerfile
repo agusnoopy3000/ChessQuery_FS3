@@ -9,10 +9,11 @@ COPY src ./src
 RUN mvn package -DskipTests -q
 
 # ─── Stage 2: runtime ──────────────────────────────────────────────────────
-FROM eclipse-temurin:17-jre-jammy
+FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
-RUN groupadd --system chessquery && useradd --system --gid chessquery --shell /bin/false chessquery
+RUN apk add --no-cache wget && \
+    addgroup -S chessquery && adduser -S chessquery -G chessquery -s /sbin/nologin
 USER chessquery
 
 COPY --from=builder /app/target/ms-users-*.jar app.jar

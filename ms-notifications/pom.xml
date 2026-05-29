@@ -53,6 +53,13 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+        <!-- JSON logging para CloudWatch (solo activo en profile aws via logback-spring.xml) -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>7.4</version>
+        </dependency>
+
 
         <!-- N2: SMTP real hacia Inbucket / Mailpit en local -->
         <dependency>

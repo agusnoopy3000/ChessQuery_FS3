@@ -1,0 +1,36 @@
+# Overrides activos cuando SPRING_PROFILES_ACTIVE=aws
+# Los valores reales vienen de las task definitions ECS (env + secrets).
+
+spring:
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 3s
+
+# CORS allow-origins debe contener la URL del CloudFront / S3 website
+# Se setea en la task definition: GATEWAY_CORS_ALLOWED_ORIGINS
+gateway:
+  cors:
+    allowed-origins: ${GATEWAY_CORS_ALLOWED_ORIGINS}
+
+# Logging: nivel INFO para apps, WARN para Spring (menos ruido en CloudWatch)
+logging:
+  level:
+    root: INFO
+    org.springframework: WARN
+    org.springframework.cloud.gateway: INFO
+    cl.chessquery: INFO
+
+# Actuator: solo health y info expuestos
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true

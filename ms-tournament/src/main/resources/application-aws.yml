@@ -1,0 +1,58 @@
+# Overrides activos cuando SPRING_PROFILES_ACTIVE=aws
+
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 10000
+      idle-timeout: 300000
+      max-lifetime: 600000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    validate-on-migrate: true
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST}
+    port: 5672
+    username: chessquery
+    password: ${RABBITMQ_PASSWORD}
+    connection-timeout: 10000
+    listener:
+      simple:
+        retry:
+          enabled: true
+          max-attempts: 5
+
+# URLs internas de otros MS vía Service Discovery (Cloud Map)
+ms-users:
+  url: ${MS_USERS_URL}
+
+logging:
+  level:
+    root: INFO
+    org.springframework: WARN
+    org.hibernate: WARN
+    cl.chessquery: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true

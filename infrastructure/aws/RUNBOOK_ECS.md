@@ -4,6 +4,9 @@ Guía operativa para llevar el proyecto **desde cero** hasta el primer despliegu
 
 > Audiencia: Agustín Castro + Martín Mora (cuentas AWS Academy ~$50).
 > Lee primero [`README.md`](README.md) (visión general) y [`DEPLOY_ECS.md`](DEPLOY_ECS.md) (plan arquitectónico + costos).
+>
+> **Alcance del deploy demo:** 6 microservicios Java (api-gateway, ms-users, ms-tournament, ms-game, ms-notifications, ms-analytics) + RabbitMQ + 2 frontends (chess-portal, organizer-panel).
+> **Fuera de alcance:** `bff-admin` (sin vista admin operativa), `bff-player`/`bff-organizer` (orquestación liviana — opcional para la demo), `ms-etl` (Python, opt-in profile).
 
 ---
 
