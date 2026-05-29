@@ -14,6 +14,7 @@ desde el [README raíz](../README.md).
 | Doc | Contenido |
 |---|---|
 | [SUPABASE_SETUP.md](./SUPABASE_SETUP.md) | Setup del Supabase local (genérico Mac/Linux). Para Arch ver `RUN_ARCH.md` en la raíz. |
+| [PLAN_SUPABASE_CLOUD.md](./PLAN_SUPABASE_CLOUD.md) | Plan paso a paso para migrar de Supabase local a Supabase Cloud (managed) de cara al deploy. |
 | [README-WINDOWS.md](./README-WINDOWS.md) | Setup en Windows con `setup.ps1`. |
 | [SELF_HOSTED_RUNNER.md](./SELF_HOSTED_RUNNER.md) | Configurar el runner self-hosted de GitHub Actions para el CI. |
 
