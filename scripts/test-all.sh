@@ -46,8 +46,15 @@ count_java() {
 
 # Extrae el conteo de tests de un log de Jest ("Tests: N passed") o Vitest
 # ("Tests  N passed"). Devuelve 0 si no encuentra.
+# Primero limpia códigos ANSI de color (\e[..m) y retornos de carro: el reporter
+# verbose de Vitest en TTY los intercala entre "Tests" y el número, lo que antes
+# rompía el match y dejaba el conteo del frontend vacío. Por eso [^0-9]* (no solo
+# espacios) entre "Tests" y la cifra.
 count_node() {
-  echo "$1" | grep -oE 'Tests:?[[:space:]]+[0-9]+ passed' | grep -oE '[0-9]+' | head -1 || true
+  echo "$1" \
+    | sed -r 's/\x1b\[[0-9;?]*[a-zA-Z]//g; s/\r//g' \
+    | grep -oE 'Tests[^0-9]*[0-9]+ passed' \
+    | grep -oE '[0-9]+ passed' | grep -oE '^[0-9]+' | head -1 || true
 }
 
 echo "============================================================"

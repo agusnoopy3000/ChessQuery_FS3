@@ -327,6 +327,7 @@ gh run list --workflow=ci    # ver últimas corridas
 | `host.docker.internal` no resuelve | Linux antiguo | Ya está manejado: `extra_hosts` en compose |
 | BFF connection refused en 3100/3200 | Puertos correctos son 3001/3002 | Ver tabla §4 |
 | Frontend `npm test` ESM error | Node < 20 | `nvm install 20 && nvm use 20` |
+| Tabla-resumen muestra el conteo del frontend **vacío** (total 493 en vez de 568) | El reporter verbose de Vitest en TTY intercala códigos ANSI/CR entre `Tests` y el número, y el parser no los limpiaba | Ya corregido: `count_node` en `scripts/test-all.sh` limpia ANSI/CR antes de contar |
 | `Could not find or load main class` | Falta `mvn package` | Build previo: `mvn -DskipTests package` |
 
 ---
