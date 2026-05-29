@@ -104,8 +104,8 @@ Los microservicios Java descargan dependencias automáticamente la primera vez q
 | `bff-player` | Jest (NestJS) | Unit service + http | 47 | 96% líneas |
 | `bff-organizer` | Jest (NestJS) | Unit service + http | 28 | 94% líneas |
 | `chess-portal` (frontend) | Vitest + RTL + jsdom | Page specs | 37 | 76% líneas |
-| `organizer-panel` (frontend) | Vitest + RTL + jsdom | Page specs | 13 | 52% líneas |
-| **Total** | — | — | **530** | — |
+| `organizer-panel` (frontend) | Vitest + RTL + jsdom | Page specs | 38 | 75% líneas |
+| **Total** | — | — | **555** | — |
 
 **Patrones aplicados:**
 - **Unit**: servicios + controllers con dependencias mockeadas (Mockito / Jest mocks / `vi.mock`).
@@ -197,7 +197,7 @@ O por app individual:
 
 ```bash
 cd frontend/apps/chess-portal && npm test          # 37 tests, cobertura v8
-cd frontend/apps/organizer-panel && npm test       # 13 tests, cobertura v8
+cd frontend/apps/organizer-panel && npm test       # 38 tests, cobertura v8
 
 # Watch mode
 npx vitest
@@ -237,7 +237,7 @@ done
 (cd frontend/apps/chess-portal && npm test)
 (cd frontend/apps/organizer-panel && npm test)
 
-echo "✅ 530 tests pasaron"
+echo "✅ 555 tests pasaron"
 ```
 
 Este script **ya está en el repo** como `scripts/test-all.sh`. Corré toda la suite con:
@@ -248,7 +248,7 @@ bash scripts/test-all.sh
 
 > ⚠️ Asume que ya hiciste `npm install` en `frontend/`, `bff-player/` y `bff-organizer/` (ver §0).
 > La **primera** corrida de Maven baja dependencias (~5-10 min); las siguientes, ~2 min.
-> Última corrida verificada: **530 tests, 0 fallos, 0 errores**.
+> Última corrida verificada: **555 tests, 0 fallos, 0 errores**.
 
 ---
 
@@ -332,7 +332,7 @@ Umbrales sugeridos por módulo (no bloquean build aún):
 Ubicación: `frontend/apps/<app>/coverage/index.html`
 Esperado:
 - `chess-portal`: 76% líneas / 72% statements
-- `organizer-panel`: 52% líneas (en progreso, faltan specs de `OrganizerTournaments`)
+- `organizer-panel`: 75% líneas (`OrganizerTournaments.tsx` cubierto al 84%)
 
 ---
 
@@ -340,7 +340,7 @@ Esperado:
 
 - [ ] `for m in api-gateway ms-{users,tournament,game,notifications,analytics}; do (cd $m && mvn -B clean test); done` → 6× BUILD SUCCESS
 - [ ] `(cd bff-player && npm test) && (cd bff-organizer && npm test)` → 75 tests OK
-- [ ] `(cd frontend/apps/chess-portal && npm test) && (cd frontend/apps/organizer-panel && npm test)` → 50 tests OK
+- [ ] `(cd frontend/apps/chess-portal && npm test) && (cd frontend/apps/organizer-panel && npm test)` → 75 tests OK
 - [ ] `docker compose -f infrastructure/docker-compose.yml up -d --build` → 13 contenedores healthy
 - [ ] `curl http://localhost:8080/actuator/health` devuelve UP
 - [ ] `git status` no muestra `node_modules`, `target/`, `coverage/`, `.env`

@@ -7,7 +7,7 @@ test del proyecto, para que cualquiera que retome el desarrollo entienda el porq
 > todo tras un `git clone`. Este documento es el *de fondo*: la teoría, el diseño y la cobertura.
 > Si solo querés ejecutar los tests, andá a `TESTING.md`.
 
-Última verificación de la suite: **530 tests, 0 fallos, 0 errores** (corrida local sobre Arch Linux,
+Última verificación de la suite: **555 tests, 0 fallos, 0 errores** (corrida local sobre Arch Linux,
 Maven 3.9.16 + JDK 17 + Node 26).
 
 ---
@@ -25,8 +25,8 @@ Maven 3.9.16 + JDK 17 + Node 26).
 | BFF | `bff-player` | Jest (NestJS) | 47 | Unit (service + http) |
 | BFF | `bff-organizer` | Jest (NestJS) | 28 | Unit (service + http) |
 | Frontend | `chess-portal` | Vitest + RTL + jsdom | 37 | Component/page specs |
-| Frontend | `organizer-panel` | Vitest + RTL + jsdom | 13 | Component/page specs |
-| | | **TOTAL** | **530** | |
+| Frontend | `organizer-panel` | Vitest + RTL + jsdom | 38 | Component/page specs |
+| | | **TOTAL** | **555** | |
 
 **Pirámide de pruebas aplicada:** base ancha de **unitarias** rápidas (mockean dependencias),
 una capa de **integración** por microservicio que valida el wiring real HTTP→Service→JPA contra
@@ -102,7 +102,10 @@ dependencias mockeadas**. No tocan red, broker ni base de datos. Son las más nu
 - **`chess-portal` (37)**: specs de `Home`, `Login`, `Register`, `MyDashboard`,
   `PlayerMatchmaking`, `PlayerPortal`, `TournamentDetail` — cada una cubre loading, error,
   render del happy-path y navegación.
-- **`organizer-panel` (13)**: `Login`, `OrganizerPortal`, `OrganizerTournaments`.
+- **`organizer-panel` (38)**: `Login`, `OrganizerPortal`, `OrganizerTournaments` (esta última
+  ampliada a 28 casos: listado/KPIs, búsqueda, filtros por estado, selección y detalle,
+  transiciones DRAFT→OPEN→IN_PROGRESS→FINISHED, borrado con `window.confirm`, generación de
+  ronda, standings, pairings y registro de resultados).
 
 ---
 
@@ -233,12 +236,13 @@ datos) y **navegación** (post-mutate, links).
 | `api-gateway` | ≥80% líneas | en rango | ✅ |
 | `ms-analytics` | ≥75% líneas | en rango | ✅ |
 | `chess-portal` | — | 76% líneas / 72.5% stmts | ✅ |
-| `organizer-panel` | — | 52% líneas | ⚠️ en progreso |
+| `organizer-panel` | ≥75% líneas | 75.3% (`OrganizerTournaments.tsx` 84%) | ✅ |
 | `bff-player` | — | 96% líneas / 71.8% ramas | ✅ |
 | `bff-organizer` | — | 94% líneas / 83.6% ramas | ✅ |
 
 > Los umbrales **no bloquean el build aún** (no hay `check` de JaCoCo que falle el `mvn verify`).
-> El punto más flojo es `organizer-panel`: `OrganizerTournaments.tsx` queda en ~35% de líneas.
+> `OrganizerTournaments.tsx` —que antes hundía el promedio a ~35%— ahora está cubierto al **84%**
+> de líneas, llevando a `organizer-panel` a **75.3%** global.
 
 ### 5.3 Cómo ver un reporte
 
@@ -274,8 +278,10 @@ Ordenados por relación impacto/esfuerzo:
    Agregar la regla `jacoco:check` en cada `pom.xml` con el mínimo por módulo (85/80/75%) para que
    un PR que baje la cobertura **rompa el CI**, no solo lo reporte.
 
-2. **Subir `organizer-panel` al nivel del resto.** Completar specs de `OrganizerTournaments.tsx`
-   (creación/edición/listado, estados DRAFT/OPEN/CONFIRMED) para pasar de ~52% a ≥75% líneas.
+2. ~~**Subir `organizer-panel` al nivel del resto.**~~ ✅ **Hecho.** Se ampliaron las specs de
+   `OrganizerTournaments.tsx` (listado/KPIs, búsqueda, filtros, estados DRAFT/OPEN/IN_PROGRESS/
+   FINISHED, borrado, rondas, standings y pairings): el módulo pasó de ~52% a **75.3%** líneas
+   (`OrganizerTournaments.tsx` 35% → 84%).
 
 3. **Reemplazar H2 por Testcontainers (Postgres real) en integración.** H2 en `MODE=PostgreSQL`
    emula, pero no es Postgres. Usar `@Testcontainers` con una imagen de Postgres detectaría

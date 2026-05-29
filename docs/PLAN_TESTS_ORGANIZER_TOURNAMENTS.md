@@ -113,11 +113,11 @@ const t = (over = {}) => ({
 
 ## 5. Criterio de "hecho" (Definition of Done)
 
-- [ ] `cd frontend/apps/organizer-panel && npm test` → todos los specs en verde.
-- [ ] `npm test -- --coverage` muestra **`OrganizerTournaments.tsx` ≥ 75% líneas**.
-- [ ] Cobertura global de `organizer-panel` **≥ 75% líneas** (hoy 52.3%).
-- [ ] Actualizar la tabla de cobertura en `docs/PRUEBAS.md` §5.2 y en `TESTING.md` §1.
-- [ ] CI (`frontend-tests`) verde en el PR.
+- [x] `cd frontend/apps/organizer-panel && npm test` → todos los specs en verde (38 tests).
+- [x] `npm test -- --coverage` muestra **`OrganizerTournaments.tsx` 84.03% líneas** (≥75% ✅).
+- [x] Cobertura global de `organizer-panel` **75.32% líneas** (≥75% ✅, era 52.3%).
+- [x] Actualizar la tabla de cobertura en `docs/PRUEBAS.md` §5.2 y en `TESTING.md` §1.
+- [ ] CI (`frontend-tests`) verde en el PR. *(pendiente: abrir PR)*
 
 ## 6. Fuera de alcance (a propósito)
 - Los estilos inline y los handlers `onMouseEnter/Leave` (puro CSS, no aportan a la métrica útil).
