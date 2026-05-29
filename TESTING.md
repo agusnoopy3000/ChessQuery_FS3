@@ -246,6 +246,20 @@ Este script **ya está en el repo** como `scripts/test-all.sh`. Corré toda la s
 bash scripts/test-all.sh
 ```
 
+Al terminar imprime una **tabla-resumen** con el conteo real de tests por módulo
+(capa, tipo de prueba y total), tomado de los reportes Surefire/Jest/Vitest de esa
+misma corrida — útil para verificar de un vistazo los **568 tests** y dónde está cada uno:
+
+```
+Módulo           │ Capa          │ Tipo de prueba                    │ Tests
+─────────────────┼───────────────┼───────────────────────────────────┼──────
+api-gateway      │ Backend Java  │ Unit + filtro JWT (HS256/ES256)   │    44
+…
+organizer-panel  │ Frontend      │ Page specs (Vitest + RTL)         │    38
+─────────────────┴───────────────┴───────────────────────────────────┴──────
+TOTAL                                                                    568
+```
+
 > ⚠️ Asume que ya hiciste `npm install` en `frontend/`, `bff-player/` y `bff-organizer/` (ver §0).
 > La **primera** corrida de Maven baja dependencias (~5-10 min); las siguientes, ~2 min.
 > Última corrida verificada: **568 tests, 0 fallos, 0 errores**.
