@@ -130,6 +130,11 @@ jq --version              # esperado: 1.7+          (tenés 1.8.1) ✓
 > ```bash
 > yay -S supabase-bin
 > ```
+>
+> ⚠️ **Cuidado:** en la CLI 2.10x el paquete AUR `supabase-bin` quedó roto — instala
+> `supabase` pero **no** el motor `supabase-go`, así que `supabase start` falla con
+> `Could not find the supabase-go binary`. Si te pasa, usá la vía npm (`npm i -g supabase`)
+> — ver §7.0.
 
 > Si algo no responde, instalá con (repos oficiales + AUR por separado):
 >
@@ -523,6 +528,33 @@ Pegale `http://localhost:5173/play/{id}` cuando crees una partida en vivo y quer
 ---
 
 ## 7. Troubleshooting
+
+### 7.0 Supabase: `Could not find the supabase-go binary`
+
+**Síntoma:** `supabase start` / `supabase status` fallan con
+`Could not find the supabase-go binary`, aunque `supabase --version` sí responde.
+
+**Causa:** desde la CLI 2.10x el comando se parte en dos: el launcher `supabase`
+y el motor `supabase-go` (un binario aparte). El paquete **AUR `supabase-bin`
+NO instala `supabase-go`**, así que su `/usr/bin/supabase` no arranca.
+
+**Fix:** usar la instalación de **npm**, que sí trae el motor y queda primera en el PATH:
+
+```bash
+npm i -g supabase
+hash -r                 # limpia la ruta cacheada por bash (o abrí una terminal nueva)
+which supabase          # debe apuntar a ~/.local/share/npm-global/bin/supabase
+supabase --version
+```
+
+Opcional, para sacar el binario roto del AUR y que no confunda el PATH:
+
+```bash
+sudo pacman -R supabase-bin
+```
+
+> ⚠️ Por esto, el `yay -S supabase-bin` que sugiere §1.1 puede dejarte un
+> `supabase` que no levanta. Preferí la vía npm de arriba.
 
 ### 7.1 `host.docker.internal` no resuelve dentro de los containers
 
