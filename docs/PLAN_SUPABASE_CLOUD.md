@@ -166,22 +166,28 @@ export SUPABASE_ANON_KEY=<anon-key>
 export SUPABASE_WEBHOOK_SECRET=$(openssl rand -base64 32)
 
 # Crear/actualizar secrets (los crea §1.6 del RUNBOOK_ECS, esto los actualiza con cloud)
-aws secretsmanager update-secret --secret-id chessquery/supabase-service-key  --secret-string "$SUPABASE_SERVICE_KEY"
-aws secretsmanager update-secret --secret-id chessquery/supabase-jwt-secret    --secret-string "$SUPABASE_JWT_SECRET"
+# ⚠️ Los IDs deben coincidir EXACTO con los que crea RUNBOOK_ECS §1.6:
+#    jwt-secret (NO supabase-jwt-secret), supabase-service-key, supabase-webhook-secret
+aws secretsmanager update-secret --secret-id chessquery/supabase-service-key   --secret-string "$SUPABASE_SERVICE_KEY"
+aws secretsmanager update-secret --secret-id chessquery/jwt-secret             --secret-string "$SUPABASE_JWT_SECRET"
 aws secretsmanager update-secret --secret-id chessquery/supabase-webhook-secret --secret-string "$SUPABASE_WEBHOOK_SECRET"
 # El SUPABASE_URL no es secret, va como variable de entorno plana en la task definition
 ```
 
 ### 4.3 Task definitions ECS
 
-Editar `infrastructure/aws/task-definitions/*.template.json`:
+> **Nota (verificado 2026-05):** los templates **ya tienen cableadas** todas las
+> variables Supabase necesarias. NO hay que editar la estructura de los JSON; solo
+> exportar los valores correctos para que `envsubst`/`deploy.yml` los rendericen.
 
-| Archivo | Cambio |
-|---|---|
-| `api-gateway.template.json` | `SUPABASE_URL` env: agregar `https://${SUPABASE_PROJECT_REF}.supabase.co`. Agregar secret `SUPABASE_JWT_SECRET` |
-| `ms-game.template.json` | `SUPABASE_URL` ya existe — solo cambiar el valor renderizado en CI |
-| `ms-users.template.json` | Agregar env `SUPABASE_WEBHOOK_SECRET` desde secret |
-| `ms-notifications.template.json` | Igual que ms-users si valida webhook |
+Estado actual de los templates:
+
+| Archivo | Supabase ya presente | Acción |
+|---|---|---|
+| `api-gateway.template.json` | env `SUPABASE_URL`; secrets `SUPABASE_JWT_SECRET`, `SUPABASE_SERVICE_KEY`, `SUPABASE_WEBHOOK_SECRET` | Solo exportar `SUPABASE_URL` y los ARNs. **Es el único que recibe el webhook** (`SupabaseWebhookController`) y valida `X-Webhook-Secret` |
+| `ms-game.template.json` | env `SUPABASE_URL`, `STORAGE_PROVIDER=supabase`; secret `SUPABASE_SERVICE_KEY` | Solo exportar valores (storage de PGNs vía signed URLs) |
+| `ms-users.template.json` | — | **Sin cambios.** No recibe el webhook directo: se entera por evento RabbitMQ `user.registered` que publica el api-gateway |
+| `ms-notifications.template.json` | — | **Sin cambios.** Consume eventos por RabbitMQ |
 
 Exportar la variable al renderizar templates:
 

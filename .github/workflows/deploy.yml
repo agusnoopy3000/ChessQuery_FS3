@@ -14,7 +14,7 @@ on:
       cluster:
         description: 'Cluster ECS objetivo'
         required: true
-        default: 'chessquery'
+        default: 'chessquery-cluster'
 
 permissions:
   id-token: write
@@ -33,6 +33,7 @@ jobs:
           - ms-tournament
           - ms-game
           - ms-notifications
+          - ms-analytics
     steps:
       - name: Skip si el input filtra otro servicio
         if: github.event.inputs.service != 'todos' && github.event.inputs.service != matrix.service

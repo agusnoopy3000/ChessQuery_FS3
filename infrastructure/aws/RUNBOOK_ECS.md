@@ -118,15 +118,22 @@ done
 ### 1.6 Secrets Manager (resto de credenciales)
 
 ```bash
-aws secretsmanager create-secret --name $PROJECT/rabbitmq-password   --secret-string "$(openssl rand -base64 24 | tr -d '/+=')"
-aws secretsmanager create-secret --name $PROJECT/supabase-service-key --secret-string "<tu-supabase-service-key>"
-aws secretsmanager create-secret --name $PROJECT/jwt-secret           --secret-string "$(openssl rand -base64 48)"
+aws secretsmanager create-secret --name $PROJECT/rabbitmq-password     --secret-string "$(openssl rand -base64 24 | tr -d '/+=')"
+aws secretsmanager create-secret --name $PROJECT/supabase-service-key   --secret-string "<tu-supabase-service-key>"
+aws secretsmanager create-secret --name $PROJECT/jwt-secret             --secret-string "<JWT secret de Supabase: Project Settings > API > JWT Secret>"
+aws secretsmanager create-secret --name $PROJECT/supabase-webhook-secret --secret-string "<secret del webhook Supabase → ms-users>"
 
-# Guarda los ARNs (los necesitan los task definitions)
+# Guarda los ARNs (los necesitan los task definitions y deploy.yml)
 export DB_PASSWORD_ARN=$(aws secretsmanager describe-secret --secret-id $PROJECT/db-password --query ARN --output text)
 export RABBITMQ_PASSWORD_ARN=$(aws secretsmanager describe-secret --secret-id $PROJECT/rabbitmq-password --query ARN --output text)
 export SUPABASE_SERVICE_KEY_ARN=$(aws secretsmanager describe-secret --secret-id $PROJECT/supabase-service-key --query ARN --output text)
+export JWT_SECRET_ARN=$(aws secretsmanager describe-secret --secret-id $PROJECT/jwt-secret --query ARN --output text)
+export SUPABASE_WEBHOOK_SECRET_ARN=$(aws secretsmanager describe-secret --secret-id $PROJECT/supabase-webhook-secret --query ARN --output text)
 ```
+
+> **Nota:** el `jwt-secret` debe ser el **mismo JWT Secret de tu proyecto Supabase Cloud**
+> (Project Settings → API → JWT Secret), no uno aleatorio — el api-gateway valida los
+> tokens emitidos por Supabase contra él.
 
 ---
 
@@ -135,14 +142,28 @@ export SUPABASE_SERVICE_KEY_ARN=$(aws secretsmanager describe-secret --secret-id
 ### 2.1 Secrets del repositorio
 
 ```bash
+# Credenciales AWS (las consumen build-and-push.yml y deploy.yml)
 gh secret set AWS_ACCESS_KEY_ID      --body "<de Academy>"
 gh secret set AWS_SECRET_ACCESS_KEY  --body "<de Academy>"
 gh secret set AWS_SESSION_TOKEN      --body "<de Academy, obligatorio en Academy>"
 gh secret set AWS_REGION             --body "$AWS_REGION"
 gh secret set AWS_ACCOUNT_ID         --body "$AWS_ACCOUNT_ID"
+
+# Datos de infra que deploy.yml inyecta en las task definitions (envsubst)
+gh secret set TASK_EXECUTION_ROLE_ARN     --body "$TASK_EXECUTION_ROLE_ARN"
+gh secret set DB_HOST                     --body "$DB_HOST"
+gh secret set RABBITMQ_HOST               --body "rabbitmq.$PROJECT.local"
+gh secret set SUPABASE_URL                --body "https://<tu-proyecto>.supabase.co"
+gh secret set DB_PASSWORD_ARN             --body "$DB_PASSWORD_ARN"
+gh secret set RABBITMQ_PASSWORD_ARN       --body "$RABBITMQ_PASSWORD_ARN"
+gh secret set SUPABASE_SERVICE_KEY_ARN    --body "$SUPABASE_SERVICE_KEY_ARN"
+gh secret set JWT_SECRET_ARN              --body "$JWT_SECRET_ARN"
+gh secret set SUPABASE_WEBHOOK_SECRET_ARN --body "$SUPABASE_WEBHOOK_SECRET_ARN"
 ```
 
-> ⚠️ Las credenciales del Academy caducan; debes refrescar estos secrets cada sesión larga.
+> ⚠️ Las credenciales del Academy caducan (TTL 4h); refresca `AWS_ACCESS_KEY_ID`,
+> `AWS_SECRET_ACCESS_KEY` y `AWS_SESSION_TOKEN` cada sesión larga. Los ARNs e infra
+> (DB_HOST, *_ARN, etc.) son estables y se setean una sola vez.
 
 ### 2.2 Verificar workflows ya commiteados
 
@@ -181,6 +202,7 @@ cd infrastructure/aws/task-definitions
 export ECR_REGISTRY DB_HOST=$DB_HOST RABBITMQ_HOST=rabbitmq.$PROJECT.local \
        TASK_EXECUTION_ROLE_ARN AWS_REGION IMAGE_TAG=v0.1.0 \
        DB_PASSWORD_ARN RABBITMQ_PASSWORD_ARN SUPABASE_SERVICE_KEY_ARN \
+       JWT_SECRET_ARN SUPABASE_WEBHOOK_SECRET_ARN \
        SUPABASE_URL=https://<tu-proyecto>.supabase.co
 
 for f in *.template.json; do
@@ -229,7 +251,7 @@ create_service ms-users         8081
 create_service ms-tournament    8082
 create_service ms-game          8083
 create_service ms-notifications 8085
-create_service ms-analytics     8086
+create_service ms-analytics     8084
 create_service api-gateway      8080
 ```
 
@@ -337,8 +359,8 @@ Para reanudar: `--desired-count 1` y `start-db-instance`.
 - [ ] Cluster ECS Fargate creado
 - [ ] Namespace Cloud Map `chessquery.local`
 - [ ] RDS `chessquery-pg` + 6 bases creadas
-- [ ] Secrets Manager: db-password, rabbitmq-password, supabase-service-key
-- [ ] GitHub secrets configurados (AWS_*, AWS_REGION, AWS_ACCOUNT_ID)
+- [ ] Secrets Manager: db-password, rabbitmq-password, supabase-service-key, jwt-secret, supabase-webhook-secret
+- [ ] GitHub secrets configurados (AWS_*, ARNs, DB_HOST, RABBITMQ_HOST, SUPABASE_URL, TASK_EXECUTION_ROLE_ARN)
 - [ ] Workflow `build-and-push.yml` ejecutado → imágenes en ECR
 - [ ] Task definitions renderizadas + registradas
 - [ ] 7 services ECS creados (orden: rabbitmq → MS → api-gateway)
