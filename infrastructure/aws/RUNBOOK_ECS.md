@@ -2,11 +2,33 @@
 
 Guía operativa para llevar el proyecto **desde cero** hasta el primer despliegue en AWS ECS, usando GitHub Actions para CI/CD.
 
+> ## ⚠️ Arquitectura de despliegue: TASK ÚNICA (Opción A)
+>
+> **AWS Academy bloquea Cloud Map / Service Discovery** (`servicediscovery:Create*` → AccessDenied),
+> así que NO hay DNS interno entre microservicios. El despliegue usa **una sola task ECS**
+> con todos los contenedores comunicándose por `localhost` (mismo network namespace en
+> `awsvpc`). Solo el api-gateway (8080) queda público.
+>
+> - Task-def: [`task-definitions/chessquery-stack.template.json`](task-definitions/chessquery-stack.template.json) (10 contenedores: gateway + 2 BFFs + 5 MS + RabbitMQ + Redis).
+> - Las task-defs **por servicio** (`ms-users.template.json`, etc.) quedan como referencia de la
+>   alternativa con Cloud Map (no disponible en Academy). El deploy NO las usa.
+>
+> **Camino rápido (scripts):**
+> ```bash
+> export SUPABASE_URL=... SUPABASE_SERVICE_KEY=... SUPABASE_JWT_SECRET=...
+> bash scripts/setup-aws.sh          # Fase B: ECR, cluster, RDS+6 DBs, Secrets
+> bash scripts/set-gh-secrets.sh     # Fase C: GitHub Secrets
+> # (correr build-and-push.yml para subir imágenes a ECR)
+> export IMAGE_TAG=v0.1.0
+> bash scripts/create-ecs-service.sh # Fase D: registra task-def + crea el service único
+> ```
+> Las secciones manuales de abajo (§1–§4) explican el detalle de cada paso.
+
 > Audiencia: Agustín Castro + Martín Mora (cuentas AWS Academy ~$50).
 > Lee primero [`README.md`](README.md) (visión general) y [`DEPLOY_ECS.md`](DEPLOY_ECS.md) (plan arquitectónico + costos).
 >
-> **Alcance del deploy demo:** 6 microservicios Java (api-gateway, ms-users, ms-tournament, ms-game, ms-notifications, ms-analytics) + RabbitMQ + 2 frontends (chess-portal, organizer-panel).
-> **Fuera de alcance:** `bff-admin` (sin vista admin operativa), `bff-player`/`bff-organizer` (orquestación liviana — opcional para la demo), `ms-etl` (Python, opt-in profile).
+> **Alcance del deploy demo:** api-gateway + 5 MS Java (ms-users, ms-tournament, ms-game, ms-notifications, ms-analytics) + bff-player + bff-organizer + RabbitMQ + Redis, todo en la task única. Frontends (chess-portal, organizer-panel) van aparte en S3/CloudFront.
+> **Fuera de alcance:** `bff-admin` (sin vista admin operativa) y `ms-etl` (Python, opt-in).
 
 ---
 
@@ -98,7 +120,7 @@ aws secretsmanager create-secret --name $PROJECT/db-password --secret-string "$D
 aws rds create-db-instance \
   --db-instance-identifier $PROJECT-pg \
   --db-instance-class db.t4g.micro \
-  --engine postgres --engine-version 16.4 \
+  --engine postgres --engine-version 16.8 \
   --master-username chessquery --master-user-password "$DB_PASSWORD" \
   --allocated-storage 20 --storage-type gp3 \
   --vpc-security-group-ids $SG_RDS \
@@ -326,10 +348,8 @@ Si los 3 health checks (`/actuator/health` de api-gateway, ms-users, ms-tourname
 ## 8. Apagado para ahorrar saldo
 
 ```bash
-# Bajar tasks a 0 (no eliminar)
-for s in api-gateway ms-users ms-tournament ms-game ms-notifications ms-analytics rabbitmq; do
-  aws ecs update-service --cluster $PROJECT-cluster --service $s --desired-count 0
-done
+# Bajar la task a 0 (no eliminar el service)
+aws ecs update-service --cluster $PROJECT-cluster --service chessquery-stack --desired-count 0
 
 # Detener RDS (hasta 7 días)
 aws rds stop-db-instance --db-instance-identifier $PROJECT-pg
