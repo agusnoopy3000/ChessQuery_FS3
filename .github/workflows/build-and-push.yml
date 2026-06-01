@@ -17,7 +17,7 @@ permissions:
 jobs:
   build-push:
     name: Build & push (${{ matrix.service }})
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     strategy:
       fail-fast: false
       matrix:
@@ -88,8 +88,6 @@ jobs:
             ${{ steps.tags.outputs.ecr_uri }}:${{ steps.tags.outputs.sha_tag }}
             ${{ steps.tags.outputs.ecr_uri }}:latest
             ${{ steps.tags.outputs.extra_tag != '' && format('{0}:{1}', steps.tags.outputs.ecr_uri, steps.tags.outputs.extra_tag) || '' }}
-          cache-from: type=gha,scope=${{ matrix.service }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
       - name: Output image URI
         run: |
