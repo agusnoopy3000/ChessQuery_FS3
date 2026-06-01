@@ -10,6 +10,9 @@
       "name": "rabbitmq",
       "image": "rabbitmq:3.13-management-alpine",
       "essential": true,
+      "user": "0",
+      "entryPoint": ["/bin/sh", "-c"],
+      "command": ["printf 'chessquery-erlang-cookie-singlenode' > /var/lib/rabbitmq/.erlang.cookie; chown 100:101 /var/lib/rabbitmq/.erlang.cookie; chmod 400 /var/lib/rabbitmq/.erlang.cookie; export HOME=/var/lib/rabbitmq; exec docker-entrypoint.sh rabbitmq-server"],
       "environment": [
         { "name": "RABBITMQ_DEFAULT_USER",  "value": "chessquery" },
         { "name": "RABBITMQ_DEFAULT_VHOST", "value": "/" }
@@ -19,7 +22,7 @@
       ],
       "healthCheck": {
         "command": ["CMD-SHELL", "rabbitmq-diagnostics -q ping || exit 1"],
-        "interval": 15, "timeout": 10, "retries": 5, "startPeriod": 60
+        "interval": 15, "timeout": 10, "retries": 5, "startPeriod": 90
       },
       "logConfiguration": {
         "logDriver": "awslogs",
@@ -76,7 +79,7 @@
         { "name": "SUPABASE_WEBHOOK_SECRET", "valueFrom": "${SUPABASE_WEBHOOK_SECRET_ARN}" }
       ],
       "healthCheck": {
-        "command": ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"],
+        "command": ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health/readiness | grep -q '\"status\":\"UP\"' || exit 1"],
         "interval": 30, "timeout": 5, "retries": 5, "startPeriod": 150
       },
       "logConfiguration": {
@@ -97,6 +100,7 @@
       "dependsOn": [{ "containerName": "rabbitmq", "condition": "HEALTHY" }],
       "environment": [
         { "name": "SPRING_PROFILES_ACTIVE", "value": "aws" },
+        { "name": "SPRING_JPA_HIBERNATE_DDL_AUTO", "value": "none" },
         { "name": "DB_URL",        "value": "jdbc:postgresql://${DB_HOST}:5432/users_db" },
         { "name": "DB_USER",       "value": "chessquery" },
         { "name": "RABBITMQ_HOST", "value": "localhost" }
@@ -123,6 +127,7 @@
       "dependsOn": [{ "containerName": "rabbitmq", "condition": "HEALTHY" }],
       "environment": [
         { "name": "SPRING_PROFILES_ACTIVE", "value": "aws" },
+        { "name": "SPRING_JPA_HIBERNATE_DDL_AUTO", "value": "none" },
         { "name": "DB_URL",        "value": "jdbc:postgresql://${DB_HOST}:5432/tournament_db" },
         { "name": "DB_USER",       "value": "chessquery" },
         { "name": "RABBITMQ_HOST", "value": "localhost" },
@@ -150,6 +155,7 @@
       "dependsOn": [{ "containerName": "rabbitmq", "condition": "HEALTHY" }],
       "environment": [
         { "name": "SPRING_PROFILES_ACTIVE", "value": "aws" },
+        { "name": "SPRING_JPA_HIBERNATE_DDL_AUTO", "value": "none" },
         { "name": "DB_URL",           "value": "jdbc:postgresql://${DB_HOST}:5432/game_db" },
         { "name": "DB_USER",          "value": "chessquery" },
         { "name": "RABBITMQ_HOST",    "value": "localhost" },
@@ -179,6 +185,7 @@
       "dependsOn": [{ "containerName": "rabbitmq", "condition": "HEALTHY" }],
       "environment": [
         { "name": "SPRING_PROFILES_ACTIVE", "value": "aws" },
+        { "name": "SPRING_JPA_HIBERNATE_DDL_AUTO", "value": "none" },
         { "name": "DB_URL",        "value": "jdbc:postgresql://${DB_HOST}:5432/analytics_db" },
         { "name": "DB_USER",       "value": "chessquery" },
         { "name": "RABBITMQ_HOST", "value": "localhost" }
@@ -205,6 +212,7 @@
       "dependsOn": [{ "containerName": "rabbitmq", "condition": "HEALTHY" }],
       "environment": [
         { "name": "SPRING_PROFILES_ACTIVE", "value": "aws" },
+        { "name": "SPRING_JPA_HIBERNATE_DDL_AUTO", "value": "none" },
         { "name": "DB_URL",        "value": "jdbc:postgresql://${DB_HOST}:5432/notifications_db" },
         { "name": "DB_USER",       "value": "chessquery" },
         { "name": "RABBITMQ_HOST", "value": "localhost" },

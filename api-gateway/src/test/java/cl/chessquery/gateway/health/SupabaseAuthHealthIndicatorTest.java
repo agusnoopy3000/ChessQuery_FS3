@@ -18,32 +18,36 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>Construye un WebClient.Builder con un ExchangeFunction propio
  * que simula respuestas o errores sin abrir sockets.</p>
+ *
+ * <p>El indicador mide CONECTIVIDAD: cualquier respuesta HTTP (200 o 401) = UP;
+ * solo un fallo de red/timeout = DOWN.</p>
  */
 class SupabaseAuthHealthIndicatorTest {
 
     private SupabaseAuthHealthIndicator newIndicator(ExchangeFunction ex) {
         WebClient.Builder builder = WebClient.builder().exchangeFunction(ex);
-        return new SupabaseAuthHealthIndicator(builder, "http://supabase.local");
+        return new SupabaseAuthHealthIndicator(builder, "http://supabase.local", "anon-test-key");
     }
 
     @Test
-    @DisplayName("health_okResponse_returnsUp")
+    @DisplayName("health_okResponse_returnsUpWithHttpStatus")
     void health_okResponse_returnsUp() {
         ExchangeFunction ex = req -> Mono.just(
                 ClientResponse.create(HttpStatus.OK).body("{\"name\":\"GoTrue\"}").build());
         Health h = newIndicator(ex).health();
         assertThat(h.getStatus()).isEqualTo(Status.UP);
-        assertThat(h.getDetails()).containsKey("endpoint").containsKey("response");
+        assertThat(h.getDetails()).containsKey("endpoint").containsKey("httpStatus");
+        assertThat(h.getDetails().get("httpStatus")).isEqualTo(200);
     }
 
     @Test
-    @DisplayName("health_truncatesLargeBody")
-    void health_truncatesLargeBody() {
-        String big = "x".repeat(500);
+    @DisplayName("health_unauthorized_stillUp_porqueEsReachable")
+    void health_unauthorized_stillUp() {
         ExchangeFunction ex = req -> Mono.just(
-                ClientResponse.create(HttpStatus.OK).body(big).build());
+                ClientResponse.create(HttpStatus.UNAUTHORIZED).build());
         Health h = newIndicator(ex).health();
-        assertThat(((String) h.getDetails().get("response")).length()).isEqualTo(200);
+        assertThat(h.getStatus()).isEqualTo(Status.UP);
+        assertThat(h.getDetails().get("httpStatus")).isEqualTo(401);
     }
 
     @Test
