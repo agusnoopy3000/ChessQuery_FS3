@@ -290,3 +290,43 @@ aws s3 sync apps/chess-portal/dist/ s3://chessquery-chess-portal --delete
   Auth → Users).
 
 > **Apagar/encender** (incluye lo nuevo): el ALB no cobra por estar idle de forma significativa, pero para ahorro total se puede dejar. RDS + ECS se apagan como en §1.6. El DNS del ALB **no cambia** al reencender.
+
+---
+
+## 7. Release v0.2.0 — features funcionales (pendiente de deploy)
+
+Cambios de aplicación listos en la rama (commits sobre `feat/aws-deploy-fixes`),
+**aún no desplegados** al cloud:
+
+- **Invitación a partida** sin alta indebida en Supabase (solo push in-app + link).
+- **Partidas en vivo de torneo**: al generar la ronda, ms-tournament crea una
+  partida por emparejamiento en ms-game (con control de tiempo del torneo) y
+  notifica a los jugadores; el organizador las observa en vivo (tablero
+  espectador); al terminar, el resultado vuelve solo al pairing (consumer
+  `game.finished`). Migraciones nuevas: **ms-game V5**, **ms-tournament V6**
+  (aditivas, se aplican solas con Flyway al arrancar).
+- **Login/Registro**: accesibilidad + recuperación de contraseña
+  (`/forgot-password`, `/reset-password`).
+
+### Procedimiento de redeploy (Fase B)
+```bash
+# 0) Credenciales Academy frescas en ~/.aws/credentials
+# 1) (recomendado) smoke test e2e local con infrastructure/docker-compose.yml
+# 2) Build + push de imágenes con tag nuevo
+export IMAGE_TAG=v0.2.0
+bash scripts/build-push-ecr.sh          # 8 imágenes → ECR (la task-def usa un único IMAGE_TAG)
+# 3) Re-render task-def + update-service (mantener CORS explícito y el LB)
+export SUPABASE_URL=https://pmtxxzscpactsgkijpul.supabase.co
+export GATEWAY_CORS_ALLOWED_ORIGINS="http://chessquery-chess-portal.s3-website-us-east-1.amazonaws.com,http://chessquery-organizer-panel.s3-website-us-east-1.amazonaws.com"
+#   envsubst de chessquery-stack.template.json → register-task-definition → update-service --force-new-deployment
+#   (Flyway aplica V5 ms-game y V6 ms-tournament al arrancar)
+# 4) Rebuild + sync de frontends a S3
+cd frontend && npm run build -w @chessquery/ui-lib && npm run build -w chess-portal && npm run build -w organizer-panel && cd ..
+aws s3 sync frontend/apps/chess-portal/dist/    s3://chessquery-chess-portal    --delete
+aws s3 sync frontend/apps/organizer-panel/dist/ s3://chessquery-organizer-panel --delete
+# 5) Verificar contra el ALB (readiness + flujo de torneo en vivo)
+```
+> Nota: el control de tiempo de la partida sale de `Tournament.timeControl` (texto
+> libre "min+seg"); fallback 5+0. El consumer `game.finished` es idempotente y no
+> entra en loop (solo actúa con `tournamentPairingId` y si el pairing no tiene
+> resultado).
