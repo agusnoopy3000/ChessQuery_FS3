@@ -167,11 +167,14 @@ interface FieldProps {
   value: string;
   onChange: (e: ChangeEvent<HTMLInputElement>) => void;
   name: string;
+  autoComplete?: string;
+  autoFocus?: boolean;
 }
-const Field = ({ label, type = 'text', placeholder = '', hint = '', error = '', half = false, value, onChange, name }: FieldProps) => {
+const Field = ({ label, type = 'text', placeholder = '', hint = '', error = '', half = false, value, onChange, name, autoComplete, autoFocus }: FieldProps) => {
   const [focused, setFocused] = useState(false);
   const [show, setShow] = useState(false);
   const isPass = type === 'password';
+  const descId = hint || error ? `${name}-desc` : undefined;
   return (
     <div
       style={{
@@ -183,6 +186,7 @@ const Field = ({ label, type = 'text', placeholder = '', hint = '', error = '', 
       }}
     >
       <label
+        htmlFor={name}
         style={{
           fontSize: 10,
           letterSpacing: '0.12em',
@@ -196,11 +200,16 @@ const Field = ({ label, type = 'text', placeholder = '', hint = '', error = '', 
       </label>
       <div style={{ position: 'relative' }}>
         <input
+          id={name}
           name={name}
           type={isPass ? (show ? 'text' : 'password') : type}
           value={value}
           onChange={onChange}
           placeholder={placeholder}
+          autoComplete={autoComplete}
+          autoFocus={autoFocus}
+          aria-invalid={!!error}
+          aria-describedby={descId}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           style={{
@@ -249,7 +258,7 @@ const Field = ({ label, type = 'text', placeholder = '', hint = '', error = '', 
         )}
       </div>
       {(hint || error) && (
-        <span style={{ fontSize: 11, color: error ? '#e05a5a' : '#4a4d40', lineHeight: 1.4 }}>{error || hint}</span>
+        <span id={descId} role={error ? 'alert' : undefined} style={{ fontSize: 11, color: error ? '#e05a5a' : '#4a4d40', lineHeight: 1.4 }}>{error || hint}</span>
       )}
     </div>
   );
@@ -529,13 +538,13 @@ export const RegisterPage = () => {
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <Field label="Nombre" name="nombre" value={form.nombre} onChange={handleChange} error={errors.nombre} half />
-              <Field label="Apellido" name="apellido" value={form.apellido} onChange={handleChange} error={errors.apellido} half />
+              <Field label="Nombre" name="nombre" autoComplete="given-name" autoFocus value={form.nombre} onChange={handleChange} error={errors.nombre} half />
+              <Field label="Apellido" name="apellido" autoComplete="family-name" value={form.apellido} onChange={handleChange} error={errors.apellido} half />
             </div>
 
-            <Field label="Email" type="email" name="email" value={form.email} onChange={handleChange} error={errors.email} placeholder="tu@email.com" />
-            <Field label="Contraseña" type="password" name="password" value={form.password} onChange={handleChange} error={errors.password} hint="Mínimo 8 caracteres" />
-            <Field label="Confirmar contraseña" type="password" name="confirmPassword" value={form.confirmPassword} onChange={handleChange} error={errors.confirmPassword} />
+            <Field label="Email" type="email" name="email" autoComplete="email" value={form.email} onChange={handleChange} error={errors.email} placeholder="tu@email.com" />
+            <Field label="Contraseña" type="password" name="password" autoComplete="new-password" value={form.password} onChange={handleChange} error={errors.password} hint="Mínimo 8 caracteres" />
+            <Field label="Confirmar contraseña" type="password" name="confirmPassword" autoComplete="new-password" value={form.confirmPassword} onChange={handleChange} error={errors.confirmPassword} />
 
             {role === 'PLAYER' ? (
               <Field
@@ -580,7 +589,7 @@ export const RegisterPage = () => {
             </div>
 
             {serverError && (
-              <div style={{ background: 'rgba(224,90,90,0.1)', border: '1px solid #e05a5a', borderRadius: 8, padding: '10px 14px', color: '#e05a5a', fontSize: 13 }}>
+              <div role="alert" style={{ background: 'rgba(224,90,90,0.1)', border: '1px solid #e05a5a', borderRadius: 8, padding: '10px 14px', color: '#e05a5a', fontSize: 13 }}>
                 {serverError}
               </div>
             )}

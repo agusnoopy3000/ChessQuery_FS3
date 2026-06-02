@@ -147,16 +147,19 @@ interface FieldProps {
   name: string;
   autoComplete?: string;
   rightSlot?: ReactNode;
+  autoFocus?: boolean;
 }
 
-const Field = ({ label, type = 'text', placeholder = '', hint = '', error = '', value, onChange, name, autoComplete, rightSlot }: FieldProps) => {
+const Field = ({ label, type = 'text', placeholder = '', hint = '', error = '', value, onChange, name, autoComplete, rightSlot, autoFocus }: FieldProps) => {
   const [focused, setFocused] = useState(false);
   const [show, setShow] = useState(false);
   const isPass = type === 'password';
+  const descId = hint || error ? `${name}-desc` : undefined;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
         <label
+          htmlFor={name}
           style={{
             fontSize: 10,
             letterSpacing: '0.12em',
@@ -172,13 +175,17 @@ const Field = ({ label, type = 'text', placeholder = '', hint = '', error = '', 
       </div>
       <div style={{ position: 'relative' }}>
         <input
+          id={name}
           name={name}
           type={isPass ? (show ? 'text' : 'password') : type}
           value={value}
           onChange={onChange}
           placeholder={placeholder}
           autoComplete={autoComplete}
+          autoFocus={autoFocus}
           required
+          aria-invalid={!!error}
+          aria-describedby={descId}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           style={{
@@ -228,7 +235,11 @@ const Field = ({ label, type = 'text', placeholder = '', hint = '', error = '', 
         )}
       </div>
       {(hint || error) && (
-        <span style={{ fontSize: 11, color: error ? '#e05a5a' : '#4a4d40', lineHeight: 1.4 }}>
+        <span
+          id={descId}
+          role={error ? 'alert' : undefined}
+          style={{ fontSize: 11, color: error ? '#e05a5a' : '#4a4d40', lineHeight: 1.4 }}
+        >
           {error || hint}
         </span>
       )}
@@ -484,6 +495,7 @@ export const LoginPage = () => {
               type="email"
               name="email"
               autoComplete="email"
+              autoFocus
               value={form.email}
               onChange={handleChange}
               error={errors.email}
@@ -519,6 +531,7 @@ export const LoginPage = () => {
 
             {errors._form && (
               <div
+                role="alert"
                 style={{
                   background: 'rgba(224,90,90,0.08)',
                   border: '1px solid rgba(224,90,90,0.3)',
