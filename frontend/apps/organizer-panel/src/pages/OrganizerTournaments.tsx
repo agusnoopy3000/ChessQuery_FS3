@@ -49,16 +49,23 @@ export const OrganizerTournamentsPage = () => {
     setDraftResults({});
   }, [selectedTournamentId]);
 
+  // Mientras el torneo está en progreso, refrescamos en vivo para que la grilla
+  // y la clasificación reflejen los resultados que entran solos al terminar las
+  // partidas (game.finished → recordResult en el backend).
+  const liveRefetch = selectedTournament?.status === 'IN_PROGRESS' ? 8000 : false;
+
   const standings = useQuery({
     queryKey: ['organizer', 'tournaments', 'standings', selectedTournamentId],
     queryFn: () => organizerApi.tournamentStandings(selectedTournamentId!),
     enabled: selectedTournamentId != null,
+    refetchInterval: liveRefetch,
   });
 
   const round = useQuery({
     queryKey: ['organizer', 'tournaments', 'round', selectedTournamentId, selectedRound],
     queryFn: () => organizerApi.round(selectedTournamentId!, selectedRound),
     enabled: selectedTournamentId != null,
+    refetchInterval: liveRefetch,
   });
 
   const generateRound = useMutation({
@@ -652,7 +659,19 @@ export const OrganizerTournamentsPage = () => {
             )}
           </Card>
 
-          <Card header="Emparejamientos de ronda">
+          <Card
+            header={
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span>Emparejamientos de ronda</span>
+                {(() => {
+                  const liveCount = (round.data?.pairings ?? []).filter((p) => p.liveSessionId && !p.result).length;
+                  return liveCount > 0 ? (
+                    <Badge variant="success">🔴 {liveCount} en vivo</Badge>
+                  ) : null;
+                })()}
+              </div>
+            }
+          >
             {!selectedTournamentId ? (
               <EmptyState title="Sin ronda" description="Elige un torneo para ver y administrar sus rondas." icon="♜" />
             ) : round.isLoading ? (
