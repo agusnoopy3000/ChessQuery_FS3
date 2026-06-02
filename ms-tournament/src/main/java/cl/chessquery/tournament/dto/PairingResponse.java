@@ -6,5 +6,6 @@ public record PairingResponse(
         Long whitePlayerId,
         Long blackPlayerId,
         String result,
-        Integer boardNumber
+        Integer boardNumber,
+        Long liveSessionId
 ) {}

@@ -135,6 +135,8 @@ export interface Pairing {
   blackPlayerName?: string;
   blackPlayerRating?: number;
   result: '1-0' | '0-1' | '1/2-1/2' | null;
+  /** Id de la partida en vivo asociada al emparejamiento (para observarla). */
+  liveSessionId?: number | null;
 }
 
 export interface Round {

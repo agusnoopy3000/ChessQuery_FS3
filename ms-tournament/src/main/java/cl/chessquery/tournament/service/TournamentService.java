@@ -1,5 +1,6 @@
 package cl.chessquery.tournament.service;
 
+import cl.chessquery.tournament.client.LiveGameClient;
 import cl.chessquery.tournament.client.UserEloClient;
 import cl.chessquery.tournament.dto.*;
 import cl.chessquery.tournament.entity.*;
@@ -29,6 +30,7 @@ public class TournamentService {
     private final TournamentPairingRepository      pairingRepo;
     private final PairingStrategyFactory           strategyFactory;
     private final UserEloClient                    userEloClient;
+    private final LiveGameClient                   liveGameClient;
     private final EventPublisherService            events;
 
     // ── Crear torneo ──────────────────────────────────────────────────────────
@@ -344,6 +346,27 @@ public class TournamentService {
         }
         pairingRepo.saveAll(pairings);
 
+        // Por cada emparejamiento con 2 jugadores, crear una partida en vivo en
+        // ms-game y notificar a ambos para que se unan. Si ms-game no responde,
+        // la ronda igual queda generada (el organizador puede reintentar luego).
+        for (TournamentPairing pairing : pairings) {
+            if (pairing.getWhitePlayerId() == null || pairing.getBlackPlayerId() == null) {
+                continue; // bye / jugador sin rival
+            }
+            Long sessionId = liveGameClient.createTournamentGame(
+                    pairing.getWhitePlayerId(),
+                    pairing.getBlackPlayerId(),
+                    null, null,
+                    pairing.getId());
+            if (sessionId != null) {
+                pairing.setLiveSessionId(sessionId);
+                String inviter = "Torneo " + t.getName() + " · Ronda " + roundNumber;
+                events.publishGameInvitation(sessionId, pairing.getWhitePlayerId(), inviter);
+                events.publishGameInvitation(sessionId, pairing.getBlackPlayerId(), inviter);
+            }
+        }
+        pairingRepo.saveAll(pairings);
+
         events.publishRoundStarting(tournamentId, roundNumber, pairings.size());
         log.info("Ronda {} generada para torneo {} con {} emparejamientos",
                 roundNumber, tournamentId, pairings.size());
@@ -630,7 +653,8 @@ public class TournamentService {
                 p.getWhitePlayerId(),
                 p.getBlackPlayerId(),
                 p.getResult(),
-                p.getBoardNumber()
+                p.getBoardNumber(),
+                p.getLiveSessionId()
         );
     }
 }

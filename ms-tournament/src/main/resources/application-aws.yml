@@ -38,6 +38,8 @@ spring:
 # URLs internas de otros MS vía Service Discovery (Cloud Map)
 ms-users:
   url: ${MS_USERS_URL}
+ms-game:
+  url: ${MS_GAME_URL:http://localhost:8083}
 
 logging:
   level:

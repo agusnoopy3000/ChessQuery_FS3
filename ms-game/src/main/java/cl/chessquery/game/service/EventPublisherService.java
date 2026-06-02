@@ -37,6 +37,11 @@ public class EventPublisherService {
         if (game.getOpening() != null && game.getOpening().getId() != null) {
             payload.put("openingId", game.getOpening().getId());
         }
+        // Si la partida proviene de un emparejamiento de torneo, lo incluimos para
+        // que ms-tournament registre el resultado de vuelta en el pairing.
+        if (game.getTournamentPairingId() != null) {
+            payload.put("tournamentPairingId", game.getTournamentPairingId());
+        }
         publish("game.finished", payload);
     }
 

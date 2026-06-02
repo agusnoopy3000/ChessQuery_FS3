@@ -57,6 +57,7 @@ class TournamentServiceTest {
     @Mock private TournamentPairingRepository pairingRepo;
     @Mock private PairingStrategyFactory strategyFactory;
     @Mock private UserEloClient userEloClient;
+    @Mock private cl.chessquery.tournament.client.LiveGameClient liveGameClient;
     @Mock private EventPublisherService events;
 
     @InjectMocks private TournamentService service;

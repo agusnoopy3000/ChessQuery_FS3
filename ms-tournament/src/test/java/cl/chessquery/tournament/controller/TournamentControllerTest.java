@@ -197,7 +197,7 @@ class TournamentControllerTest {
     @DisplayName("recordResult_returns200")
     void recordResult_returns200() throws Exception {
         when(service.recordResult(eq(1L), eq("1-0")))
-                .thenReturn(new PairingResponse(1L, 7L, 1L, 2L, "1-0", 1));
+                .thenReturn(new PairingResponse(1L, 7L, 1L, 2L, "1-0", 1, null));
         mvc.perform(patch("/tournaments/pairings/1/result")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"result\":\"1-0\"}"))

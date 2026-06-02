@@ -6,6 +6,7 @@ import { organizerApi, type CreateTournamentInput, type RegistrationRow } from '
 import { dedupeBy, formatDate, tournamentStatusVariant, unwrapContent } from '../portal-utils';
 import { CreateTournamentModal } from '../components/CreateTournamentModal';
 import { RegistrationsPanel } from '../components/RegistrationsPanel';
+import { LiveSpectatorModal } from '../components/LiveSpectatorModal';
 
 const RESULT_OPTIONS = [
   { value: '1-0', label: '1-0' },
@@ -20,6 +21,7 @@ export const OrganizerTournamentsPage = () => {
   const [draftResults, setDraftResults] = useState<Record<number, string>>({});
   const [statusFilter, setStatusFilter] = useState<'ALL' | Tournament['status']>('ALL');
   const [search, setSearch] = useState('');
+  const [spectating, setSpectating] = useState<{ sessionId: number; white: string; black: string } | null>(null);
 
   const tournaments = useQuery({
     queryKey: ['organizer', 'tournaments', 'list'],
@@ -676,6 +678,29 @@ export const OrganizerTournamentsPage = () => {
                     render: (row) => `${row.blackPlayerName ?? `#${row.blackPlayerId ?? '—'}`} ${row.blackPlayerRating ? `(${row.blackPlayerRating})` : ''}`,
                   },
                   {
+                    key: 'live',
+                    header: 'Partida',
+                    width: 130,
+                    render: (row) =>
+                      row.liveSessionId ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            setSpectating({
+                              sessionId: row.liveSessionId!,
+                              white: row.whitePlayerName ?? `#${row.whitePlayerId ?? '—'}`,
+                              black: row.blackPlayerName ?? `#${row.blackPlayerId ?? '—'}`,
+                            })
+                          }
+                        >
+                          👁 Ver en vivo
+                        </Button>
+                      ) : (
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>—</span>
+                      ),
+                  },
+                  {
                     key: 'result',
                     header: 'Resultado',
                     render: (row) => (
@@ -707,6 +732,15 @@ export const OrganizerTournamentsPage = () => {
           </Card>
         </div>
       </div>
+
+      {spectating && (
+        <LiveSpectatorModal
+          sessionId={spectating.sessionId}
+          whiteLabel={spectating.white}
+          blackLabel={spectating.black}
+          onClose={() => setSpectating(null)}
+        />
+      )}
     </div>
   );
 };
