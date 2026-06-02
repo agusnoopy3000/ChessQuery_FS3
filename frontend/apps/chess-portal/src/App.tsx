@@ -11,6 +11,8 @@ import { PlayerMatchmakingPage } from './pages/PlayerMatchmaking';
 import { LiveGamePage } from './pages/LiveGame';
 import { PlayerPortalPage } from './pages/PlayerPortal';
 import { RegisterPage } from './pages/Register';
+import { ForgotPasswordPage } from './pages/ForgotPassword';
+import { ResetPasswordPage } from './pages/ResetPassword';
 import { TournamentDetailPage } from './pages/TournamentDetail';
 import { TournamentsPage } from './pages/Tournaments';
 
@@ -98,11 +100,14 @@ export const App = () => {
   const navigate = useNavigate();
   const { user, logout, loading } = useAuth();
 
-  if (location.pathname === '/login' || location.pathname === '/register') {
+  const authRoutes = ['/login', '/register', '/forgot-password', '/reset-password'];
+  if (authRoutes.includes(location.pathname)) {
     return (
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
       </Routes>
     );
   }

@@ -513,8 +513,7 @@ export const LoginPage = () => {
               placeholder="••••••••"
               rightSlot={
                 <Link
-                  to="/login"
-                  onClick={(e) => e.preventDefault()}
+                  to="/forgot-password"
                   style={{
                     fontSize: 11,
                     color: '#6abf74',
@@ -522,7 +521,6 @@ export const LoginPage = () => {
                     fontFamily: 'Space Mono, monospace',
                     letterSpacing: '0.04em',
                   }}
-                  title="Funcionalidad de recuperación de contraseña próximamente"
                 >
                   ¿Olvidaste?
                 </Link>
