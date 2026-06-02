@@ -71,7 +71,7 @@
         { "name": "REDIS_HOST",        "value": "localhost" },
         { "name": "REDIS_PASSWORD",    "value": "" },
         { "name": "SUPABASE_URL",      "value": "${SUPABASE_URL}" },
-        { "name": "GATEWAY_CORS_ALLOWED_ORIGINS", "value": "*" }
+        { "name": "GATEWAY_CORS_ALLOWED_ORIGINS", "value": "${GATEWAY_CORS_ALLOWED_ORIGINS}" }
       ],
       "secrets": [
         { "name": "RABBITMQ_PASSWORD",       "valueFrom": "${RABBITMQ_PASSWORD_ARN}" },

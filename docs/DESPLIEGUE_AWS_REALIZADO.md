@@ -250,6 +250,43 @@ aws s3 sync apps/chess-portal/dist/ s3://chessquery-chess-portal --delete
 - ✅ 9 imágenes en ECR (`v0.1.0`)
 - ✅ Secrets en Secrets Manager + 14 GitHub Secrets
 - ⬜ Registrar runner self-hosted (para CI/CD automatizado)
-- ⬜ Webhook Supabase → gateway (Fase E del RUNBOOK; conviene ALB antes)
-- ⬜ Frontend a S3 (§5)
-- ⬜ ALB / EIP para URL estable del gateway
+- ✅ **Webhook Supabase → gateway** (2026-06-01, ver §6.3)
+- ✅ **ALB para URL estable del gateway** (2026-06-01, ver §6.1)
+- ✅ **Frontend a S3** (2026-06-01, ver §6.2)
+
+### 6.1 ALB implementado (2026-06-01)
+- **DNS estable:** `chessquery-alb-984810293.us-east-1.elb.amazonaws.com` (HTTP :80 → forward a `api-gateway:8080`).
+- `SG_ALB=sg-071f18480ea23a5c4` (ingress 80 desde internet). `SG_ECS` (`sg-00d4ad8b2817ad4cc`) acepta 8080 desde el ALB.
+- Target group `chessquery-gw-tg` tipo `ip`, health check `/actuator/health/readiness` → **healthy**.
+- Service `chessquery-stack` **recreado** con `--load-balancers` (ECS no deja agregar LB a service existente) y `desired-count 1`, grace period 180s.
+- ⚠️ Regla vieja `8080 0.0.0.0/0` en SG_ECS **no removida** todavía (opcional, ver guía A.1).
+
+### 6.2 Frontend en S3 implementado (2026-06-01)
+- Buckets static website: `chessquery-chess-portal` y `chessquery-organizer-panel` (us-east-1, lectura pública).
+  - http://chessquery-chess-portal.s3-website-us-east-1.amazonaws.com
+  - http://chessquery-organizer-panel.s3-website-us-east-1.amazonaws.com
+- Build con `VITE_API_URL=<ALB DNS>` + Supabase Cloud (`.env.production`, gitignored, anon key).
+- **CORS acotado** a los 2 orígenes S3 vía task-def rev **6** (env `GATEWAY_CORS_ALLOWED_ORIGINS`, ahora variable en la template).
+- 🐞 **Bug encontrado y resuelto en el camino:** `GatewayConfig` usa `allowCredentials(true)`; con `GATEWAY_CORS_ALLOWED_ORIGINS=*` Spring lanzaba excepción en cada preflight → **500**. Se arregló poniendo orígenes **explícitos** (no `*`). Preflight ahora 200 con `Access-Control-Allow-Origin` correcto; origen no autorizado → 403.
+
+### 6.3 Webhook user.registered activado (2026-06-01)
+- Flujo: signup en Supabase → trigger `on_auth_user_registered_webhook` en `auth.users` →
+  función `notify_user_registered()` (pg_net) → `POST /webhooks/supabase/user-registered`
+  del gateway (header `X-Supabase-Webhook-Secret`) → publica `user.registered` a RabbitMQ →
+  `ms-users` crea el perfil.
+- **Config crítica del lado Supabase Cloud:** la 00003 apuntaba a `host.docker.internal`
+  (no resuelve desde Cloud). Migración `00005` repunta la URL al ALB. El **secret** se inyectó
+  redefiniendo la función desde el SQL Editor con el valor literal (Cloud bloquea
+  `ALTER DATABASE ... SET app.settings.*` con error 42501).
+- **Pre-requisito:** "Confirm email" **desactivado** en Auth (`mailer_autoconfirm=true`), si no
+  el signup no devuelve sesión y el front falla al loguear.
+- ✅ Verificado e2e: signup → perfil creado en `ms-users` (`/api/player/me/dashboard` → 200).
+
+### 6.4 Auth end-to-end verificado (2026-06-01)
+- Token real de Supabase Cloud es **ES256** (asimétrico); el gateway lo valida vía **JWKS**
+  (`/auth/v1/.well-known/jwks.json`), con fallback HS256 al secret legacy.
+- Cadena probada con datos reales: token → ALB → gateway (JWKS) → bff-player → ms-* → RDS.
+- ⚠️ Quedan usuarios de prueba `smoke+*` / `webhooktest+*` en Supabase Auth (borrables desde
+  Auth → Users).
+
+> **Apagar/encender** (incluye lo nuevo): el ALB no cobra por estar idle de forma significativa, pero para ahorro total se puede dejar. RDS + ECS se apagan como en §1.6. El DNS del ALB **no cambia** al reencender.

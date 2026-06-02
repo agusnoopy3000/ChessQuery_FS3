@@ -88,18 +88,21 @@ curl http://<ALB_DNS>/actuator/health/readiness
 ### B.1 Variables de build
 `frontend/apps/chess-portal/.env.production` (y equivalente en `organizer-panel`):
 ```
-VITE_API_BASE_URL=http://<ALB_DNS>
+VITE_API_URL=http://<ALB_DNS>
 VITE_SUPABASE_URL=https://pmtxxzscpactsgkijpul.supabase.co
 VITE_SUPABASE_ANON_KEY=<anon key>
 ```
-> Confirmá el nombre exacto de la var de la API en el código del front (ej. `VITE_API_URL`).
+> ✅ Confirmado en el código: la var es **`VITE_API_URL`** (no `VITE_API_BASE_URL`).
 
 ### B.2 Build
+> ⚠️ Es un monorepo con workspaces: las apps dependen de `@chessquery/ui-lib`, que hay
+> que compilar **primero**. Usar los scripts de workspace desde `frontend/`:
 ```bash
 cd frontend
 npm ci
-npm --prefix apps/chess-portal run build      # genera apps/chess-portal/dist
-npm --prefix apps/organizer-panel run build
+npm run build -w @chessquery/ui-lib        # dep compartida primero
+npm run build -w chess-portal              # genera apps/chess-portal/dist
+npm run build -w organizer-panel
 ```
 
 ### B.3 Bucket + static website hosting
@@ -131,11 +134,15 @@ echo "http://chessquery-chess-portal.s3-website-us-east-1.amazonaws.com"
 ```
 
 ### B.5 CORS en el gateway
-El gateway usa `GATEWAY_CORS_ALLOWED_ORIGINS` (hoy `*`). En producción, acotarlo a las
-URLs de los buckets (env en la task-def, redeploy):
+El gateway usa `GATEWAY_CORS_ALLOWED_ORIGINS`. Acotarlo a las URLs de los buckets
+(env en la task-def → `register-task-definition` → `update-service --force-new-deployment`):
 ```
 GATEWAY_CORS_ALLOWED_ORIGINS=http://chessquery-chess-portal.s3-website-us-east-1.amazonaws.com,http://chessquery-organizer-panel.s3-website-us-east-1.amazonaws.com
 ```
+> 🐞 **No usar `*`.** `GatewayConfig` setea `allowCredentials(true)`; Spring **prohíbe**
+> combinar credentials con origen `*` y devuelve **500 en cada preflight**. Hay que listar
+> los orígenes explícitamente (como arriba). En la template, `GATEWAY_CORS_ALLOWED_ORIGINS`
+> ya es una variable (`${...}`) que se rinde con `envsubst`.
 
 ---
 
