@@ -2,6 +2,7 @@ package cl.chessquery.tournament.service;
 
 import cl.chessquery.tournament.client.LiveGameClient;
 import cl.chessquery.tournament.client.UserEloClient;
+import cl.chessquery.tournament.util.TimeControlParser;
 import cl.chessquery.tournament.dto.*;
 import cl.chessquery.tournament.entity.*;
 import cl.chessquery.tournament.exception.ApiException;
@@ -346,6 +347,9 @@ public class TournamentService {
         }
         pairingRepo.saveAll(pairings);
 
+        // Control de tiempo del torneo (texto libre → ms), aplicado a todas las mesas.
+        TimeControlParser.TimeControl tc = TimeControlParser.parse(t.getTimeControl());
+
         // Por cada emparejamiento con 2 jugadores, crear una partida en vivo en
         // ms-game y notificar a ambos para que se unan. Si ms-game no responde,
         // la ronda igual queda generada (el organizador puede reintentar luego).
@@ -357,7 +361,8 @@ public class TournamentService {
                     pairing.getWhitePlayerId(),
                     pairing.getBlackPlayerId(),
                     null, null,
-                    pairing.getId());
+                    pairing.getId(),
+                    tc.initialMs(), tc.incrementMs());
             if (sessionId != null) {
                 pairing.setLiveSessionId(sessionId);
                 String inviter = "Torneo " + t.getName() + " · Ronda " + roundNumber;

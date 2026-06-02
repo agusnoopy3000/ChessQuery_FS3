@@ -37,7 +37,8 @@ public class LiveGameClient {
      */
     @SuppressWarnings("unchecked")
     public Long createTournamentGame(Long whitePlayerId, Long blackPlayerId,
-                                     Integer whiteElo, Integer blackElo, Long pairingId) {
+                                     Integer whiteElo, Integer blackElo, Long pairingId,
+                                     Long timeControlInitialMs, Long timeControlIncrementMs) {
         CircuitBreaker cb = circuitBreakerFactory.create("ms-game");
         return cb.run(
                 () -> {
@@ -47,6 +48,8 @@ public class LiveGameClient {
                     req.put("whiteEloBefore", whiteElo);
                     req.put("blackEloBefore", blackElo);
                     req.put("tournamentPairingId", pairingId);
+                    req.put("timeControlInitialMs", timeControlInitialMs);
+                    req.put("timeControlIncrementMs", timeControlIncrementMs);
                     String url = msGameUrl + "/games/live";
                     Map<String, Object> body = restTemplate.postForObject(url, req, Map.class);
                     if (body == null || body.get("id") == null) {
