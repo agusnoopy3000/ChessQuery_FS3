@@ -855,10 +855,10 @@ export const LiveGamePage = () => {
         {state.status === 'WAITING' && myColor === 'white' && (
           <Card style={{ marginBottom: 16, background: 'var(--surface-2)' }}>
             <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>
-              📧 Invitar por email
+              🔔 Invitar a un jugador
             </p>
             <p style={{ margin: '4px 0 8px', fontSize: 12, color: 'var(--text-muted)' }}>
-              Mandamos un link mágico al rival. Hace click y entra directo a la partida.
+              Si el rival ya tiene cuenta, le llega una notificación in-app al instante. Si no, compartile el link directo de abajo.
             </p>
             <div style={{ display: 'flex', gap: 6, alignItems: 'stretch', marginBottom: 10 }}>
               <input
@@ -889,24 +889,13 @@ export const LiveGamePage = () => {
                   if (!id) return;
                   setInviteSending(true);
                   try {
-                    // 1) Magic link por email (todos los casos: con o sin cuenta).
-                    const { error: otpErr } = await supabase.auth.signInWithOtp({
-                      email: inviteEmail,
-                      options: { emailRedirectTo: shareUrl },
-                    });
-                    if (otpErr) throw otpErr;
-
-                    // 2) Push in-app: si el email tiene un Player asociado, el
-                    //    backend publica game.invitation y ms-notifications crea
-                    //    una notificación que el bell del invitado va a mostrar
-                    //    como toast emergente automáticamente (polling 8s).
-                    try {
-                      const r = await liveGameApi.invite(id, inviteEmail.trim(), shareUrl);
-                      setInviteMatched(!!r.matched);
-                    } catch {
-                      // No bloqueamos el flujo: el email igual se envió.
-                      setInviteMatched(false);
-                    }
+                    // Push in-app: si el email tiene un Player asociado, el backend
+                    // publica game.invitation y ms-notifications crea una notificación
+                    // que el bell del invitado muestra como toast (polling 8s).
+                    // NO damos de alta al email en Supabase: para quien no tiene
+                    // cuenta, el camino es compartir el link directo de abajo.
+                    const r = await liveGameApi.invite(id, inviteEmail.trim(), shareUrl);
+                    setInviteMatched(!!r.matched);
                     setInviteSent(true);
                   } catch (e) {
                     setInviteError(message(e));
@@ -929,7 +918,7 @@ export const LiveGamePage = () => {
               }}>
                 {inviteMatched
                   ? '🔔 Notificación in-app enviada — verá un toast emergente al instante.'
-                  : 'ℹ El email se envió. El destinatario no tiene cuenta aún; recibirá solo el magic link.'}
+                  : 'ℹ Ese email no tiene una cuenta de jugador. Compartile el link directo de abajo para que se una.'}
               </p>
             )}
             <p style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--text-muted)' }}>
