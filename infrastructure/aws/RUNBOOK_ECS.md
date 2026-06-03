@@ -2,11 +2,33 @@
 
 Guía operativa para llevar el proyecto **desde cero** hasta el primer despliegue en AWS ECS, usando GitHub Actions para CI/CD.
 
+> ## ⚠️ Arquitectura de despliegue: TASK ÚNICA (Opción A)
+>
+> **AWS Academy bloquea Cloud Map / Service Discovery** (`servicediscovery:Create*` → AccessDenied),
+> así que NO hay DNS interno entre microservicios. El despliegue usa **una sola task ECS**
+> con todos los contenedores comunicándose por `localhost` (mismo network namespace en
+> `awsvpc`). Solo el api-gateway (8080) queda público.
+>
+> - Task-def: [`task-definitions/chessquery-stack.template.json`](task-definitions/chessquery-stack.template.json) (10 contenedores: gateway + 2 BFFs + 5 MS + RabbitMQ + Redis).
+> - Las task-defs **por servicio** (`ms-users.template.json`, etc.) quedan como referencia de la
+>   alternativa con Cloud Map (no disponible en Academy). El deploy NO las usa.
+>
+> **Camino rápido (scripts):**
+> ```bash
+> export SUPABASE_URL=... SUPABASE_SERVICE_KEY=... SUPABASE_JWT_SECRET=...
+> bash scripts/setup-aws.sh          # Fase B: ECR, cluster, RDS+6 DBs, Secrets
+> bash scripts/set-gh-secrets.sh     # Fase C: GitHub Secrets
+> # (correr build-and-push.yml para subir imágenes a ECR)
+> export IMAGE_TAG=v0.1.0
+> bash scripts/create-ecs-service.sh # Fase D: registra task-def + crea el service único
+> ```
+> Las secciones manuales de abajo (§1–§4) explican el detalle de cada paso.
+
 > Audiencia: Agustín Castro + Martín Mora (cuentas AWS Academy ~$50).
 > Lee primero [`README.md`](README.md) (visión general) y [`DEPLOY_ECS.md`](DEPLOY_ECS.md) (plan arquitectónico + costos).
 >
-> **Alcance del deploy demo:** 6 microservicios Java (api-gateway, ms-users, ms-tournament, ms-game, ms-notifications, ms-analytics) + RabbitMQ + 2 frontends (chess-portal, organizer-panel).
-> **Fuera de alcance:** `bff-admin` (sin vista admin operativa), `bff-player`/`bff-organizer` (orquestación liviana — opcional para la demo), `ms-etl` (Python, opt-in profile).
+> **Alcance del deploy demo:** api-gateway + 5 MS Java (ms-users, ms-tournament, ms-game, ms-notifications, ms-analytics) + bff-player + bff-organizer + RabbitMQ + Redis, todo en la task única. Frontends (chess-portal, organizer-panel) van aparte en S3/CloudFront.
+> **Fuera de alcance:** `bff-admin` (sin vista admin operativa) y `ms-etl` (Python, opt-in).
 
 ---
 
@@ -98,7 +120,7 @@ aws secretsmanager create-secret --name $PROJECT/db-password --secret-string "$D
 aws rds create-db-instance \
   --db-instance-identifier $PROJECT-pg \
   --db-instance-class db.t4g.micro \
-  --engine postgres --engine-version 16.4 \
+  --engine postgres --engine-version 16.8 \
   --master-username chessquery --master-user-password "$DB_PASSWORD" \
   --allocated-storage 20 --storage-type gp3 \
   --vpc-security-group-ids $SG_RDS \
@@ -118,15 +140,22 @@ done
 ### 1.6 Secrets Manager (resto de credenciales)
 
 ```bash
-aws secretsmanager create-secret --name $PROJECT/rabbitmq-password   --secret-string "$(openssl rand -base64 24 | tr -d '/+=')"
-aws secretsmanager create-secret --name $PROJECT/supabase-service-key --secret-string "<tu-supabase-service-key>"
-aws secretsmanager create-secret --name $PROJECT/jwt-secret           --secret-string "$(openssl rand -base64 48)"
+aws secretsmanager create-secret --name $PROJECT/rabbitmq-password     --secret-string "$(openssl rand -base64 24 | tr -d '/+=')"
+aws secretsmanager create-secret --name $PROJECT/supabase-service-key   --secret-string "<tu-supabase-service-key>"
+aws secretsmanager create-secret --name $PROJECT/jwt-secret             --secret-string "<JWT secret de Supabase: Project Settings > API > JWT Secret>"
+aws secretsmanager create-secret --name $PROJECT/supabase-webhook-secret --secret-string "<secret del webhook Supabase → ms-users>"
 
-# Guarda los ARNs (los necesitan los task definitions)
+# Guarda los ARNs (los necesitan los task definitions y deploy.yml)
 export DB_PASSWORD_ARN=$(aws secretsmanager describe-secret --secret-id $PROJECT/db-password --query ARN --output text)
 export RABBITMQ_PASSWORD_ARN=$(aws secretsmanager describe-secret --secret-id $PROJECT/rabbitmq-password --query ARN --output text)
 export SUPABASE_SERVICE_KEY_ARN=$(aws secretsmanager describe-secret --secret-id $PROJECT/supabase-service-key --query ARN --output text)
+export JWT_SECRET_ARN=$(aws secretsmanager describe-secret --secret-id $PROJECT/jwt-secret --query ARN --output text)
+export SUPABASE_WEBHOOK_SECRET_ARN=$(aws secretsmanager describe-secret --secret-id $PROJECT/supabase-webhook-secret --query ARN --output text)
 ```
+
+> **Nota:** el `jwt-secret` debe ser el **mismo JWT Secret de tu proyecto Supabase Cloud**
+> (Project Settings → API → JWT Secret), no uno aleatorio — el api-gateway valida los
+> tokens emitidos por Supabase contra él.
 
 ---
 
@@ -135,14 +164,28 @@ export SUPABASE_SERVICE_KEY_ARN=$(aws secretsmanager describe-secret --secret-id
 ### 2.1 Secrets del repositorio
 
 ```bash
+# Credenciales AWS (las consumen build-and-push.yml y deploy.yml)
 gh secret set AWS_ACCESS_KEY_ID      --body "<de Academy>"
 gh secret set AWS_SECRET_ACCESS_KEY  --body "<de Academy>"
 gh secret set AWS_SESSION_TOKEN      --body "<de Academy, obligatorio en Academy>"
 gh secret set AWS_REGION             --body "$AWS_REGION"
 gh secret set AWS_ACCOUNT_ID         --body "$AWS_ACCOUNT_ID"
+
+# Datos de infra que deploy.yml inyecta en las task definitions (envsubst)
+gh secret set TASK_EXECUTION_ROLE_ARN     --body "$TASK_EXECUTION_ROLE_ARN"
+gh secret set DB_HOST                     --body "$DB_HOST"
+gh secret set RABBITMQ_HOST               --body "rabbitmq.$PROJECT.local"
+gh secret set SUPABASE_URL                --body "https://<tu-proyecto>.supabase.co"
+gh secret set DB_PASSWORD_ARN             --body "$DB_PASSWORD_ARN"
+gh secret set RABBITMQ_PASSWORD_ARN       --body "$RABBITMQ_PASSWORD_ARN"
+gh secret set SUPABASE_SERVICE_KEY_ARN    --body "$SUPABASE_SERVICE_KEY_ARN"
+gh secret set JWT_SECRET_ARN              --body "$JWT_SECRET_ARN"
+gh secret set SUPABASE_WEBHOOK_SECRET_ARN --body "$SUPABASE_WEBHOOK_SECRET_ARN"
 ```
 
-> ⚠️ Las credenciales del Academy caducan; debes refrescar estos secrets cada sesión larga.
+> ⚠️ Las credenciales del Academy caducan (TTL 4h); refresca `AWS_ACCESS_KEY_ID`,
+> `AWS_SECRET_ACCESS_KEY` y `AWS_SESSION_TOKEN` cada sesión larga. Los ARNs e infra
+> (DB_HOST, *_ARN, etc.) son estables y se setean una sola vez.
 
 ### 2.2 Verificar workflows ya commiteados
 
@@ -181,6 +224,7 @@ cd infrastructure/aws/task-definitions
 export ECR_REGISTRY DB_HOST=$DB_HOST RABBITMQ_HOST=rabbitmq.$PROJECT.local \
        TASK_EXECUTION_ROLE_ARN AWS_REGION IMAGE_TAG=v0.1.0 \
        DB_PASSWORD_ARN RABBITMQ_PASSWORD_ARN SUPABASE_SERVICE_KEY_ARN \
+       JWT_SECRET_ARN SUPABASE_WEBHOOK_SECRET_ARN \
        SUPABASE_URL=https://<tu-proyecto>.supabase.co
 
 for f in *.template.json; do
@@ -229,7 +273,7 @@ create_service ms-users         8081
 create_service ms-tournament    8082
 create_service ms-game          8083
 create_service ms-notifications 8085
-create_service ms-analytics     8086
+create_service ms-analytics     8084
 create_service api-gateway      8080
 ```
 
@@ -304,10 +348,8 @@ Si los 3 health checks (`/actuator/health` de api-gateway, ms-users, ms-tourname
 ## 8. Apagado para ahorrar saldo
 
 ```bash
-# Bajar tasks a 0 (no eliminar)
-for s in api-gateway ms-users ms-tournament ms-game ms-notifications ms-analytics rabbitmq; do
-  aws ecs update-service --cluster $PROJECT-cluster --service $s --desired-count 0
-done
+# Bajar la task a 0 (no eliminar el service)
+aws ecs update-service --cluster $PROJECT-cluster --service chessquery-stack --desired-count 0
 
 # Detener RDS (hasta 7 días)
 aws rds stop-db-instance --db-instance-identifier $PROJECT-pg
@@ -337,8 +379,8 @@ Para reanudar: `--desired-count 1` y `start-db-instance`.
 - [ ] Cluster ECS Fargate creado
 - [ ] Namespace Cloud Map `chessquery.local`
 - [ ] RDS `chessquery-pg` + 6 bases creadas
-- [ ] Secrets Manager: db-password, rabbitmq-password, supabase-service-key
-- [ ] GitHub secrets configurados (AWS_*, AWS_REGION, AWS_ACCOUNT_ID)
+- [ ] Secrets Manager: db-password, rabbitmq-password, supabase-service-key, jwt-secret, supabase-webhook-secret
+- [ ] GitHub secrets configurados (AWS_*, ARNs, DB_HOST, RABBITMQ_HOST, SUPABASE_URL, TASK_EXECUTION_ROLE_ARN)
 - [ ] Workflow `build-and-push.yml` ejecutado → imágenes en ECR
 - [ ] Task definitions renderizadas + registradas
 - [ ] 7 services ECS creados (orden: rabbitmq → MS → api-gateway)

@@ -97,6 +97,19 @@ public class EventPublisherService {
         publish("game.finished", payload);
     }
 
+    /** Routing key: game.invitation — push in-app al jugador para que se una a
+     *  su partida en vivo del torneo. {@code gameId} = id de la sesión en vivo
+     *  (el front lo usa para linkear a /play/{gameId}). */
+    public void publishGameInvitation(Long liveSessionId, Long playerId, String inviterName) {
+        Map<String, Object> payload = Map.of(
+                "gameId",      liveSessionId,
+                "playerId",    playerId,
+                "inviterId",   0L,
+                "inviterName", inviterName == null ? "" : inviterName
+        );
+        publish("game.invitation", payload);
+    }
+
     private void publish(String routingKey, Map<String, Object> payload) {
         Map<String, Object> event = Map.of(
                 "eventId",   UUID.randomUUID().toString(),

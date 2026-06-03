@@ -1,0 +1,281 @@
+{
+  "family": "chessquery-stack",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "4096",
+  "memory": "8192",
+  "executionRoleArn": "${TASK_EXECUTION_ROLE_ARN}",
+  "containerDefinitions": [
+    {
+      "name": "rabbitmq",
+      "image": "rabbitmq:3.13-management-alpine",
+      "essential": true,
+      "user": "0",
+      "entryPoint": ["/bin/sh", "-c"],
+      "command": ["printf 'chessquery-erlang-cookie-singlenode' > /var/lib/rabbitmq/.erlang.cookie; chown 100:101 /var/lib/rabbitmq/.erlang.cookie; chmod 400 /var/lib/rabbitmq/.erlang.cookie; export HOME=/var/lib/rabbitmq; exec docker-entrypoint.sh rabbitmq-server"],
+      "environment": [
+        { "name": "RABBITMQ_DEFAULT_USER",  "value": "chessquery" },
+        { "name": "RABBITMQ_DEFAULT_VHOST", "value": "/" }
+      ],
+      "secrets": [
+        { "name": "RABBITMQ_DEFAULT_PASS", "valueFrom": "${RABBITMQ_PASSWORD_ARN}" }
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "rabbitmq-diagnostics -q ping || exit 1"],
+        "interval": 15, "timeout": 10, "retries": 5, "startPeriod": 90
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/chessquery/stack",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "rabbitmq",
+          "awslogs-create-group": "true"
+        }
+      }
+    },
+    {
+      "name": "redis",
+      "image": "redis:7-alpine",
+      "essential": true,
+      "healthCheck": {
+        "command": ["CMD-SHELL", "redis-cli ping | grep -q PONG || exit 1"],
+        "interval": 15, "timeout": 5, "retries": 5, "startPeriod": 10
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/chessquery/stack",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "redis",
+          "awslogs-create-group": "true"
+        }
+      }
+    },
+    {
+      "name": "api-gateway",
+      "image": "${ECR_REGISTRY}/chessquery/api-gateway:${IMAGE_TAG}",
+      "essential": true,
+      "portMappings": [{ "containerPort": 8080, "protocol": "tcp" }],
+      "dependsOn": [
+        { "containerName": "rabbitmq", "condition": "HEALTHY" },
+        { "containerName": "redis",    "condition": "HEALTHY" }
+      ],
+      "environment": [
+        { "name": "SPRING_PROFILES_ACTIVE", "value": "aws" },
+        { "name": "MS_USERS_URL",      "value": "http://localhost:8081" },
+        { "name": "BFF_PLAYER_URL",    "value": "http://localhost:3001" },
+        { "name": "BFF_ORGANIZER_URL", "value": "http://localhost:3002" },
+        { "name": "BFF_ADMIN_URL",     "value": "http://localhost:3003" },
+        { "name": "RABBITMQ_HOST",     "value": "localhost" },
+        { "name": "REDIS_HOST",        "value": "localhost" },
+        { "name": "REDIS_PASSWORD",    "value": "" },
+        { "name": "SUPABASE_URL",      "value": "${SUPABASE_URL}" },
+        { "name": "GATEWAY_CORS_ALLOWED_ORIGINS", "value": "${GATEWAY_CORS_ALLOWED_ORIGINS}" }
+      ],
+      "secrets": [
+        { "name": "RABBITMQ_PASSWORD",       "valueFrom": "${RABBITMQ_PASSWORD_ARN}" },
+        { "name": "SUPABASE_JWT_SECRET",     "valueFrom": "${JWT_SECRET_ARN}" },
+        { "name": "SUPABASE_WEBHOOK_SECRET", "valueFrom": "${SUPABASE_WEBHOOK_SECRET_ARN}" }
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health/readiness | grep -q '\"status\":\"UP\"' || exit 1"],
+        "interval": 30, "timeout": 5, "retries": 5, "startPeriod": 150
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/chessquery/stack",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "api-gateway",
+          "awslogs-create-group": "true"
+        }
+      }
+    },
+    {
+      "name": "ms-users",
+      "image": "${ECR_REGISTRY}/chessquery/ms-users:${IMAGE_TAG}",
+      "essential": false,
+      "portMappings": [{ "containerPort": 8081, "protocol": "tcp" }],
+      "dependsOn": [{ "containerName": "rabbitmq", "condition": "HEALTHY" }],
+      "environment": [
+        { "name": "SPRING_PROFILES_ACTIVE", "value": "aws" },
+        { "name": "SPRING_JPA_HIBERNATE_DDL_AUTO", "value": "none" },
+        { "name": "DB_URL",        "value": "jdbc:postgresql://${DB_HOST}:5432/users_db" },
+        { "name": "DB_USER",       "value": "chessquery" },
+        { "name": "RABBITMQ_HOST", "value": "localhost" }
+      ],
+      "secrets": [
+        { "name": "DB_PASSWORD",       "valueFrom": "${DB_PASSWORD_ARN}" },
+        { "name": "RABBITMQ_PASSWORD", "valueFrom": "${RABBITMQ_PASSWORD_ARN}" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/chessquery/stack",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "ms-users",
+          "awslogs-create-group": "true"
+        }
+      }
+    },
+    {
+      "name": "ms-tournament",
+      "image": "${ECR_REGISTRY}/chessquery/ms-tournament:${IMAGE_TAG}",
+      "essential": false,
+      "portMappings": [{ "containerPort": 8082, "protocol": "tcp" }],
+      "dependsOn": [{ "containerName": "rabbitmq", "condition": "HEALTHY" }],
+      "environment": [
+        { "name": "SPRING_PROFILES_ACTIVE", "value": "aws" },
+        { "name": "SPRING_JPA_HIBERNATE_DDL_AUTO", "value": "none" },
+        { "name": "DB_URL",        "value": "jdbc:postgresql://${DB_HOST}:5432/tournament_db" },
+        { "name": "DB_USER",       "value": "chessquery" },
+        { "name": "RABBITMQ_HOST", "value": "localhost" },
+        { "name": "MS_USERS_URL",  "value": "http://localhost:8081" }
+      ],
+      "secrets": [
+        { "name": "DB_PASSWORD",       "valueFrom": "${DB_PASSWORD_ARN}" },
+        { "name": "RABBITMQ_PASSWORD", "valueFrom": "${RABBITMQ_PASSWORD_ARN}" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/chessquery/stack",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "ms-tournament",
+          "awslogs-create-group": "true"
+        }
+      }
+    },
+    {
+      "name": "ms-game",
+      "image": "${ECR_REGISTRY}/chessquery/ms-game:${IMAGE_TAG}",
+      "essential": false,
+      "portMappings": [{ "containerPort": 8083, "protocol": "tcp" }],
+      "dependsOn": [{ "containerName": "rabbitmq", "condition": "HEALTHY" }],
+      "environment": [
+        { "name": "SPRING_PROFILES_ACTIVE", "value": "aws" },
+        { "name": "SPRING_JPA_HIBERNATE_DDL_AUTO", "value": "none" },
+        { "name": "DB_URL",           "value": "jdbc:postgresql://${DB_HOST}:5432/game_db" },
+        { "name": "DB_USER",          "value": "chessquery" },
+        { "name": "RABBITMQ_HOST",    "value": "localhost" },
+        { "name": "SUPABASE_URL",     "value": "${SUPABASE_URL}" },
+        { "name": "STORAGE_PROVIDER", "value": "supabase" }
+      ],
+      "secrets": [
+        { "name": "DB_PASSWORD",          "valueFrom": "${DB_PASSWORD_ARN}" },
+        { "name": "RABBITMQ_PASSWORD",    "valueFrom": "${RABBITMQ_PASSWORD_ARN}" },
+        { "name": "SUPABASE_SERVICE_KEY", "valueFrom": "${SUPABASE_SERVICE_KEY_ARN}" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/chessquery/stack",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "ms-game",
+          "awslogs-create-group": "true"
+        }
+      }
+    },
+    {
+      "name": "ms-analytics",
+      "image": "${ECR_REGISTRY}/chessquery/ms-analytics:${IMAGE_TAG}",
+      "essential": false,
+      "portMappings": [{ "containerPort": 8084, "protocol": "tcp" }],
+      "dependsOn": [{ "containerName": "rabbitmq", "condition": "HEALTHY" }],
+      "environment": [
+        { "name": "SPRING_PROFILES_ACTIVE", "value": "aws" },
+        { "name": "SPRING_JPA_HIBERNATE_DDL_AUTO", "value": "none" },
+        { "name": "DB_URL",        "value": "jdbc:postgresql://${DB_HOST}:5432/analytics_db" },
+        { "name": "DB_USER",       "value": "chessquery" },
+        { "name": "RABBITMQ_HOST", "value": "localhost" }
+      ],
+      "secrets": [
+        { "name": "DB_PASSWORD",       "valueFrom": "${DB_PASSWORD_ARN}" },
+        { "name": "RABBITMQ_PASSWORD", "valueFrom": "${RABBITMQ_PASSWORD_ARN}" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/chessquery/stack",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "ms-analytics",
+          "awslogs-create-group": "true"
+        }
+      }
+    },
+    {
+      "name": "ms-notifications",
+      "image": "${ECR_REGISTRY}/chessquery/ms-notifications:${IMAGE_TAG}",
+      "essential": false,
+      "portMappings": [{ "containerPort": 8085, "protocol": "tcp" }],
+      "dependsOn": [{ "containerName": "rabbitmq", "condition": "HEALTHY" }],
+      "environment": [
+        { "name": "SPRING_PROFILES_ACTIVE", "value": "aws" },
+        { "name": "SPRING_JPA_HIBERNATE_DDL_AUTO", "value": "none" },
+        { "name": "DB_URL",        "value": "jdbc:postgresql://${DB_HOST}:5432/notifications_db" },
+        { "name": "DB_USER",       "value": "chessquery" },
+        { "name": "RABBITMQ_HOST", "value": "localhost" },
+        { "name": "MS_USERS_URL",  "value": "http://localhost:8081" }
+      ],
+      "secrets": [
+        { "name": "DB_PASSWORD",       "valueFrom": "${DB_PASSWORD_ARN}" },
+        { "name": "RABBITMQ_PASSWORD", "valueFrom": "${RABBITMQ_PASSWORD_ARN}" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/chessquery/stack",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "ms-notifications",
+          "awslogs-create-group": "true"
+        }
+      }
+    },
+    {
+      "name": "bff-player",
+      "image": "${ECR_REGISTRY}/chessquery/bff-player:${IMAGE_TAG}",
+      "essential": false,
+      "portMappings": [{ "containerPort": 3001, "protocol": "tcp" }],
+      "environment": [
+        { "name": "PORT",                  "value": "3001" },
+        { "name": "MS_USERS_URL",          "value": "http://localhost:8081" },
+        { "name": "MS_TOURNAMENT_URL",     "value": "http://localhost:8082" },
+        { "name": "MS_GAME_URL",           "value": "http://localhost:8083" },
+        { "name": "MS_ANALYTICS_URL",      "value": "http://localhost:8084" },
+        { "name": "MS_NOTIFICATIONS_URL",  "value": "http://localhost:8085" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/chessquery/stack",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "bff-player",
+          "awslogs-create-group": "true"
+        }
+      }
+    },
+    {
+      "name": "bff-organizer",
+      "image": "${ECR_REGISTRY}/chessquery/bff-organizer:${IMAGE_TAG}",
+      "essential": false,
+      "portMappings": [{ "containerPort": 3002, "protocol": "tcp" }],
+      "environment": [
+        { "name": "PORT",              "value": "3002" },
+        { "name": "MS_USERS_URL",      "value": "http://localhost:8081" },
+        { "name": "MS_TOURNAMENT_URL", "value": "http://localhost:8082" },
+        { "name": "MS_GAME_URL",       "value": "http://localhost:8083" },
+        { "name": "MS_ANALYTICS_URL",  "value": "http://localhost:8084" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/chessquery/stack",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "bff-organizer",
+          "awslogs-create-group": "true"
+        }
+      }
+    }
+  ]
+}

@@ -3,6 +3,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
+// El tablero espectador importa el cliente Supabase (se instancia al cargar el
+// módulo y requiere VITE_*). No se ejercita en este test → lo mockeamos para no
+// arrastrar esa dependencia (en CI no hay .env).
+vi.mock('../components/LiveSpectatorModal', () => ({
+  LiveSpectatorModal: () => null,
+}));
+
 // Mocks de los componentes de UI: los reemplazamos por placeholders mínimos
 // para no depender de su implementación (la página tiene 700 LOC con muchísimas
 // dependencias visuales que no aportan al test). Cada mock conserva *solo* las

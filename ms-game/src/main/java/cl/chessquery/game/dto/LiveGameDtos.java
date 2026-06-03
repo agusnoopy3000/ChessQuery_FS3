@@ -10,12 +10,19 @@ import java.util.List;
 public final class LiveGameDtos {
     private LiveGameDtos() {}
 
-    /** POST /games/live  (creador = white). */
+    /** POST /games/live.
+     *  Modo casual: solo {@code whitePlayerId} (creador), la sesión queda WAITING
+     *  hasta que un rival hace join.
+     *  Modo torneo: además {@code blackPlayerId} y {@code tournamentPairingId} —
+     *  la sesión se crea ACTIVE con ambos jugadores ya asignados. */
     public record CreateLiveGameRequest(
             @NotNull Long whitePlayerId,
             Integer whiteEloBefore,
             Long timeControlInitialMs,
-            Long timeControlIncrementMs
+            Long timeControlIncrementMs,
+            Long blackPlayerId,
+            Integer blackEloBefore,
+            Long tournamentPairingId
     ) {}
 
     /** POST /games/live/{id}/join. */

@@ -104,7 +104,7 @@ class LiveGameServiceTest {
     }
 
     private void createAndJoin() {
-        live.create(new CreateLiveGameRequest(1L, 1500, 600_000L, 0L));
+        live.create(new CreateLiveGameRequest(1L, 1500, 600_000L, 0L, null, null, null));
         live.join(1L, new JoinLiveGameRequest(2L, 1500));
     }
 
@@ -119,7 +119,7 @@ class LiveGameServiceTest {
         @Test
         @DisplayName("fullFlow_create_join_fiveMoves_resign_producesValidPgn")
         void fullFlow_create_join_fiveMoves_resign_producesValidPgn() {
-            LiveGameResponse created = live.create(new CreateLiveGameRequest(1L, 1500, 600_000L, 0L));
+            LiveGameResponse created = live.create(new CreateLiveGameRequest(1L, 1500, 600_000L, 0L, null, null, null));
             assertThat(created.id()).isEqualTo(1L);
             assertThat(created.status()).isEqualTo("WAITING");
 
@@ -188,7 +188,7 @@ class LiveGameServiceTest {
         @Test
         @DisplayName("move_sessionNotActive_returns409")
         void move_sessionNotActive_returns409() {
-            live.create(new CreateLiveGameRequest(1L, 1500, null, null));
+            live.create(new CreateLiveGameRequest(1L, 1500, null, null, null, null, null));
             assertThatThrownBy(() -> live.move(1L, new MoveRequest(1L, "e2e4", null, null)))
                     .isInstanceOf(ApiException.class)
                     .matches(e -> ((ApiException) e).getStatus() == 409);
@@ -230,7 +230,7 @@ class LiveGameServiceTest {
         @Test
         @DisplayName("join_sameAsCreator_returns400")
         void join_sameAsCreator_returns400() {
-            live.create(new CreateLiveGameRequest(1L, 1500, null, null));
+            live.create(new CreateLiveGameRequest(1L, 1500, null, null, null, null, null));
             assertThatThrownBy(() -> live.join(1L, new JoinLiveGameRequest(1L, 1500)))
                     .isInstanceOf(ApiException.class)
                     .matches(e -> ((ApiException) e).getStatus() == 400);
@@ -288,7 +288,7 @@ class LiveGameServiceTest {
         @Test
         @DisplayName("resign_sessionNotActive_throws409")
         void resign_sessionNotActive_throws409() {
-            live.create(new CreateLiveGameRequest(1L, 1500, null, null));
+            live.create(new CreateLiveGameRequest(1L, 1500, null, null, null, null, null));
             assertThatThrownBy(() -> live.resign(1L, new ResignRequest(1L)))
                     .isInstanceOf(ApiException.class)
                     .matches(e -> ((ApiException) e).getStatus() == 409);

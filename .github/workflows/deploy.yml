@@ -1,20 +1,20 @@
-name: Deploy to ECS Fargate
+name: Deploy to ECS Fargate (task única)
+
+# Opción A: toda la plataforma corre en UNA task ECS (contenedores comunicados
+# por localhost) porque AWS Academy bloquea Cloud Map / Service Discovery.
+# Ver infrastructure/aws/task-definitions/chessquery-stack.template.json
 
 on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: 'Tag de imagen a desplegar (ej: sha-abc1234 o latest)'
+        description: 'Tag de imagen a desplegar (ej: sha-abc1234 o v0.1.0)'
         required: true
         default: 'latest'
-      service:
-        description: 'Servicio a desplegar (todos | api-gateway | ms-users | ...)'
-        required: true
-        default: 'todos'
       cluster:
         description: 'Cluster ECS objetivo'
         required: true
-        default: 'chessquery'
+        default: 'chessquery-cluster'
 
 permissions:
   id-token: write
@@ -22,24 +22,9 @@ permissions:
 
 jobs:
   deploy:
-    name: Deploy ${{ matrix.service }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        service:
-          - api-gateway
-          - ms-users
-          - ms-tournament
-          - ms-game
-          - ms-notifications
+    name: Deploy chessquery-stack
+    runs-on: [self-hosted, Linux, X64]
     steps:
-      - name: Skip si el input filtra otro servicio
-        if: github.event.inputs.service != 'todos' && github.event.inputs.service != matrix.service
-        run: |
-          echo "Saltando ${{ matrix.service }} — input pidió ${{ github.event.inputs.service }}"
-          exit 0
-
       - uses: actions/checkout@v4
 
       - name: Configure AWS credentials (OIDC)
@@ -67,19 +52,18 @@ jobs:
         run: |
           export ECR_REGISTRY="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com"
           export IMAGE_TAG="${{ github.event.inputs.image_tag }}"
-          export DB_HOST="${{ secrets.DB_HOST }}"
-          export DB_PASSWORD_ARN="${{ secrets.DB_PASSWORD_ARN }}"
-          export JWT_SECRET_ARN="${{ secrets.JWT_SECRET_ARN }}"
-          export RABBITMQ_HOST="${{ secrets.RABBITMQ_HOST }}"
-          export RABBITMQ_PASSWORD_ARN="${{ secrets.RABBITMQ_PASSWORD_ARN }}"
-          export SUPABASE_URL="${{ secrets.SUPABASE_URL }}"
-          export SUPABASE_SERVICE_KEY_ARN="${{ secrets.SUPABASE_SERVICE_KEY_ARN }}"
-          export SUPABASE_WEBHOOK_SECRET_ARN="${{ secrets.SUPABASE_WEBHOOK_SECRET_ARN }}"
-          export TASK_EXECUTION_ROLE_ARN="${{ secrets.TASK_EXECUTION_ROLE_ARN }}"
           export AWS_REGION="${{ secrets.AWS_REGION }}"
+          export TASK_EXECUTION_ROLE_ARN="${{ secrets.TASK_EXECUTION_ROLE_ARN }}"
+          export DB_HOST="${{ secrets.DB_HOST }}"
+          export SUPABASE_URL="${{ secrets.SUPABASE_URL }}"
+          export DB_PASSWORD_ARN="${{ secrets.DB_PASSWORD_ARN }}"
+          export RABBITMQ_PASSWORD_ARN="${{ secrets.RABBITMQ_PASSWORD_ARN }}"
+          export SUPABASE_SERVICE_KEY_ARN="${{ secrets.SUPABASE_SERVICE_KEY_ARN }}"
+          export JWT_SECRET_ARN="${{ secrets.JWT_SECRET_ARN }}"
+          export SUPABASE_WEBHOOK_SECRET_ARN="${{ secrets.SUPABASE_WEBHOOK_SECRET_ARN }}"
 
-          template="infrastructure/aws/task-definitions/${{ matrix.service }}.template.json"
-          rendered="task-def-${{ matrix.service }}.json"
+          template="infrastructure/aws/task-definitions/chessquery-stack.template.json"
+          rendered="task-def-chessquery-stack.json"
           envsubst < "$template" > "$rendered"
           echo "task_def=$rendered" >> $GITHUB_OUTPUT
           echo "::group::Task definition rendered"
@@ -99,15 +83,15 @@ jobs:
         run: |
           aws ecs update-service \
             --cluster ${{ github.event.inputs.cluster }} \
-            --service ${{ matrix.service }} \
+            --service chessquery-stack \
             --task-definition ${{ steps.register.outputs.task_def_arn }} \
             --force-new-deployment \
             > /dev/null
-          echo "::notice title=Service updated::${{ matrix.service }} → ${{ steps.register.outputs.task_def_arn }}"
+          echo "::notice title=Service updated::chessquery-stack → ${{ steps.register.outputs.task_def_arn }}"
 
       - name: Wait for service to stabilize
         run: |
           aws ecs wait services-stable \
             --cluster ${{ github.event.inputs.cluster }} \
-            --services ${{ matrix.service }}
-          echo "::notice title=Service stable::${{ matrix.service }} desplegado"
+            --services chessquery-stack
+          echo "::notice title=Service stable::chessquery-stack desplegado"

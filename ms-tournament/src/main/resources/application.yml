@@ -72,6 +72,10 @@ resilience4j:
 ms-users:
   url: ${MS_USERS_URL:http://ms-users:8081}
 
+# ── MS-Game URL (crear partidas en vivo por emparejamiento) ──────────────────
+ms-game:
+  url: ${MS_GAME_URL:http://ms-game:8083}
+
 # ── Actuator / Monitoring ───────────────────────────────────────────────────
 management:
   endpoints:

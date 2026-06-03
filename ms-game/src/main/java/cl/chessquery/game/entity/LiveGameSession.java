@@ -61,6 +61,11 @@ public class LiveGameSession {
     @Column(name = "finalized_game_id")
     private Long finalizedGameId;
 
+    /** Si la partida proviene de un emparejamiento de torneo, su id (para
+     *  registrar el resultado de vuelta en ms-tournament al finalizar). */
+    @Column(name = "tournament_pairing_id")
+    private Long tournamentPairingId;
+
     @Column(name = "started_at")
     private Instant startedAt;
 

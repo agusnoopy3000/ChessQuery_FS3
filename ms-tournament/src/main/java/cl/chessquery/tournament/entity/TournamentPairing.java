@@ -31,4 +31,9 @@ public class TournamentPairing {
 
     @Column(name = "board_number")
     private Integer boardNumber;
+
+    /** Id de la partida en vivo (ms-game) creada para este emparejamiento.
+     *  Permite al organizador observarla y correlacionar el resultado final. */
+    @Column(name = "live_session_id")
+    private Long liveSessionId;
 }

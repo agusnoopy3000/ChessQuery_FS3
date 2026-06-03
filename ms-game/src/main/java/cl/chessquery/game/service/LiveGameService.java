@@ -105,9 +105,18 @@ public class LiveGameService {
 
     @Transactional
     public LiveGameResponse create(CreateLiveGameRequest req) {
+        // Modo torneo: si viene blackPlayerId, ambos jugadores quedan asignados y
+        // la sesión arranca ACTIVE (no espera join). En casual queda WAITING.
+        boolean tournamentMode = req.blackPlayerId() != null;
+        if (tournamentMode && req.blackPlayerId().equals(req.whitePlayerId())) {
+            throw new ApiException(400, "SAME_PLAYER",
+                    "El jugador de blancas y negras no pueden ser el mismo");
+        }
+        Instant now = Instant.now();
         LiveGameSession s = LiveGameSession.builder()
                 .whitePlayerId(req.whitePlayerId())
-                .status(SessionStatus.WAITING)
+                .blackPlayerId(req.blackPlayerId())
+                .status(tournamentMode ? SessionStatus.ACTIVE : SessionStatus.WAITING)
                 .initialFen(INITIAL_FEN)
                 .currentFen(INITIAL_FEN)
                 .turn("w")
@@ -116,9 +125,14 @@ public class LiveGameService {
                 .clockWhiteMs(req.timeControlInitialMs())
                 .clockBlackMs(req.timeControlInitialMs())
                 .whiteEloBefore(req.whiteEloBefore())
+                .blackEloBefore(req.blackEloBefore())
+                .tournamentPairingId(req.tournamentPairingId())
+                .startedAt(tournamentMode ? now : null)
                 .build();
         sessionRepo.save(s);
-        log.info("LiveGame creada id={} white={}", s.getId(), s.getWhitePlayerId());
+        log.info("LiveGame creada id={} white={} black={} pairing={} modo={}",
+                s.getId(), s.getWhitePlayerId(), s.getBlackPlayerId(),
+                s.getTournamentPairingId(), tournamentMode ? "torneo" : "casual");
         return toResponse(s, List.of());
     }
 
@@ -469,7 +483,7 @@ public class LiveGameService {
                 s.getWhiteEloBefore(),
                 s.getBlackEloBefore(),
                 moves.size(),
-                null,
+                s.getTournamentPairingId(),
                 duration,
                 s.getStartedAt() != null ? s.getStartedAt() : now,
                 pgn

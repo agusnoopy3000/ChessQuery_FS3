@@ -20,9 +20,24 @@ public class RabbitMQConfig {
 
     public static final String EXCHANGE = "ChessEvents";
 
+    /** Cola propia para recibir game.finished de ms-game (resultado de las
+     *  partidas en vivo de torneo). Cola dedicada para no competir con
+     *  ms-analytics / ms-notifications. */
+    public static final String GAME_RESULTS_QUEUE = "tournament.game.results";
+
     @Bean
     public TopicExchange chessEventsExchange() {
         return ExchangeBuilder.topicExchange(EXCHANGE).durable(true).build();
+    }
+
+    @Bean
+    public Queue tournamentGameResultsQueue() {
+        return QueueBuilder.durable(GAME_RESULTS_QUEUE).build();
+    }
+
+    @Bean
+    public Binding gameResultsBinding(Queue tournamentGameResultsQueue, TopicExchange chessEventsExchange) {
+        return BindingBuilder.bind(tournamentGameResultsQueue).to(chessEventsExchange).with("game.finished");
     }
 
     @Bean

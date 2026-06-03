@@ -3,6 +3,7 @@
 .env.production
 .env.local
 infrastructure/.env
+infrastructure/aws/.deploy-outputs.env
 
 # Build artifacts (Java)
 **/target/

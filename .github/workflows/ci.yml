@@ -45,6 +45,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
+        continue-on-error: true   # no bloquear el job si se agotó la cuota de artifacts
         uses: actions/upload-artifact@v4
         with:
           name: jacoco-${{ matrix.module }}
@@ -78,6 +79,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
+        continue-on-error: true   # no bloquear el job si se agotó la cuota de artifacts
         uses: actions/upload-artifact@v4
         with:
           name: vitest-${{ matrix.app }}

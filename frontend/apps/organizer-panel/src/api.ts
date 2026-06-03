@@ -223,6 +223,7 @@ const normalizePairing = (value: unknown): Pairing => {
     blackPlayerName: asString(raw.blackPlayerName),
     blackPlayerRating: asNumber(raw.blackPlayerRating),
     result: ((asString(raw.result) ?? null) as Pairing['result']),
+    liveSessionId: asNumber(raw.liveSessionId) ?? null,
   };
 };
 
@@ -562,6 +563,7 @@ export interface LiveGameSummary {
   status: 'WAITING' | 'ACTIVE' | 'FINISHED' | 'ABANDONED';
   currentFen: string;
   turn: 'w' | 'b';
+  result?: string | null;
 }
 
 export const liveGameApi = {
