@@ -216,11 +216,18 @@
         { "name": "DB_URL",        "value": "jdbc:postgresql://${DB_HOST}:5432/notifications_db" },
         { "name": "DB_USER",       "value": "chessquery" },
         { "name": "RABBITMQ_HOST", "value": "localhost" },
-        { "name": "MS_USERS_URL",  "value": "http://localhost:8081" }
+        { "name": "MS_USERS_URL",  "value": "http://localhost:8081" },
+        { "name": "SMTP_HOST",     "value": "smtp.gmail.com" },
+        { "name": "SMTP_PORT",     "value": "587" },
+        { "name": "SMTP_USERNAME", "value": "${SMTP_USERNAME}" },
+        { "name": "SMTP_AUTH",     "value": "true" },
+        { "name": "SMTP_STARTTLS", "value": "true" },
+        { "name": "MAIL_FROM",     "value": "${MAIL_FROM}" }
       ],
       "secrets": [
         { "name": "DB_PASSWORD",       "valueFrom": "${DB_PASSWORD_ARN}" },
-        { "name": "RABBITMQ_PASSWORD", "valueFrom": "${RABBITMQ_PASSWORD_ARN}" }
+        { "name": "RABBITMQ_PASSWORD", "valueFrom": "${RABBITMQ_PASSWORD_ARN}" },
+        { "name": "SMTP_PASSWORD",     "valueFrom": "${SMTP_PASSWORD_ARN}" }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",
