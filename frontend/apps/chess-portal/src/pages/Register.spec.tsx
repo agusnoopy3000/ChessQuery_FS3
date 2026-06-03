@@ -86,12 +86,13 @@ describe('RegisterPage', () => {
     expect(navigateMock).not.toHaveBeenCalled();
   });
 
-  it('llama a register y navega cuando los datos son válidos', async () => {
+  it('llama a register, muestra éxito y navega cuando los datos son válidos', async () => {
     registerMock.mockResolvedValue({});
     render(<RegisterPage />);
     fillBaseFields();
     toggleTerms();
     fireEvent.click(screen.getByRole('button', { name: /Crear cuenta jugador/i }));
+    // 1) register se llama con los datos correctos
     await waitFor(() => {
       expect(registerMock).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -102,7 +103,14 @@ describe('RegisterPage', () => {
           role: 'PLAYER',
         }),
       );
-      expect(navigateMock).toHaveBeenCalledWith('/portal');
     });
+    // 2) se muestra la pantalla de éxito con animación
+    await waitFor(() => {
+      expect(screen.getByText(/Cuenta creada con éxito/i)).toBeInTheDocument();
+    });
+    // 3) la navegación ocurre de forma diferida (tras la confirmación)
+    await waitFor(() => {
+      expect(navigateMock).toHaveBeenCalledWith('/portal');
+    }, { timeout: 2500 });
   });
 });
