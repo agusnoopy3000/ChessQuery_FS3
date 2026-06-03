@@ -320,6 +320,7 @@ public class NotificationService {
     }
 
     private static Long toLong(Object v) {
+        if (v == null) return null;
         if (v instanceof Number n) return n.longValue();
         return Long.parseLong(v.toString());
     }

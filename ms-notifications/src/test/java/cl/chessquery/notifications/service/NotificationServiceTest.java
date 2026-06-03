@@ -174,6 +174,21 @@ class NotificationServiceTest {
         assertThat(cap.getValue().getSubject()).contains("Magnus").contains("42");
     }
 
+    @Test
+    void notifyGameInvitation_unregisteredEmail_sendsEmailOnlyNoInApp() {
+        // Invitado sin cuenta: playerId null + email presente. Debe enviar email
+        // y NO crear in-app, sin NPE (regresión del toString sobre null).
+        java.util.Map<String, Object> payload = new java.util.HashMap<>();
+        payload.put("gameId", 9);
+        payload.put("playerId", null);
+        payload.put("email", "invitado@example.com");
+        payload.put("gameUrl", "http://portal/play/9");
+        payload.put("inviterName", "Ana");
+        notificationService.notifyGameInvitation(payload);
+        verify(mockEmailService).sendEmail(isNull(), eq("invitado@example.com"), anyString(), anyString());
+        verify(notificationLogRepo, never()).save(any());
+    }
+
 
     @Test
     void notifyGameFinished_notifiesBothPlayers() {
