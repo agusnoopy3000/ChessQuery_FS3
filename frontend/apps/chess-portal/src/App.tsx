@@ -4,6 +4,7 @@ import { Role, useAuth } from '@chessquery/shared';
 import { Button, Card, Shell, ShellNavItem } from '@chessquery/ui-lib';
 import { NotificationBell } from './components/NotificationBell';
 import { getDefaultRoute } from './portal-utils';
+import { organizerPanelUrl } from './lib/urls';
 import { HomePage } from './pages/Home';
 import { LoginPage } from './pages/Login';
 import { MyDashboardPage } from './pages/MyDashboard';
@@ -37,9 +38,6 @@ const RequireRole = ({ userRole, roles, children }: RequireRoleProps) => {
 
   return children;
 };
-
-export const organizerPanelUrl = (): string =>
-  `${window.location.protocol}//${window.location.hostname}:5174`;
 
 /**
  * Cuando un ORGANIZER aterriza en el portal de jugadores (por login,

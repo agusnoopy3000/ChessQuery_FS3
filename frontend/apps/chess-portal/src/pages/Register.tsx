@@ -1,6 +1,7 @@
 import { useState, ChangeEvent, FormEvent, ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Role, useAuth, translateAuthError } from '@chessquery/shared';
+import { organizerPanelUrl } from '../lib/urls';
 
 /* ── Logo SVG ── */
 const ChessQueryLogo = () => (
@@ -357,9 +358,8 @@ export const RegisterPage = () => {
       if (next && next.startsWith('/')) {
         navigate(next);
       } else if (role === 'ORGANIZER') {
-        // Enviar directo al organizer-panel en :5174 (cross-origin, navegación full).
-        const organizerUrl = `${window.location.protocol}//${window.location.hostname}:5174`;
-        window.location.assign(organizerUrl);
+        // El organizer-panel es otra app (otro origen) → navegación full a su URL.
+        window.location.assign(organizerPanelUrl());
       } else {
         navigate('/portal');
       }

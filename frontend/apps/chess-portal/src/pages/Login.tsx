@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth, translateAuthError } from '@chessquery/shared';
 import { playerApi } from '../api';
+import { organizerPanelUrl } from '../lib/urls';
 
 /* ── Logo ── */
 const ChessQueryLogo = () => (
@@ -313,8 +314,7 @@ export const LoginPage = () => {
       // ORGANIZER: enviar directo al panel del organizador en :5174 sin
       // pasar por el portal del jugador (cross-origin, no react-router).
       if (u.role === 'ORGANIZER') {
-        const organizerUrl = `${window.location.protocol}//${window.location.hostname}:5174`;
-        window.location.assign(organizerUrl);
+        window.location.assign(organizerPanelUrl());
         return;
       }
 
