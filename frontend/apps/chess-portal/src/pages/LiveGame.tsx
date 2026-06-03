@@ -19,8 +19,8 @@ import { computeMaterialBalance, flagFromIsoCode } from '../lib/chessHelpers';
 import { copyToClipboard } from '../lib/clipboard';
 
 import 'chessground/assets/chessground.base.css';
-import 'chessground/assets/chessground.brown.css';
 import 'chessground/assets/chessground.cburnett.css';
+import '../lib/board-encroissant.css';
 
 interface LiveMove {
   moveNumber: number;
@@ -91,6 +91,7 @@ export const LiveGamePage = () => {
   const { user } = useAuth();
   const cgRef = useRef<HTMLDivElement>(null);
   const cgApi = useRef<CgApi | null>(null);
+  const [flipped, setFlipped] = useState(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const [state, setState] = useState<LiveGameState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -358,10 +359,15 @@ export const LiveGamePage = () => {
     // Pre-move habilitado cuando es la partida en vivo y hay rival (R9).
     const allowPremove = myColor !== null && state.status === 'ACTIVE' && !isReviewing && !isMyTurn;
 
+    const baseOrient: 'white' | 'black' = myColor ?? 'white';
+    const orientation: 'white' | 'black' = flipped
+      ? (baseOrient === 'white' ? 'black' : 'white')
+      : baseOrient;
+
     const config: CgConfig = {
       fen: viewedFen,
       turnColor,
-      orientation: myColor ?? 'white',
+      orientation,
       check: chess?.isCheck() ? turnColor : undefined,
       viewOnly: isReviewing,
       movable: {
@@ -409,7 +415,7 @@ export const LiveGamePage = () => {
     // status flip, viewedFen) — el set() ya recolocó piezas pero bounds
     // pueden seguir stale si elementos hermanos cambiaron de tamaño.
     cgApi.current?.state?.dom?.bounds?.clear?.();
-  }, [state, myColor, viewedFen, isReviewing]);
+  }, [state, myColor, viewedFen, isReviewing, flipped]);
 
   // ResizeObserver sobre el contenedor del tablero — chessground solo observa
   // su propio wrap; si el padre cambia (window resize, rotación móvil), bounds
@@ -742,6 +748,23 @@ export const LiveGamePage = () => {
         )}
 
         <div ref={cgRef} className="cq-live-board" />
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+          <button
+            type="button"
+            onClick={() => setFlipped((f) => !f)}
+            title="Girar tablero"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              background: 'transparent', border: '1px solid var(--border, #2a2d27)',
+              color: 'var(--text-dim, #7a7d6e)', borderRadius: 8,
+              padding: '5px 10px', fontSize: 12, cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            ⇅ Girar tablero
+          </button>
+        </div>
 
         <div style={{ alignSelf: 'stretch', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 8 }}>
           <PlayerHeaderRow
