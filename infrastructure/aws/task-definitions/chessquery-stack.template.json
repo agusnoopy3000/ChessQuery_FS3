@@ -160,7 +160,8 @@
         { "name": "DB_USER",          "value": "chessquery" },
         { "name": "RABBITMQ_HOST",    "value": "localhost" },
         { "name": "SUPABASE_URL",     "value": "${SUPABASE_URL}" },
-        { "name": "STORAGE_PROVIDER", "value": "supabase" }
+        { "name": "STORAGE_PROVIDER", "value": "supabase" },
+        { "name": "GATEWAY_MS_USERS_URL", "value": "http://localhost:8081" }
       ],
       "secrets": [
         { "name": "DB_PASSWORD",          "valueFrom": "${DB_PASSWORD_ARN}" },
