@@ -1,6 +1,7 @@
 import { ChangeEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth, translateAuthError } from '@chessquery/shared';
+import { playerPortalUrl } from '../lib/urls';
 
 /* ── Logo ── */
 const ChessQueryLogo = () => (
@@ -457,7 +458,7 @@ export const LoginPage = () => {
         <div className="cq-org-login-help" style={{ position: 'absolute', top: 36, right: 40, fontSize: 13, color: 'var(--cq-text-dim, #7a7d6e)' }}>
           ¿Eres jugador?{' '}
           <a
-            href="http://localhost:5173/login"
+            href={`${playerPortalUrl()}/login`}
             style={{ color: 'var(--cq-accent, #6abf74)', fontWeight: 600, textDecoration: 'none' }}
           >
             Ir al portal →
