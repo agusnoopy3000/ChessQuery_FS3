@@ -152,15 +152,29 @@ public class NotificationService {
         Long recipientId = toLong(payload.get("playerId"));
         Object gameId = payload.get("gameId");
         Object inviterName = payload.getOrDefault("inviterName", "tu rival");
-        if (recipientId == null) {
-            log.debug("game.invitation sin playerId, ignorado");
-            return;
+        String email = (payload.get("email") instanceof String s && !s.isBlank()) ? s.trim() : null;
+        String gameUrl = (payload.get("gameUrl") instanceof String u && !u.isBlank()) ? u.trim() : null;
+
+        // Email al correo invitado (sea jugador registrado o no). Sólo se envía
+        // de verdad si hay SMTP configurado; si no, queda en log (no rompe nada).
+        if (email != null) {
+            String emailSubject = "Te invitan a una partida en ChessQuery";
+            String emailBody = String.format(
+                    "%s te invitó a jugar una partida en ChessQuery.%s",
+                    inviterName,
+                    gameUrl != null ? "\n\nUnite a la partida:\n" + gameUrl : "");
+            mockEmailService.sendEmail(recipientId, email, emailSubject, emailBody);
         }
-        String subject = "Te invitan a una partida";
-        String body = String.format("%s te invitó a jugar (partida #%s).", inviterName, gameId);
-        saveLog(recipientId, Channel.IN_APP, "game.invitation", body, payload, NotifStatus.SENT);
-        log.info("game.invitation: notificación in-app creada para player {} (game {})",
-                recipientId, gameId);
+
+        // Notificación in-app sólo si el invitado tiene cuenta (playerId).
+        if (recipientId != null) {
+            String body = String.format("%s te invitó a jugar (partida #%s).", inviterName, gameId);
+            saveLog(recipientId, Channel.IN_APP, "game.invitation", body, payload, NotifStatus.SENT);
+            log.info("game.invitation: notificación in-app creada para player {} (game {})",
+                    recipientId, gameId);
+        } else if (email == null) {
+            log.debug("game.invitation sin playerId ni email, ignorado");
+        }
     }
 
     /**

@@ -47,13 +47,15 @@ public class EventPublisherService {
 
     /** Routing key: game.invitation — push in-app al jugador invitado. */
     public void publishGameInvitation(Long gameId, Long invitedPlayerId, Long inviterPlayerId,
-                                       String inviterName, String gameUrl) {
+                                       String inviterName, String gameUrl, String email) {
         java.util.Map<String, Object> payload = new java.util.HashMap<>();
         payload.put("gameId", gameId);
+        // playerId puede ser null: invitado sin cuenta registrada (sólo email).
         payload.put("playerId", invitedPlayerId);
         payload.put("inviterId", inviterPlayerId == null ? 0L : inviterPlayerId);
         payload.put("inviterName", inviterName == null ? "" : inviterName);
         payload.put("gameUrl", gameUrl == null ? "" : gameUrl);
+        payload.put("email", email == null ? "" : email);
         publish("game.invitation", payload);
     }
 

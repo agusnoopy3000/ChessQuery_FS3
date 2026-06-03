@@ -121,7 +121,7 @@ class EventPublisherServiceTest {
         @Test
         @DisplayName("publishGameInvitation_allFieldsProvided_payloadMatches")
         void publishGameInvitation_allFieldsProvided_payloadMatches() {
-            publisher.publishGameInvitation(10L, 20L, 30L, "Magnus", "https://x/game/10");
+            publisher.publishGameInvitation(10L, 20L, 30L, "Magnus", "https://x/game/10", "rival@chessquery.cl");
 
             Map<String, Object> event = capturePublishedEvent("game.invitation");
             @SuppressWarnings("unchecked")
@@ -130,20 +130,22 @@ class EventPublisherServiceTest {
                     .containsEntry("playerId", 20L)
                     .containsEntry("inviterId", 30L)
                     .containsEntry("inviterName", "Magnus")
-                    .containsEntry("gameUrl", "https://x/game/10");
+                    .containsEntry("gameUrl", "https://x/game/10")
+                    .containsEntry("email", "rival@chessquery.cl");
         }
 
         @Test
         @DisplayName("publishGameInvitation_nullOptionalFields_payloadDefaultsApplied")
         void publishGameInvitation_nullOptionalFields_payloadDefaultsApplied() {
-            publisher.publishGameInvitation(10L, 20L, null, null, null);
+            publisher.publishGameInvitation(10L, 20L, null, null, null, null);
 
             Map<String, Object> event = capturePublishedEvent("game.invitation");
             @SuppressWarnings("unchecked")
             Map<String, Object> payload = (Map<String, Object>) event.get("payload");
             assertThat(payload).containsEntry("inviterId", 0L)
                     .containsEntry("inviterName", "")
-                    .containsEntry("gameUrl", "");
+                    .containsEntry("gameUrl", "")
+                    .containsEntry("email", "");
         }
     }
 

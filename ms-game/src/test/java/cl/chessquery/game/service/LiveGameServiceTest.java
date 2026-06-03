@@ -471,7 +471,7 @@ class LiveGameServiceTest {
             when(restTemplate.getForObject(anyString(), eq(Map.class), anyString())).thenReturn(body);
             Map<String, Object> r = live.invitePlayer(1L, "x@y.cl", null, 1L);
             assertThat(r).containsEntry("matched", false);
-            verify(events, never()).publishGameInvitation(any(), any(), any(), any(), any());
+            verify(events, never()).publishGameInvitation(any(), any(), any(), any(), any(), any());
         }
 
         @Test
@@ -487,7 +487,7 @@ class LiveGameServiceTest {
 
             assertThat(r).containsEntry("matched", true).containsEntry("playerId", 5L);
             verify(events).publishGameInvitation(eq(1L), eq(5L), eq(1L),
-                    eq("el creador de la partida"), eq("https://url"));
+                    eq("el creador de la partida"), eq("https://url"), eq("x@y.cl"));
         }
     }
 
