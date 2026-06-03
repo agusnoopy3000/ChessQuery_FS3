@@ -19,7 +19,7 @@ import { computeMaterialBalance, flagFromIsoCode } from '../lib/chessHelpers';
 import { copyToClipboard } from '../lib/clipboard';
 
 import 'chessground/assets/chessground.base.css';
-import 'chessground/assets/chessground.cburnett.css';
+import '../lib/pieces-staunty.css';
 import '../lib/board-encroissant.css';
 
 interface LiveMove {
