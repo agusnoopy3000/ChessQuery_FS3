@@ -612,7 +612,8 @@ public class LiveGameService {
                 s.getFinishedAt(),
                 s.getLastMoveAt(),
                 openingEco,
-                openingName
+                openingName,
+                s.getTournamentPairingId()
         );
     }
 }

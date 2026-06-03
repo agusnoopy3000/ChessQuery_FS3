@@ -207,10 +207,15 @@ public class NotificationService {
         if (recipientId == null) return;
         String outcome = describeResult(result, myColor);
         String opponentName = playerNameResolver.resolve(opponentId);
-        String subject = String.format("Partida #%s finalizada · %s", finalizedGameId, outcome);
+        // El resultado de torneo grabado por el organizador llega sin gameId
+        // (no hubo partida en vivo). En ese caso evitamos imprimir "#null".
+        boolean hasGameId = finalizedGameId != null && !"null".equals(String.valueOf(finalizedGameId));
+        String gameRef = hasGameId ? " #" + finalizedGameId : "";
+        String subject = String.format("Partida%s finalizada · %s", gameRef, outcome);
+        String pgnNote = hasGameId ? String.format(" PGN guardado como game #%s.", finalizedGameId) : "";
         String body = String.format(
-                "Tu partida contra %s terminó: %s. Resultado %s. PGN guardado como game #%s.",
-                opponentName, outcome, result, finalizedGameId);
+                "Tu partida contra %s terminó: %s. Resultado %s.%s",
+                opponentName, outcome, result, pgnNote);
         mockEmailService.sendEmail(recipientId,
                 "jugador-" + recipientId + "@chessquery.cl", subject, body);
         saveLog(recipientId, Channel.EMAIL, "game.finished", subject, payload, NotifStatus.SENT);

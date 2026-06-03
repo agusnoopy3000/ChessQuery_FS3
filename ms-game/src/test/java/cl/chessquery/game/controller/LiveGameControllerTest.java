@@ -36,7 +36,7 @@ class LiveGameControllerTest {
         return new LiveGameResponse(id, 1L, 2L, status,
                 "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
                 "w", null, null, 600_000L, 0L, 600_000L, 600_000L, null,
-                List.of(), null, null, null, null, null);
+                List.of(), null, null, null, null, null, null);
     }
 
     @Test
