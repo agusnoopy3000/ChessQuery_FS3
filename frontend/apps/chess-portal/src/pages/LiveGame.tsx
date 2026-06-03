@@ -16,6 +16,7 @@ import { api, liveGameApi, playerApi } from '../api';
 import { supabase } from '../lib/supabase';
 import { useMyPlayerId } from '../hooks/useMyPlayerId';
 import { computeMaterialBalance, flagFromIsoCode } from '../lib/chessHelpers';
+import { copyToClipboard } from '../lib/clipboard';
 
 import 'chessground/assets/chessground.base.css';
 import 'chessground/assets/chessground.brown.css';
@@ -63,6 +64,9 @@ interface LiveGameState {
   clockWhiteMs?: number | null;
   clockBlackMs?: number | null;
   lastMoveAt?: string | null;
+  // Presente sólo si la partida pertenece a un emparejamiento de torneo.
+  // Sirve para separar la lógica del fin de partida (torneo vs casual).
+  tournamentPairingId?: number | null;
 }
 
 const dataApi = {
@@ -943,13 +947,12 @@ export const LiveGamePage = () => {
               <Button
                 size="sm"
                 onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(shareUrl);
+                  const ok = await copyToClipboard(shareUrl);
+                  if (ok) {
                     setCopied(true);
                     setTimeout(() => setCopied(false), 1500);
-                  } catch {
-                    /* portapapeles bloqueado: el input ya está seleccionado */
                   }
+                  // si falla, el input queda seleccionado para copiar a mano
                 }}
               >
                 {copied ? '✓ Copiado' : 'Copiar'}
@@ -1051,8 +1054,8 @@ export const LiveGamePage = () => {
           myColor={myColor}
           whiteName={whiteName}
           blackName={blackName}
-          onClose={() => navigate('/play')}
-          onViewSaved={state.finalizedGameId ? () => navigate(`/player/${myPlayerId ?? ''}`) : null}
+          isTournament={state.tournamentPairingId != null}
+          onClose={() => navigate(state.tournamentPairingId != null ? '/tournaments' : '/play')}
           onRematch={async () => {
             if (!id) return;
             // Si el rival ya creó la revancha, navegamos directo. Si no, la creamos.
@@ -1218,15 +1221,15 @@ interface GameOverModalProps {
   myColor: 'white' | 'black' | null;
   whiteName: string;
   blackName: string;
+  isTournament: boolean;
   onClose: () => void;
-  onViewSaved: (() => void) | null;
   onRematch: () => void;
   rematchPending: boolean;
   rematchCreating: boolean;
 }
 
 const GameOverModal = ({
-  state, myColor, whiteName, blackName, onClose, onViewSaved,
+  state, myColor, whiteName, blackName, isTournament, onClose,
   onRematch, rematchPending, rematchCreating,
 }: GameOverModalProps) => {
   const winner = state.result === '1-0' ? 'white' : state.result === '0-1' ? 'black' : null;
@@ -1288,16 +1291,15 @@ const GameOverModal = ({
           {state.result}
         </p>
         <div style={{ display: 'grid', gap: 8 }}>
-          <Button variant="primary" onClick={onRematch} loading={rematchCreating}>
-            {rematchPending ? '🔁 Aceptar revancha del rival' : '🔁 Revancha (colores invertidos)'}
-          </Button>
-          {onViewSaved && (
-            <Button variant="secondary" onClick={onViewSaved}>
-              Ver partida guardada #{state.finalizedGameId}
+          {/* La revancha sólo aplica al juego casual. En torneo el resultado lo
+              gestiona el organizador, así que no se ofrece revancha. */}
+          {!isTournament && (
+            <Button variant="primary" onClick={onRematch} loading={rematchCreating}>
+              {rematchPending ? '🔁 Aceptar revancha del rival' : '🔁 Revancha (colores invertidos)'}
             </Button>
           )}
-          <Button variant="ghost" onClick={onClose}>
-            Volver al portal
+          <Button variant={isTournament ? 'primary' : 'ghost'} onClick={onClose}>
+            {isTournament ? 'Volver al torneo' : 'Volver al portal'}
           </Button>
         </div>
       </div>

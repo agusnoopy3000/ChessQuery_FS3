@@ -233,27 +233,54 @@ export const NotificationBell = () => {
                 Sin notificaciones aún.
               </div>
             )}
-            {items.map((n) => (
-              <div
-                key={n.id}
-                style={{
-                  padding: '10px 14px',
-                  borderBottom: '1px solid rgba(255,255,255,0.04)',
-                  background: n.readAt ? 'transparent' : 'rgba(106,191,116,0.06)',
-                  display: 'flex', gap: 10, alignItems: 'flex-start',
-                }}
-              >
-                <span style={{ fontSize: 16, lineHeight: 1.2, flexShrink: 0 }}>{eventIcon(n.eventType)}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text, #e8ead4)' }}>
-                    {n.subject || n.eventType}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                    {formatRelative(n.createdAt)}
+            {items.map((n) => {
+              const link = notificationLink(n);
+              const isInvitation = n.eventType === 'game.invitation';
+              const go = () => { if (link) { setOpen(false); navigate(link); } };
+              const rowClickable = !isInvitation && !!link;
+              return (
+                <div
+                  key={n.id}
+                  onClick={rowClickable ? go : undefined}
+                  style={{
+                    padding: '10px 14px',
+                    borderBottom: '1px solid rgba(255,255,255,0.04)',
+                    background: n.readAt ? 'transparent' : 'rgba(106,191,116,0.06)',
+                    display: 'flex', gap: 10, alignItems: 'flex-start',
+                    cursor: rowClickable ? 'pointer' : 'default',
+                  }}
+                >
+                  <span style={{ fontSize: 16, lineHeight: 1.2, flexShrink: 0 }}>{eventIcon(n.eventType)}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text, #e8ead4)' }}>
+                      {n.subject || n.eventType}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                      {formatRelative(n.createdAt)}
+                    </div>
+                    {/* La invitación sigue siendo aceptable desde la campana aunque
+                        el toast ya haya desaparecido. */}
+                    {isInvitation && link && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); go(); }}
+                        style={{
+                          marginTop: 8, padding: '6px 12px', borderRadius: 6, border: 'none',
+                          background: '#6abf74', color: '#0e100d',
+                          fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                        }}
+                      >
+                        Aceptar y unirse
+                      </button>
+                    )}
+                    {!isInvitation && link && (
+                      <div style={{ marginTop: 4, fontSize: 11, color: '#6abf74', fontWeight: 600 }}>
+                        Ver detalle →
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
