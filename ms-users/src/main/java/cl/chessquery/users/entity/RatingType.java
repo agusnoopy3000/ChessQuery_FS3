@@ -5,5 +5,9 @@ public enum RatingType {
     FIDE_STANDARD,
     FIDE_RAPID,
     FIDE_BLITZ,
-    PLATFORM
+    PLATFORM,
+    LICHESS_BULLET,
+    LICHESS_BLITZ,
+    LICHESS_RAPID,
+    LICHESS_CLASSICAL
 }

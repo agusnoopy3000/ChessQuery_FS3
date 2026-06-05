@@ -35,10 +35,10 @@ class LichessMockSource:
             base = rng.randint(1100, 2400)
             players.append({
                 "lichessUsername": username,
-                "eloPlatformRapid":     max(800, base + rng.randint(-150, 150)),
-                "eloPlatformBlitz":     max(800, base + rng.randint(-200, 100)),
-                "eloPlatformBullet":    max(800, base + rng.randint(-250, 50)),
-                "eloPlatformClassical": max(800, base + rng.randint(-100, 200)),
+                "eloLichessRapid":     max(800, base + rng.randint(-150, 150)),
+                "eloLichessBlitz":     max(800, base + rng.randint(-200, 100)),
+                "eloLichessBullet":    max(800, base + rng.randint(-250, 50)),
+                "eloLichessClassical": max(800, base + rng.randint(-100, 200)),
                 "totalGames": rng.randint(50, 4000),
                 "source": "LICHESS",
             })

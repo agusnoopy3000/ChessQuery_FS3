@@ -318,6 +318,7 @@ export const RegisterPage = () => {
   const [newsletter, setNewsletter] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -354,15 +355,21 @@ export const RegisterPage = () => {
         lichessUsername: role === 'PLAYER' ? form.lichess.trim() || undefined : undefined,
         clubName: role === 'ORGANIZER' ? form.club.trim() || undefined : undefined,
       });
-      // Si venía de un link de invitación (?next=/play/123), respetamos esa URL.
-      if (next && next.startsWith('/')) {
-        navigate(next);
-      } else if (role === 'ORGANIZER') {
-        // El organizer-panel es otra app (otro origen) → navegación full a su URL.
-        window.location.assign(organizerPanelUrl());
-      } else {
-        navigate('/portal');
-      }
+      // Mostramos una confirmación de éxito breve (con animación) y recién luego
+      // redirigimos al destino correspondiente, para dar feedback claro al usuario.
+      const go = () => {
+        if (next && next.startsWith('/')) {
+          navigate(next);
+        } else if (role === 'ORGANIZER') {
+          // El organizer-panel es otra app (otro origen) → navegación full a su URL.
+          window.location.assign(organizerPanelUrl());
+        } else {
+          navigate('/portal');
+        }
+      };
+      setSuccess(true);
+      window.setTimeout(go, 1400);
+      return;
     } catch (err) {
       const raw =
         (err as { message?: string })?.message ??
@@ -378,6 +385,44 @@ export const RegisterPage = () => {
 
   const fontStack = "'Space Grotesk', system-ui, sans-serif";
   const submitLabel = role === 'PLAYER' ? 'Crear cuenta jugador' : 'Crear cuenta organizador';
+
+  // Pantalla de éxito con animación, mostrada brevemente antes de redirigir.
+  if (success) {
+    return (
+      <div
+        style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          minHeight: '100vh', background: '#111210', color: '#e8ead4', fontFamily: fontStack,
+          textAlign: 'center', padding: 24, gap: 18,
+        }}
+      >
+        <style>{`
+          @keyframes cq-pop { 0% { transform: scale(0.4); opacity: 0 } 60% { transform: scale(1.12) } 100% { transform: scale(1); opacity: 1 } }
+          @keyframes cq-check { from { stroke-dashoffset: 48 } to { stroke-dashoffset: 0 } }
+          @keyframes cq-fade { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: translateY(0) } }
+          @keyframes cq-spin { to { transform: rotate(360deg) } }
+        `}</style>
+        <div style={{
+          width: 92, height: 92, borderRadius: '50%',
+          background: 'rgba(106,191,116,0.12)', border: '2px solid #6abf74',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          animation: 'cq-pop 0.45s cubic-bezier(0.2,0.8,0.2,1) both',
+          boxShadow: '0 0 40px rgba(106,191,116,0.25)',
+        }}>
+          <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#6abf74" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 12.5l5 5L20 6" style={{ strokeDasharray: 48, strokeDashoffset: 48, animation: 'cq-check 0.5s 0.25s ease forwards' }} />
+          </svg>
+        </div>
+        <h2 style={{ margin: 0, fontSize: 26, fontWeight: 700, animation: 'cq-fade 0.4s 0.3s both' }}>
+          ¡Cuenta creada con éxito!
+        </h2>
+        <p style={{ margin: 0, fontSize: 14, color: '#7a7d6e', animation: 'cq-fade 0.4s 0.45s both' }}>
+          {role === 'ORGANIZER' ? 'Te llevamos al panel del organizador…' : 'Te llevamos a tu portal…'}
+        </p>
+        <div style={{ marginTop: 6, fontSize: 22, color: '#6abf74', display: 'inline-block', animation: 'cq-spin 0.9s linear infinite' }}>⟳</div>
+      </div>
+    );
+  }
 
   return (
     <div

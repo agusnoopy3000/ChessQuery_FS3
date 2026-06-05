@@ -100,6 +100,7 @@ export class PlayerService {
     return { profile, recentGames, stats };
   }
 
+
   async getPublicProfile(playerId: string): Promise<DashboardResponse> {
     const { msUsers, msGame, msAnalytics } = this.http.urls;
 
@@ -361,26 +362,44 @@ export class PlayerService {
     games: unknown[];
     error?: string;
   }> {
-    const { msUsers, msEtl } = this.http.urls;
-    const profile = await this.http.get<{ lichessUsername?: string | null }>(
-      `${msUsers}/users/${playerId}/profile`,
-    );
-    const username = profile?.lichessUsername?.trim() || null;
+    const { msUsers } = this.http.urls;
+    // Sincroniza con la API pública de Lichess y persiste en ms-users (eloLichess*),
+    // devolviendo el perfil actualizado. (Reemplaza la ruta vía ms-etl, no desplegado.)
+    let profile: {
+      lichessUsername?: string | null;
+      eloLichessBullet?: number | null;
+      eloLichessBlitz?: number | null;
+      eloLichessRapid?: number | null;
+      eloLichessClassical?: number | null;
+    };
+    try {
+      profile = await this.http.post(`${msUsers}/users/${playerId}/lichess-sync`, {});
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'No se pudo sincronizar con Lichess';
+      return { username: null, user: null, games: [], error: msg };
+    }
 
+    const username = profile?.lichessUsername?.trim() || null;
     if (!username) {
       return { username: null, user: null, games: [], error: 'Jugador sin lichessUsername registrado.' };
     }
 
-    try {
-      const [user, games] = await Promise.all([
-        this.http.get<unknown>(`${msEtl}/lichess/users/${encodeURIComponent(username)}`),
-        this.http.get<unknown[]>(`${msEtl}/lichess/users/${encodeURIComponent(username)}/games?max=10`),
-      ]);
-      return { username, user, games: games ?? [] };
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'No se pudo consultar Lichess';
-      return { username, user: null, games: [], error: msg };
+    const ratings = [
+      { variant: 'bullet', rating: profile.eloLichessBullet },
+      { variant: 'blitz', rating: profile.eloLichessBlitz },
+      { variant: 'rapid', rating: profile.eloLichessRapid },
+      { variant: 'classical', rating: profile.eloLichessClassical },
+    ].filter((r) => r.rating != null);
+
+    if (ratings.length === 0) {
+      return {
+        username,
+        user: null,
+        games: [],
+        error: `No encontramos ratings para @${username} en Lichess.`,
+      };
     }
+    return { username, user: { username, ratings }, games: [] };
   }
 
   // ── Torneos (vista de jugador) ─────────────────────────────────────────

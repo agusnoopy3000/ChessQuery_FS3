@@ -79,7 +79,7 @@ export const ChessBoard = ({ fen = INITIAL_FEN, size = 320, showCoords = true }:
                   style={{
                     width: sq,
                     height: sq,
-                    background: light ? '#f0d9b5' : '#b58863',
+                    background: light ? '#e9edf2' : '#7c8ba1',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',

@@ -80,10 +80,8 @@ public class LiveGameService {
             log.warn("invite: lookup ms-users falló para email={}: {}", email, ex.getMessage());
         }
 
-        if (invitedPlayerId == null) {
-            return result;
-        }
-        if (invitedPlayerId.equals(inviterId)) {
+        // Auto-invitación: no notificar ni emailear al propio creador.
+        if (invitedPlayerId != null && invitedPlayerId.equals(inviterId)) {
             log.debug("invite: el invitado es el propio creador, no notifico");
             return result;
         }
@@ -92,12 +90,18 @@ public class LiveGameService {
         if (inviterId != null && inviterId.equals(s.getWhitePlayerId())) {
             inviterName = "el creador de la partida";
         }
-        events.publishGameInvitation(sessionId, invitedPlayerId, inviterId, inviterName, gameUrl);
-        log.info("invite: game.invitation publicado game={} → player={} ({})",
-                sessionId, invitedPlayerId, invitedName);
+        // Publicamos siempre: si el email es de un jugador registrado se crea
+        // notificación in-app (playerId != null); en todos los casos se envía el
+        // email al correo invitado (lo hace ms-notifications si hay SMTP).
+        events.publishGameInvitation(sessionId, invitedPlayerId, inviterId, inviterName, gameUrl, email.trim());
+        log.info("invite: game.invitation publicado game={} → player={} email={} ({})",
+                sessionId, invitedPlayerId, email, invitedName);
 
-        result.put("matched", true);
-        result.put("playerId", invitedPlayerId);
+        result.put("matched", invitedPlayerId != null);
+        result.put("emailSent", true);
+        if (invitedPlayerId != null) {
+            result.put("playerId", invitedPlayerId);
+        }
         return result;
     }
 
@@ -612,7 +616,8 @@ public class LiveGameService {
                 s.getFinishedAt(),
                 s.getLastMoveAt(),
                 openingEco,
-                openingName
+                openingName,
+                s.getTournamentPairingId()
         );
     }
 }

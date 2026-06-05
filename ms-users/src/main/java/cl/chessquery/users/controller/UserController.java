@@ -68,6 +68,18 @@ public class UserController {
         return playerService.getProfileBySupabaseId(supabaseUserId);
     }
 
+    @Operation(summary = "Usernames de Lichess registrados (usado por ms-etl para sincronizar ratings)")
+    @GetMapping("/lichess-usernames")
+    public java.util.List<String> getLichessUsernames() {
+        return playerRepository.findAllLichessUsernames();
+    }
+
+    @Operation(summary = "Sincroniza los ratings oficiales de Lichess del jugador (API pública de Lichess)")
+    @PostMapping("/{id}/lichess-sync")
+    public PlayerProfileResponse syncLichess(@PathVariable Long id) {
+        return playerService.syncLichess(id);
+    }
+
     @Operation(summary = "Resolver Player por email (usado por ms-game para invitaciones in-app)")
     @GetMapping("/by-email")
     public PlayerProfileResponse getByEmail(@RequestParam String email) {

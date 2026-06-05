@@ -26,6 +26,7 @@ public class PlayerService {
     private final RatingHistoryRepository     historyRepo;
     private final PlayerTitleHistoryRepository titleRepo;
     private final EventPublisherService       events;
+    private final LichessClient               lichessClient;
 
     @PersistenceContext
     private EntityManager em;
@@ -132,7 +133,8 @@ public class PlayerService {
         if (StringUtils.hasText(req.firstName())) p.setFirstName(req.firstName());
         if (StringUtils.hasText(req.lastName()))  p.setLastName(req.lastName());
         if (StringUtils.hasText(req.email()) && p.getEmail() == null) p.setEmail(req.email());
-        if (StringUtils.hasText(req.lichessUsername()) && p.getLichessUsername() == null) {
+        if (StringUtils.hasText(req.lichessUsername()) && p.getLichessUsername() == null
+                && playerRepo.findByLichessUsername(req.lichessUsername().trim()).isEmpty()) {
             p.setLichessUsername(req.lichessUsername().trim());
         }
     }
@@ -214,13 +216,22 @@ public class PlayerService {
         String firstName = StringUtils.hasText(req.firstName()) ? req.firstName() : "Jugador";
         String lastName  = StringUtils.hasText(req.lastName())  ? req.lastName()
                 : supabaseUserId.toString().substring(0, 8);
+        // Pre-chequeo: si el lichess_username ya está en uso por otro Player, NO lo
+        // seteamos (el usuario podrá vincularlo después). Evita la violación de la
+        // constraint única, que en Postgres aborta la transacción y deja el evento
+        // user.registered reencolándose en loop (bloqueando la provisión de todos).
+        String lichess = StringUtils.hasText(req.lichessUsername()) ? req.lichessUsername().trim() : null;
+        if (lichess != null && playerRepo.findByLichessUsername(lichess).isPresent()) {
+            log.warn("provision: lichess_username '{}' ya en uso por otro Player; creo Player sin él (supabaseUserId={})",
+                    lichess, supabaseUserId);
+            lichess = null;
+        }
         Player p = Player.builder()
                 .firstName(firstName)
                 .lastName(lastName)
                 .email(StringUtils.hasText(req.email()) ? req.email() : null)
                 .supabaseUserId(supabaseUserId)
-                .lichessUsername(StringUtils.hasText(req.lichessUsername())
-                        ? req.lichessUsername().trim() : null)
+                .lichessUsername(lichess)
                 .club(club)
                 .createdAt(now)
                 .updatedAt(now)
@@ -379,24 +390,56 @@ public class PlayerService {
                         "Jugador con id " + id + " no encontrado"));
     }
 
+    /**
+     * Sincroniza los ratings oficiales de Lichess del jugador (por su
+     * lichessUsername) llamando a la API pública, y los persiste en eloLichess*.
+     * Si el jugador no tiene username, devuelve el perfil sin cambios.
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public PlayerProfileResponse syncLichess(Long id) {
+        Player p = findOrThrow(id);
+        if (!StringUtils.hasText(p.getLichessUsername())) {
+            return getProfile(id);
+        }
+        lichessClient.fetchRatings(p.getLichessUsername()).ifPresent(r -> {
+            if (r.bullet() != null)    p.setEloLichessBullet(r.bullet());
+            if (r.blitz() != null)     p.setEloLichessBlitz(r.blitz());
+            if (r.rapid() != null)     p.setEloLichessRapid(r.rapid());
+            if (r.classical() != null) p.setEloLichessClassical(r.classical());
+            p.setEnrichmentSource("LICHESS");
+            p.setEnrichedAt(java.time.Instant.now());
+            playerRepo.save(p);
+            log.info("Lichess sync ok para player {} ({})", id, p.getLichessUsername());
+        });
+        return getProfile(id);
+    }
+
     private int currentElo(Player p, RatingType type) {
         Integer v = switch (type) {
-            case NATIONAL      -> p.getEloNational();
-            case FIDE_STANDARD -> p.getEloFideStandard();
-            case FIDE_RAPID    -> p.getEloFideRapid();
-            case FIDE_BLITZ    -> p.getEloFideBlitz();
-            case PLATFORM      -> p.getEloPlatform();
+            case NATIONAL          -> p.getEloNational();
+            case FIDE_STANDARD     -> p.getEloFideStandard();
+            case FIDE_RAPID        -> p.getEloFideRapid();
+            case FIDE_BLITZ        -> p.getEloFideBlitz();
+            case PLATFORM          -> p.getEloPlatform();
+            case LICHESS_BULLET    -> p.getEloLichessBullet();
+            case LICHESS_BLITZ     -> p.getEloLichessBlitz();
+            case LICHESS_RAPID     -> p.getEloLichessRapid();
+            case LICHESS_CLASSICAL -> p.getEloLichessClassical();
         };
         return v != null ? v : 0;
     }
 
     private void applyElo(Player p, RatingType type, int value) {
         switch (type) {
-            case NATIONAL      -> p.setEloNational(value);
-            case FIDE_STANDARD -> p.setEloFideStandard(value);
-            case FIDE_RAPID    -> p.setEloFideRapid(value);
-            case FIDE_BLITZ    -> p.setEloFideBlitz(value);
-            case PLATFORM      -> p.setEloPlatform(value);
+            case NATIONAL          -> p.setEloNational(value);
+            case FIDE_STANDARD     -> p.setEloFideStandard(value);
+            case FIDE_RAPID        -> p.setEloFideRapid(value);
+            case FIDE_BLITZ        -> p.setEloFideBlitz(value);
+            case PLATFORM          -> p.setEloPlatform(value);
+            case LICHESS_BULLET    -> p.setEloLichessBullet(value);
+            case LICHESS_BLITZ     -> p.setEloLichessBlitz(value);
+            case LICHESS_RAPID     -> p.setEloLichessRapid(value);
+            case LICHESS_CLASSICAL -> p.setEloLichessClassical(value);
         }
     }
 
@@ -428,6 +471,10 @@ public class PlayerService {
                 p.getEloFideRapid(),
                 p.getEloFideBlitz(),
                 p.getEloPlatform(),
+                p.getEloLichessBullet(),
+                p.getEloLichessBlitz(),
+                p.getEloLichessRapid(),
+                p.getEloLichessClassical(),
                 title,
                 p.getCreatedAt(),
                 p.getUpdatedAt()

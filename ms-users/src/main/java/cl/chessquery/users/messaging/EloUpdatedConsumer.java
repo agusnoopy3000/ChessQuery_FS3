@@ -89,11 +89,15 @@ public class EloUpdatedConsumer {
 
     private void applyElo(Player player, RatingType type, int value) {
         switch (type) {
-            case NATIONAL       -> player.setEloNational(value);
-            case FIDE_STANDARD  -> player.setEloFideStandard(value);
-            case FIDE_RAPID     -> player.setEloFideRapid(value);
-            case FIDE_BLITZ     -> player.setEloFideBlitz(value);
-            case PLATFORM       -> player.setEloPlatform(value);
+            case NATIONAL          -> player.setEloNational(value);
+            case FIDE_STANDARD     -> player.setEloFideStandard(value);
+            case FIDE_RAPID        -> player.setEloFideRapid(value);
+            case FIDE_BLITZ        -> player.setEloFideBlitz(value);
+            case PLATFORM          -> player.setEloPlatform(value);
+            case LICHESS_BULLET    -> player.setEloLichessBullet(value);
+            case LICHESS_BLITZ     -> player.setEloLichessBlitz(value);
+            case LICHESS_RAPID     -> player.setEloLichessRapid(value);
+            case LICHESS_CLASSICAL -> player.setEloLichessClassical(value);
         }
     }
 

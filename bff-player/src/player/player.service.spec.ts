@@ -22,7 +22,6 @@ describe('PlayerService', () => {
         msTournament: 'http://ms-tournament:8082',
         msGame: 'http://ms-game:8083',
         msAnalytics: 'http://ms-analytics:8084',
-        msEtl: 'http://ms-etl:8086',
         msNotifications: 'http://ms-notifications:8085',
       },
     };
@@ -326,22 +325,28 @@ describe('PlayerService', () => {
       expect(r.error).toBeDefined();
     });
 
-    it('con username consulta etl users + games', async () => {
-      http.get.mockImplementation(async (url: string) => {
-        if (url.includes('/profile')) return { lichessUsername: 'magnus' };
-        if (url.includes('/lichess/users/magnus/games')) return [{ id: 'g1' }];
-        if (url.includes('/lichess/users/magnus')) return { id: 'magnus' };
-        return {};
+    it('sincroniza con ms-users y devuelve ratings por modalidad', async () => {
+      http.post.mockResolvedValue({
+        lichessUsername: 'magnus',
+        eloLichessBullet: 3200,
+        eloLichessBlitz: 2950,
+        eloLichessRapid: 2800,
+        eloLichessClassical: null,
       });
       const r = await service.getLichessProfile('5');
       expect(r.username).toBe('magnus');
-      expect(r.games).toHaveLength(1);
+      expect(http.post).toHaveBeenCalledWith(
+        expect.stringContaining('/users/5/lichess-sync'),
+        {},
+      );
+      const ratings = (r.user as { ratings: { variant: string; rating: number }[] }).ratings;
+      expect(ratings).toHaveLength(3); // classical null se omite
+      expect(ratings.find((x) => x.variant === 'bullet')?.rating).toBe(3200);
     });
 
-    it('si etl falla devuelve error sin romper', async () => {
-      http.get.mockImplementation(async (url: string) => {
-        if (url.includes('/profile')) return { lichessUsername: 'x' };
-        throw new Error('etl down');
+    it('si el sync falla devuelve error sin romper', async () => {
+      http.post.mockImplementation(async () => {
+        throw new Error('ms-users down');
       });
       const r = await service.getLichessProfile('5');
       expect(r.error).toBeDefined();

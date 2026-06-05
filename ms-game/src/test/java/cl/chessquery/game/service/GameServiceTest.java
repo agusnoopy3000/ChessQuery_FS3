@@ -69,8 +69,8 @@ class GameServiceTest {
         assertThat(resp.whiteEloAfter()).isEqualTo(1516);
         assertThat(resp.blackEloAfter()).isEqualTo(1484);
         verify(events, times(1)).publishGameFinished(any(Game.class));
-        verify(events, times(1)).publishEloUpdated(eq(1L), eq(1500), eq(1516), eq(42L), eq("NATIONAL"));
-        verify(events, times(1)).publishEloUpdated(eq(2L), eq(1500), eq(1484), eq(42L), eq("NATIONAL"));
+        verify(events, times(1)).publishEloUpdated(eq(1L), eq(1500), eq(1516), eq(42L), eq("PLATFORM"));
+        verify(events, times(1)).publishEloUpdated(eq(2L), eq(1500), eq(1484), eq(42L), eq("PLATFORM"));
     }
 
     @Test

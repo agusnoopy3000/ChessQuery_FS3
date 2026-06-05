@@ -25,6 +25,11 @@ public record PlayerProfileResponse(
         Integer eloFideRapid,
         Integer eloFideBlitz,
         Integer eloPlatform,
+        // Ratings oficiales de Lichess por modalidad (sync por lichessUsername)
+        Integer eloLichessBullet,
+        Integer eloLichessBlitz,
+        Integer eloLichessRapid,
+        Integer eloLichessClassical,
         // Título vigente (null si no tiene)
         String currentTitle,
         Instant createdAt,

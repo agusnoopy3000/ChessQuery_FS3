@@ -22,6 +22,12 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
 
     Optional<Player> findByEmail(String email);
 
+    Optional<Player> findByLichessUsername(String lichessUsername);
+
+    /** Usernames de Lichess registrados (no nulos), para que ms-etl sincronice sus ratings. */
+    @Query("SELECT p.lichessUsername FROM Player p WHERE p.lichessUsername IS NOT NULL")
+    List<String> findAllLichessUsernames();
+
     @Query(value = """
             SELECT p.* FROM player p
             WHERE  LOWER(p.first_name || ' ' || p.last_name) =

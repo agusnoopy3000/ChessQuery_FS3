@@ -117,6 +117,10 @@ public class RatingUpdatedConsumer {
     private enum Result { UPDATED, CREATED, SKIPPED }
 
     private Result applyOne(Map<String, Object> p, String source) {
+        // Lichess: enriquece por lichess_username (no crea players: no hay identidad real).
+        if ("LICHESS".equalsIgnoreCase(source)) {
+            return applyLichess(p);
+        }
         String federationId = asString(p.get("federationId"));
         String fideId = asString(p.get("fideId"));
         String rut = asString(p.get("rut"));
@@ -141,6 +145,34 @@ public class RatingUpdatedConsumer {
             log.debug("INSERT colision para fed={} fide={} rut={}", federationId, fideId, rut);
             return Result.SKIPPED;
         }
+    }
+
+    /**
+     * Enriquecimiento Lichess: matchea por lichess_username y actualiza los
+     * ratings por modalidad. No crea players (un username no aporta identidad);
+     * solo enriquece a quien ya registró su usuario de Lichess en ChessQuery.
+     * No toca eloNational/eloFide/eloPlatform → sin colisiones entre fuentes.
+     */
+    private Result applyLichess(Map<String, Object> p) {
+        String username = asString(p.get("lichessUsername"));
+        if (username == null) return Result.SKIPPED;
+
+        Optional<Player> match = playerRepo.findByLichessUsername(username);
+        if (match.isEmpty()) return Result.SKIPPED;
+
+        Player player = match.get();
+        Integer bullet = asInt(p.get("eloLichessBullet"));
+        Integer blitz = asInt(p.get("eloLichessBlitz"));
+        Integer rapid = asInt(p.get("eloLichessRapid"));
+        Integer classical = asInt(p.get("eloLichessClassical"));
+        if (bullet != null && bullet > 0) player.setEloLichessBullet(bullet);
+        if (blitz != null && blitz > 0) player.setEloLichessBlitz(blitz);
+        if (rapid != null && rapid > 0) player.setEloLichessRapid(rapid);
+        if (classical != null && classical > 0) player.setEloLichessClassical(classical);
+        player.setEnrichmentSource("LICHESS");
+        player.setEnrichedAt(Instant.now());
+        playerRepo.save(player);
+        return Result.UPDATED;
     }
 
     private Optional<Player> lookup(

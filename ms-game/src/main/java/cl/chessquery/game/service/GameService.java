@@ -95,11 +95,14 @@ public class GameService {
         // 5. Publicar game.finished
         events.publishGameFinished(game);
 
-        // 6. Publicar elo.updated x2 (uno por jugador)
+        // 6. Publicar elo.updated x2 (uno por jugador).
+        //    Usamos ratingType PLATFORM: el ELO ganado jugando en ChessQuery se
+        //    refleja en eloPlatform y NO pisa el eloNational/eloFide que provee el
+        //    sync federativo (ETL). Cada fuente de rating mantiene su propio campo.
         events.publishEloUpdated(
-                req.whitePlayerId(), whiteEloBeforeVal, eloResult.whiteNewElo(), game.getId(), "NATIONAL");
+                req.whitePlayerId(), whiteEloBeforeVal, eloResult.whiteNewElo(), game.getId(), "PLATFORM");
         events.publishEloUpdated(
-                req.blackPlayerId(), blackEloBeforeVal, eloResult.blackNewElo(), game.getId(), "NATIONAL");
+                req.blackPlayerId(), blackEloBeforeVal, eloResult.blackNewElo(), game.getId(), "PLATFORM");
 
         log.info("Partida registrada: id={} {}-{} result={} whiteElo={}→{} blackElo={}→{}",
                 game.getId(), req.whitePlayerId(), req.blackPlayerId(), req.result(),

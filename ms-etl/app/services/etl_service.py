@@ -14,6 +14,7 @@ from app.sources.ajefech_mock import AjefechMockSource
 from app.sources.ajefech_real import AjefechRealSource
 from app.sources.chess_results_mock import ChessResultsMockSource
 from app.sources.lichess_mock import LichessMockSource
+from app.sources.lichess_real import LichessRealSource
 
 logger = logging.getLogger(__name__)
 
@@ -29,12 +30,15 @@ circuit_breakers: dict[str, CircuitBreaker] = {
 }
 
 AJEFECH_USE_MOCK = os.getenv("AJEFECH_USE_MOCK", "false").lower() == "true"
+# Lichess real solo cuando se habilita explícitamente (evita llamadas externas
+# por defecto y en tests). Con LICHESS_USE_MOCK=false usa la API pública real.
+LICHESS_USE_MOCK = os.getenv("LICHESS_USE_MOCK", "true").lower() == "true"
 
 sources = {
     "fide":          FideMockSource(),
     "ajefech":       AjefechMockSource() if AJEFECH_USE_MOCK else AjefechRealSource(),
     "chess_results": ChessResultsMockSource(),
-    "lichess":       LichessMockSource(),
+    "lichess":       LichessMockSource() if LICHESS_USE_MOCK else LichessRealSource(),
 }
 
 

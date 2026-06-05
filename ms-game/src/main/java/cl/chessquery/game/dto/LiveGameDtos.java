@@ -85,6 +85,7 @@ public final class LiveGameDtos {
             Instant finishedAt,
             Instant lastMoveAt,
             String detectedOpeningEco,
-            String detectedOpeningName
+            String detectedOpeningName,
+            Long tournamentPairingId
     ) {}
 }

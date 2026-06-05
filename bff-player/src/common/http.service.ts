@@ -14,7 +14,6 @@ export interface Upstreams {
   msTournament: string;
   msGame: string;
   msAnalytics: string;
-  msEtl: string;
   msNotifications: string;
 }
 
@@ -32,7 +31,6 @@ export class UpstreamHttpService {
       msTournament: this.config.get<string>('MS_TOURNAMENT_URL', 'http://ms-tournament:8082'),
       msGame: this.config.get<string>('MS_GAME_URL', 'http://ms-game:8083'),
       msAnalytics: this.config.get<string>('MS_ANALYTICS_URL', 'http://ms-analytics:8084'),
-      msEtl: this.config.get<string>('MS_ETL_URL', 'http://ms-etl:8086'),
       msNotifications: this.config.get<string>('MS_NOTIFICATIONS_URL', 'http://ms-notifications:8085'),
     };
   }
