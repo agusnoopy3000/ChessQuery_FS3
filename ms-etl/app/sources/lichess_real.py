@@ -45,10 +45,10 @@ def map_lichess_user(u: dict) -> dict:
 
     return {
         "lichessUsername": u.get("username") or u.get("id"),
-        "eloPlatformRapid": rating("rapid"),
-        "eloPlatformBlitz": rating("blitz"),
-        "eloPlatformBullet": rating("bullet"),
-        "eloPlatformClassical": rating("classical"),
+        "eloLichessRapid": rating("rapid"),
+        "eloLichessBlitz": rating("blitz"),
+        "eloLichessBullet": rating("bullet"),
+        "eloLichessClassical": rating("classical"),
         "totalGames": total,
         "source": "LICHESS",
     }

@@ -381,22 +381,30 @@ public class PlayerService {
 
     private int currentElo(Player p, RatingType type) {
         Integer v = switch (type) {
-            case NATIONAL      -> p.getEloNational();
-            case FIDE_STANDARD -> p.getEloFideStandard();
-            case FIDE_RAPID    -> p.getEloFideRapid();
-            case FIDE_BLITZ    -> p.getEloFideBlitz();
-            case PLATFORM      -> p.getEloPlatform();
+            case NATIONAL          -> p.getEloNational();
+            case FIDE_STANDARD     -> p.getEloFideStandard();
+            case FIDE_RAPID        -> p.getEloFideRapid();
+            case FIDE_BLITZ        -> p.getEloFideBlitz();
+            case PLATFORM          -> p.getEloPlatform();
+            case LICHESS_BULLET    -> p.getEloLichessBullet();
+            case LICHESS_BLITZ     -> p.getEloLichessBlitz();
+            case LICHESS_RAPID     -> p.getEloLichessRapid();
+            case LICHESS_CLASSICAL -> p.getEloLichessClassical();
         };
         return v != null ? v : 0;
     }
 
     private void applyElo(Player p, RatingType type, int value) {
         switch (type) {
-            case NATIONAL      -> p.setEloNational(value);
-            case FIDE_STANDARD -> p.setEloFideStandard(value);
-            case FIDE_RAPID    -> p.setEloFideRapid(value);
-            case FIDE_BLITZ    -> p.setEloFideBlitz(value);
-            case PLATFORM      -> p.setEloPlatform(value);
+            case NATIONAL          -> p.setEloNational(value);
+            case FIDE_STANDARD     -> p.setEloFideStandard(value);
+            case FIDE_RAPID        -> p.setEloFideRapid(value);
+            case FIDE_BLITZ        -> p.setEloFideBlitz(value);
+            case PLATFORM          -> p.setEloPlatform(value);
+            case LICHESS_BULLET    -> p.setEloLichessBullet(value);
+            case LICHESS_BLITZ     -> p.setEloLichessBlitz(value);
+            case LICHESS_RAPID     -> p.setEloLichessRapid(value);
+            case LICHESS_CLASSICAL -> p.setEloLichessClassical(value);
         }
     }
 

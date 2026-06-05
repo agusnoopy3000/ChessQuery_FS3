@@ -179,4 +179,60 @@ class RatingUpdatedConsumerTest {
 
         verify(playerRepo, never()).save(any());
     }
+
+    private static ChessEvent lichessEvent(String eventId, List<Map<String, Object>> players) {
+        ChessEvent e = new ChessEvent();
+        e.setEventId(eventId);
+        e.setEventType("rating.updated");
+        e.setTimestamp(Instant.now());
+        e.setPayload(Map.of("source", "LICHESS", "players", players));
+        return e;
+    }
+
+    private static Map<String, Object> lichessPayload(String username, Integer bullet,
+                                                      Integer blitz, Integer rapid, Integer classical) {
+        java.util.Map<String, Object> m = new java.util.HashMap<>();
+        m.put("lichessUsername", username);
+        m.put("eloLichessBullet", bullet);
+        m.put("eloLichessBlitz", blitz);
+        m.put("eloLichessRapid", rapid);
+        m.put("eloLichessClassical", classical);
+        m.put("source", "LICHESS");
+        return m;
+    }
+
+    @Test
+    void lichessMatchesByUsernameAndSetsRatingsWithoutTouchingOthers() {
+        Player existing = Player.builder()
+                .id(9L).firstName("Ana").lastName("López")
+                .lichessUsername("anita_cl").eloNational(1500)
+                .build();
+        when(playerRepo.findByLichessUsername("anita_cl")).thenReturn(Optional.of(existing));
+
+        consumer.onRatingUpdated(lichessEvent(UUID.randomUUID().toString(), List.of(
+                lichessPayload("anita_cl", 1800, 1750, 1700, 1650)
+        )));
+
+        ArgumentCaptor<Player> captor = ArgumentCaptor.forClass(Player.class);
+        verify(playerRepo).save(captor.capture());
+        Player saved = captor.getValue();
+        assertThat(saved.getEloLichessBullet()).isEqualTo(1800);
+        assertThat(saved.getEloLichessBlitz()).isEqualTo(1750);
+        assertThat(saved.getEloLichessRapid()).isEqualTo(1700);
+        assertThat(saved.getEloLichessClassical()).isEqualTo(1650);
+        assertThat(saved.getEnrichmentSource()).isEqualTo("LICHESS");
+        // No pisa el rating nacional ni otras fuentes
+        assertThat(saved.getEloNational()).isEqualTo(1500);
+    }
+
+    @Test
+    void lichessSkipsWhenUsernameNotRegistered() {
+        when(playerRepo.findByLichessUsername("ghost")).thenReturn(Optional.empty());
+
+        consumer.onRatingUpdated(lichessEvent(UUID.randomUUID().toString(), List.of(
+                lichessPayload("ghost", 1500, 1500, 1500, 1500)
+        )));
+
+        verify(playerRepo, never()).save(any());
+    }
 }

@@ -81,6 +81,19 @@ public class Player {
     @Column(name = "elo_platform")
     private Integer eloPlatform;
 
+    // Ratings de Lichess por modalidad (sync desde ms-etl, match por lichess_username).
+    @Column(name = "elo_lichess_bullet")
+    private Integer eloLichessBullet;
+
+    @Column(name = "elo_lichess_blitz")
+    private Integer eloLichessBlitz;
+
+    @Column(name = "elo_lichess_rapid")
+    private Integer eloLichessRapid;
+
+    @Column(name = "elo_lichess_classical")
+    private Integer eloLichessClassical;
+
     /** Fuente de la última enriquecimiento federado: AJEFECH, LICHESS, FIDE, null. */
     @Column(name = "enrichment_source", length = 20)
     private String enrichmentSource;
