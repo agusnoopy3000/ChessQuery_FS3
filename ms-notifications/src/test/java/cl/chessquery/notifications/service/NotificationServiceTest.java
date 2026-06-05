@@ -111,21 +111,22 @@ class NotificationServiceTest {
 
         // Assert
         ArgumentCaptor<NotificationLog> captor = ArgumentCaptor.forClass(NotificationLog.class);
-        verify(notificationLogRepo, times(2)).save(captor.capture());
+        verify(notificationLogRepo, times(1)).save(captor.capture()); // solo in-app, sin email
         NotificationLog saved = captor.getAllValues().get(0);
         assertThat(saved.getStatus()).isEqualTo(NotifStatus.SENT);
         assertThat(saved.getEventType()).isEqualTo("elo.updated");
         assertThat(saved.getRecipientId()).isEqualTo(12L);
+        verify(mockEmailService, never()).sendEmail(any(), anyString(), anyString(), anyString());
     }
 
     @Test
-    void notifyRegistration_persistsEmailAndInAppLog() {
+    void notifyRegistration_persistsInAppLogNoEmail() {
         when(notificationLogRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
         notificationService.notifyRegistration(Map.of(
                 "playerId", 5, "tournamentId", 1,
                 "tournamentName", "Magistral", "seedRating", 1500));
-        verify(notificationLogRepo, times(2)).save(any());
-        verify(mockEmailService).sendEmail(eq(5L), anyString(), anyString(), anyString());
+        verify(notificationLogRepo, times(1)).save(any()); // solo in-app
+        verify(mockEmailService, never()).sendEmail(any(), anyString(), anyString(), anyString());
     }
 
 
@@ -144,23 +145,25 @@ class NotificationServiceTest {
 
 
     @Test
-    void notifyRegistrationApproved_validPayload_sendsEmailAndInApp() {
+    void notifyRegistrationApproved_validPayload_savesInAppNoEmail() {
         when(notificationLogRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        ArgumentCaptor<NotificationLog> cap = ArgumentCaptor.forClass(NotificationLog.class);
         notificationService.notifyRegistrationApproved(Map.of(
                 "playerId", 5, "tournamentName", "Magistral"));
-        verify(notificationLogRepo, times(2)).save(any());
-        verify(mockEmailService).sendEmail(eq(5L), anyString(),
-                contains("aprobada"), anyString());
+        verify(notificationLogRepo, times(1)).save(cap.capture()); // solo in-app
+        assertThat(cap.getValue().getSubject()).contains("Aprobado");
+        verify(mockEmailService, never()).sendEmail(any(), anyString(), anyString(), anyString());
     }
 
     @Test
-    void notifyRegistrationRejected_withReason_includesReasonInBody() {
+    void notifyRegistrationRejected_withReason_includesReasonInApp() {
         when(notificationLogRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
         notificationService.notifyRegistrationRejected(Map.of(
                 "playerId", 5, "tournamentName", "X", "reason", "ELO bajo"));
-        ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
-        verify(mockEmailService).sendEmail(eq(5L), anyString(), anyString(), body.capture());
-        assertThat(body.getValue()).contains("ELO bajo");
+        ArgumentCaptor<NotificationLog> cap = ArgumentCaptor.forClass(NotificationLog.class);
+        verify(notificationLogRepo).save(cap.capture()); // solo in-app
+        assertThat(cap.getValue().getSubject()).contains("ELO bajo");
+        verify(mockEmailService, never()).sendEmail(any(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -197,9 +200,9 @@ class NotificationServiceTest {
         notificationService.notifyGameFinished(Map.of(
                 "whitePlayerId", 1, "blackPlayerId", 2,
                 "result", "1-0", "finalizedGameId", 99));
-        // 2 saves por jugador × 2 jugadores = 4
-        verify(notificationLogRepo, times(4)).save(any());
-        verify(mockEmailService, times(2)).sendEmail(any(), anyString(), anyString(), anyString());
+        // Solo in-app: 1 save por jugador × 2 jugadores = 2; sin email.
+        verify(notificationLogRepo, times(2)).save(any());
+        verify(mockEmailService, never()).sendEmail(any(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -209,9 +212,10 @@ class NotificationServiceTest {
         notificationService.notifyGameFinished(Map.of(
                 "whitePlayerId", 1, "blackPlayerId", 2,
                 "result", "1/2-1/2", "finalizedGameId", 1));
-        ArgumentCaptor<String> subj = ArgumentCaptor.forClass(String.class);
-        verify(mockEmailService, times(2)).sendEmail(any(), anyString(), subj.capture(), anyString());
-        assertThat(subj.getAllValues().get(0)).contains("Tablas");
+        ArgumentCaptor<NotificationLog> cap = ArgumentCaptor.forClass(NotificationLog.class);
+        verify(notificationLogRepo, times(2)).save(cap.capture()); // in-app, sin email
+        assertThat(cap.getAllValues().get(0).getSubject()).contains("Tablas");
+        verify(mockEmailService, never()).sendEmail(any(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -227,37 +231,24 @@ class NotificationServiceTest {
 
 
     @Test
-    void notifyRoundStarting_persistsLogAndEmail() {
-        when(notificationLogRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    void notifyRoundStarting_soloLogSinEmail() {
         notificationService.notifyRoundStarting(Map.of(
                 "tournamentId", 1, "roundNumber", 3, "pairingsCount", 7));
-        verify(notificationLogRepo, times(1)).save(any());
-        verify(mockEmailService).sendEmail(eq(1L), anyString(),
-                contains("ronda"), anyString());
+        // No envía email ni persiste log (los jugadores se enteran vía game.invitation).
+        verify(mockEmailService, never()).sendEmail(any(), anyString(), anyString(), anyString());
+        verify(notificationLogRepo, never()).save(any());
     }
 
     @Test
-    void notifySyncFailed_alertsAdminWithRecipientIdZero() {
-        // Arrange
+    void notifySyncFailed_soloLogSinEmail() {
         Map<String, Object> payload = Map.of(
-                "source",               "FIDE",
-                "status",               "FAILED",
-                "recordsProcessed",     0,
-                "recordsFailed",        0,
-                "durationMs",           500,
-                "circuitBreakerState",  "OPEN"
+                "source", "FIDE", "status", "FAILED",
+                "recordsProcessed", 0, "recordsFailed", 0,
+                "durationMs", 500, "circuitBreakerState", "OPEN"
         );
-        when(notificationLogRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        // Act
         notificationService.notifySyncFailed(payload);
-
-        // Assert — recipientId = 0 (admin)
-        ArgumentCaptor<NotificationLog> captor = ArgumentCaptor.forClass(NotificationLog.class);
-        verify(notificationLogRepo, times(1)).save(captor.capture());
-        NotificationLog saved = captor.getValue();
-        assertThat(saved.getStatus()).isEqualTo(NotifStatus.SENT);
-        assertThat(saved.getRecipientId()).isEqualTo(0L);
-        assertThat(saved.getSubject()).contains("ALERTA");
+        // Alerta ETL solo a log; sin email (los únicos correos son bienvenida e invitación).
+        verify(mockEmailService, never()).sendEmail(any(), anyString(), anyString(), anyString());
+        verify(notificationLogRepo, never()).save(any());
     }
 }

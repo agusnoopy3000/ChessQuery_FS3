@@ -38,12 +38,15 @@ public class NotificationService {
         String email       = (String) payload.get("email");
         String firstName   = (String) payload.get("firstName");
 
+        String greeting = (firstName != null && !firstName.isBlank()) ? firstName : "jugador";
         String subject = "¡Bienvenido a ChessQuery!";
         String body    = String.format(
-                "Hola %s, tu cuenta ha sido creada exitosamente. Email: %s",
-                firstName, email);
+                "Hola %s, tu cuenta fue creada exitosamente. ¡Bienvenido a ChessQuery!",
+                greeting);
 
-        mockEmailService.sendEmail(recipientId, email, subject, body);
+        if (email != null && !email.isBlank()) {
+            mockEmailService.sendEmail(recipientId, email, subject, body);
+        }
         saveLog(recipientId, Channel.EMAIL, "user.registered", subject, payload, NotifStatus.SENT);
         if (recipientId != null) {
             saveLog(recipientId, Channel.IN_APP, "user.registered",
@@ -67,10 +70,7 @@ public class NotificationService {
                 "Te has inscrito en %s con rating de seed %s.",
                 tournamentName, seedRating);
 
-        // En un sistema real se obtendría el email del jugador desde MS-Users.
-        // Aquí usamos el recipientId como identificador del destinatario.
-        mockEmailService.sendEmail(recipientId, "jugador-" + recipientId + "@chessquery.cl", subject, body);
-        saveLog(recipientId, Channel.EMAIL, "player.registered", subject, payload, NotifStatus.SENT);
+        // Solo notificación in-app (sin email; los únicos emails son bienvenida e invitación).
         saveLog(recipientId, Channel.IN_APP, "player.registered",
                 String.format("Estás inscrito en %s", tournamentName),
                 payload, NotifStatus.SENT);
@@ -111,8 +111,6 @@ public class NotificationService {
         String subject = "Tu inscripción fue aprobada";
         String body    = String.format("Tu inscripción al torneo %s fue aprobada. ¡Nos vemos pronto!",
                 tournamentName);
-        mockEmailService.sendEmail(recipientId, "jugador-" + recipientId + "@chessquery.cl", subject, body);
-        saveLog(recipientId, Channel.EMAIL, "registration.approved", subject, payload, NotifStatus.SENT);
         saveLog(recipientId, Channel.IN_APP, "registration.approved",
                 String.format("¡Aprobado! Estás dentro de %s", tournamentName),
                 payload, NotifStatus.SENT);
@@ -132,8 +130,6 @@ public class NotificationService {
         String reasonSuffix = (reason instanceof String s && !s.isBlank()) ? " — Motivo: " + s : "";
         String body = String.format("Tu inscripción al torneo %s fue rechazada por el organizador.%s",
                 tournamentName, reasonSuffix);
-        mockEmailService.sendEmail(recipientId, "jugador-" + recipientId + "@chessquery.cl", subject, body);
-        saveLog(recipientId, Channel.EMAIL, "registration.rejected", subject, payload, NotifStatus.SENT);
         saveLog(recipientId, Channel.IN_APP, "registration.rejected",
                 String.format("Inscripción rechazada en %s%s", tournamentName, reasonSuffix),
                 payload, NotifStatus.SENT);
@@ -193,8 +189,6 @@ public class NotificationService {
                 "Tu nuevo rating ELO es %s (antes: %s, cambio: %s).",
                 newElo, oldElo, delta);
 
-        mockEmailService.sendEmail(recipientId, "jugador-" + recipientId + "@chessquery.cl", subject, body);
-        saveLog(recipientId, Channel.EMAIL, "elo.updated", subject, payload, NotifStatus.SENT);
         saveLog(recipientId, Channel.IN_APP, "elo.updated",
                 String.format("ELO: %s → %s", oldElo, newElo),
                 payload, NotifStatus.SENT);
@@ -230,9 +224,6 @@ public class NotificationService {
         String body = String.format(
                 "Tu partida contra %s terminó: %s. Resultado %s.%s",
                 opponentName, outcome, result, pgnNote);
-        mockEmailService.sendEmail(recipientId,
-                "jugador-" + recipientId + "@chessquery.cl", subject, body);
-        saveLog(recipientId, Channel.EMAIL, "game.finished", subject, payload, NotifStatus.SENT);
         saveLog(recipientId, Channel.IN_APP, "game.finished", subject, payload, NotifStatus.SENT);
     }
 
@@ -268,13 +259,9 @@ public class NotificationService {
         Object roundNumber  = payload.get("roundNumber");
         Object tournamentId = payload.get("tournamentId");
 
-        String subject = "¡Tu ronda comienza pronto!";
-        String body    = String.format(
-                "La ronda %s del torneo %s está por comenzar.",
-                roundNumber, tournamentId);
-
-        mockEmailService.sendEmail(recipientId, "organizador-" + recipientId + "@chessquery.cl", subject, body);
-        saveLog(recipientId, Channel.EMAIL, "tournament.round.starting", subject, payload, NotifStatus.SENT);
+        // Sin email (los únicos correos son bienvenida e invitación). Solo log;
+        // a los jugadores se les notifica el inicio de ronda vía game.invitation.
+        log.info("tournament.round.starting: ronda {} del torneo {}", roundNumber, tournamentId);
     }
 
     /**
@@ -287,13 +274,10 @@ public class NotificationService {
         Long   adminId = 0L;
         Object source  = payload.get("source");
 
-        String subject = "ALERTA: Sincronización ETL fallida";
-        String body    = String.format(
-                "La sincronización de la fuente %s ha fallado. Estado del circuit breaker: %s",
+        // Sin email: alerta de ETL solo a log (los únicos correos son bienvenida e invitación).
+        log.warn("sync.completed FALLIDA: fuente={} circuitBreaker={}",
                 source, payload.get("circuitBreakerState"));
-
-        mockEmailService.sendEmail(adminId, "admin@chessquery.cl", subject, body);
-        saveLog(adminId, Channel.EMAIL, "sync.completed", subject, payload, NotifStatus.SENT);
+        if (adminId == null) return; // defensivo
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
