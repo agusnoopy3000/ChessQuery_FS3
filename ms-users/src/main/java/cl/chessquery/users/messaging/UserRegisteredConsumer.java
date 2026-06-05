@@ -58,6 +58,13 @@ public class UserRegisteredConsumer {
                 (String) payload.getOrDefault("lichessUsername", null),
                 (String) payload.getOrDefault("clubName", null)
         );
-        playerService.provisionBySupabaseId(req);
+        try {
+            playerService.provisionBySupabaseId(req);
+        } catch (Exception e) {
+            // No reencolar indefinidamente: un fallo de provisión no debe bloquear
+            // la cola y dejar sin perfil al resto de los usuarios. Se ackea y loguea.
+            log.error("user.registered: fallo provisionando supabaseUserId={}: {}",
+                    supabaseUserId, e.getMessage());
+        }
     }
 }
