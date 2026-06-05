@@ -22,7 +22,6 @@ describe('PlayerService', () => {
         msTournament: 'http://ms-tournament:8082',
         msGame: 'http://ms-game:8083',
         msAnalytics: 'http://ms-analytics:8084',
-        msEtl: 'http://ms-etl:8086',
         msNotifications: 'http://ms-notifications:8085',
       },
     };
