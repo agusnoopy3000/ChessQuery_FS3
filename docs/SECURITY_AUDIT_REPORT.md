@@ -107,7 +107,7 @@ endurecer ECS). La mayoría son **soluciones rápidas** de pocas horas.
 |---|----------|--------------|-----------|-------------|
 | H-01 | El BFF-Organizer no valida el rol; cualquier usuario logueado actúa como organizador | A01 | **Alta** | 8.1 |
 | H-02 | El rol se puede auto-asignar al registrarse (ORGANIZER/ADMIN) | A01 / A04 | **Alta** | 8.1 |
-| H-03 | Secretos por defecto conocidos (clave JWT y clave de webhook) | A02 / A07 | **Alta** (en prod) | 8.1 |
+| H-03 | Secretos por defecto conocidos (clave JWT y clave de webhook) | A02 / A07 | **Alta** (en prod) · 🛠️ parcial | 8.1 |
 | H-04 | Acciones de torneo sin verificar propiedad (IDOR entre organizadores) | A01 | **Media** | 6.5 |
 | H-05 | Los microservicios no se autentican entre sí (confían en headers) | A05 | **Media** | 5.8 |
 | H-06 | Spring Boot 3.2.4 / Spring Cloud 2023.0.1 fuera de soporte + CVEs | A06 | **Media** | 5.0 |
@@ -249,6 +249,28 @@ token = jwt.encode(
     }
 }
 ```
+
+> 🛠️ **Estado de remediación (2026-06-05) — parcial.**
+>
+> **Hecho (en código, sin AWS):** se agregó el guard de arranque en
+> `SupabaseJwtAuthFilter` (constructor). Si el perfil activo es `aws` (producción) **y**
+> el secreto empieza con `super-secret-jwt-token`, el gateway **aborta el arranque** con
+> un banner `ERROR` explicativo (visible en CloudWatch) + `IllegalStateException` que
+> indica qué variable setear. En perfil local el secreto de ejemplo se permite, para no
+> entorpecer el desarrollo. Cubierto por `SupabaseJwtAuthFilterSecretGuardTest` (5 tests:
+> bloqueo en `aws`, OK con secreto real en `aws`, OK en local, OK en otro perfil, OK por
+> el constructor de conveniencia). Los 34 tests del filtro siguen en verde.
+>
+> **Pendiente (requiere AWS):** confirmar/rotar en **AWS Secrets Manager** el valor real
+> del JWT secret del proyecto Supabase Cloud e inyectarlo vía la task definition. El guard
+> ahora **obliga** este paso: un deploy con el secreto de ejemplo no levantará el gateway.
+>
+> **Nota operativa:** si el despliegue vigente corre con el secreto de ejemplo, tras
+> mergear este cambio y redesplegar el gateway dejará de arrancar hasta setear el secreto
+> real — coordinar antes de redeploy.
+>
+> **Pendiente menor:** el `webhook-secret` por defecto (`dev-webhook-secret`) tiene el
+> mismo patrón y podría rechazarse con el mismo guard.
 
 ---
 

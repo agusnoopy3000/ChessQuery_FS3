@@ -11,8 +11,11 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.Locator;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.StandardEnvironment;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -71,6 +74,17 @@ public class SupabaseJwtAuthFilter implements GlobalFilter, Ordered {
     private static final String BEARER_PREFIX = "Bearer ";
 
     /**
+     * Prefijo del secreto JWT de ejemplo que publica Supabase en su documentación
+     * (entornos locales). Es público y conocido: si se usara para validar tokens
+     * en producción, cualquiera podría falsificar un token con rol ADMIN. Ver H-03
+     * del informe de seguridad.
+     */
+    private static final String DEFAULT_JWT_SECRET_PREFIX = "super-secret-jwt-token";
+
+    /** Perfil de Spring que indica despliegue real (AWS/producción). */
+    private static final String PRODUCTION_PROFILE = "aws";
+
+    /**
      * Rutas públicas que NO requieren autenticación JWT.
      * Incluye rutas de webhook (autenticadas por su propio mecanismo).
      */
@@ -108,14 +122,56 @@ public class SupabaseJwtAuthFilter implements GlobalFilter, Ordered {
 
     private final PlayerIdResolver playerIdResolver;
 
+    @Autowired
     public SupabaseJwtAuthFilter(
             @Value("${supabase.jwt-secret}") String jwtSecret,
             @Value("${supabase.url:http://host.docker.internal:54321}") String supabaseUrl,
+            Environment environment,
             PlayerIdResolver playerIdResolver) {
+        rejectDefaultSecretInProduction(jwtSecret, environment);
         this.hmacKey = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
         this.jwksUrl = supabaseUrl.replaceAll("/+$", "") + "/auth/v1/.well-known/jwks.json";
         this.playerIdResolver = playerIdResolver;
         log.info("SupabaseJwtAuthFilter initialized; jwks={}", jwksUrl);
+    }
+
+    /**
+     * Constructor de conveniencia para tests: usa un {@link StandardEnvironment}
+     * sin perfiles activos (equivale a ejecución local), por lo que el guard de
+     * producción nunca se dispara.
+     */
+    SupabaseJwtAuthFilter(String jwtSecret, String supabaseUrl, PlayerIdResolver playerIdResolver) {
+        this(jwtSecret, supabaseUrl, new StandardEnvironment(), playerIdResolver);
+    }
+
+    /**
+     * Aborta el arranque si se está usando el secreto JWT de ejemplo en un
+     * despliegue de producción (perfil {@code aws}). En local se permite, para
+     * no entorpecer el desarrollo. Mitiga H-03: con el secreto público cualquiera
+     * podría firmar un token válido con el rol que quisiera (incluido ADMIN).
+     */
+    private void rejectDefaultSecretInProduction(String jwtSecret, Environment environment) {
+        boolean isProduction = List.of(environment.getActiveProfiles()).contains(PRODUCTION_PROFILE);
+        boolean isDefaultSecret = jwtSecret != null && jwtSecret.startsWith(DEFAULT_JWT_SECRET_PREFIX);
+        if (isProduction && isDefaultSecret) {
+            String banner = """
+                    ====================================================================
+                    ⛔ ARRANQUE ABORTADO — SUPABASE_JWT_SECRET inseguro
+                    --------------------------------------------------------------------
+                    El perfil activo es de producción ('aws') pero el secreto JWT es el
+                    valor de EJEMPLO de Supabase (público y conocido). Con él, cualquiera
+                    podría falsificar tokens, incluido el rol ADMIN.
+
+                    Solución: definí la variable de entorno SUPABASE_JWT_SECRET con el
+                    JWT secret REAL del proyecto Supabase Cloud
+                    (Dashboard → Project Settings → API → JWT Secret), inyectado vía
+                    AWS Secrets Manager en la task definition.
+                    ====================================================================""";
+            log.error(banner);
+            throw new IllegalStateException(
+                    "SUPABASE_JWT_SECRET tiene el valor de ejemplo público en perfil de producción ('aws'): "
+                    + "configurá el secreto real del proyecto Supabase Cloud antes de desplegar (H-03).");
+        }
     }
 
     @PostConstruct
