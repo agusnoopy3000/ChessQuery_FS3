@@ -26,6 +26,7 @@ public class PlayerService {
     private final RatingHistoryRepository     historyRepo;
     private final PlayerTitleHistoryRepository titleRepo;
     private final EventPublisherService       events;
+    private final LichessClient               lichessClient;
 
     @PersistenceContext
     private EntityManager em;
@@ -379,6 +380,30 @@ public class PlayerService {
                         "Jugador con id " + id + " no encontrado"));
     }
 
+    /**
+     * Sincroniza los ratings oficiales de Lichess del jugador (por su
+     * lichessUsername) llamando a la API pública, y los persiste en eloLichess*.
+     * Si el jugador no tiene username, devuelve el perfil sin cambios.
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public PlayerProfileResponse syncLichess(Long id) {
+        Player p = findOrThrow(id);
+        if (!StringUtils.hasText(p.getLichessUsername())) {
+            return getProfile(id);
+        }
+        lichessClient.fetchRatings(p.getLichessUsername()).ifPresent(r -> {
+            if (r.bullet() != null)    p.setEloLichessBullet(r.bullet());
+            if (r.blitz() != null)     p.setEloLichessBlitz(r.blitz());
+            if (r.rapid() != null)     p.setEloLichessRapid(r.rapid());
+            if (r.classical() != null) p.setEloLichessClassical(r.classical());
+            p.setEnrichmentSource("LICHESS");
+            p.setEnrichedAt(java.time.Instant.now());
+            playerRepo.save(p);
+            log.info("Lichess sync ok para player {} ({})", id, p.getLichessUsername());
+        });
+        return getProfile(id);
+    }
+
     private int currentElo(Player p, RatingType type) {
         Integer v = switch (type) {
             case NATIONAL          -> p.getEloNational();
@@ -436,6 +461,10 @@ public class PlayerService {
                 p.getEloFideRapid(),
                 p.getEloFideBlitz(),
                 p.getEloPlatform(),
+                p.getEloLichessBullet(),
+                p.getEloLichessBlitz(),
+                p.getEloLichessRapid(),
+                p.getEloLichessClassical(),
                 title,
                 p.getCreatedAt(),
                 p.getUpdatedAt()

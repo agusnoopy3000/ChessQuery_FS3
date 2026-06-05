@@ -166,7 +166,8 @@ class UserControllerIntegrationTest {
                 "Metropolitana", "3600001", null, "rodrigo_chess", null, null,
                 new CountryDto(1, "CHL", "Chile", "CHI"),
                 new ClubDto(1, "Club de Ajedrez Lasker", "Santiago", "CL-LAS"),
-                2100, 2050, null, null, null, "FM",
+                2100, 2050, null, null, null,
+                1800, 1750, 1700, 1650, "FM",
                 Instant.now(), Instant.now()
         );
     }

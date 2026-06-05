@@ -24,6 +24,7 @@ export class PlayerController {
     return this.playerService.getDashboard(userId);
   }
 
+
   @Get('me/rating-chart')
   async myRatingChart(
     @Req() req: Request,

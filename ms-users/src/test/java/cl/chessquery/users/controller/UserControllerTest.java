@@ -36,7 +36,7 @@ class UserControllerTest {
     private PlayerProfileResponse sample(long id) {
         return new PlayerProfileResponse(id, "A", "B", "a@b.cl", null, null, null, null,
                 null, null, null, null, null, null, null, 1500, null, null, null, null,
-                null, Instant.now(), Instant.now());
+                null, null, null, null, null, Instant.now(), Instant.now());
     }
 
     @Test
