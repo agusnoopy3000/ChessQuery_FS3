@@ -2,12 +2,16 @@ package cl.chessquery.gateway.webhook;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.StandardEnvironment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -31,16 +35,67 @@ public class SupabaseWebhookController {
     private static final String EXCHANGE_NAME = "ChessEvents";
     private static final String ROUTING_KEY = "user.registered";
 
+    /**
+     * Secreto de webhook de ejemplo (público y conocido, está en el repo y la doc).
+     * Si se usara en producción, cualquiera podría forjar eventos user.registered.
+     * Ver H-03 del informe de seguridad.
+     */
+    private static final String DEFAULT_WEBHOOK_SECRET = "dev-webhook-secret";
+
+    /** Perfil de Spring que indica despliegue real (AWS/producción). */
+    private static final String PRODUCTION_PROFILE = "aws";
+
     private final RabbitTemplate rabbitTemplate;
     private final String expectedWebhookSecret;
 
+    @Autowired
     public SupabaseWebhookController(
             RabbitTemplate rabbitTemplate,
-            @Value("${supabase.webhook-secret}") String webhookSecret) {
+            @Value("${supabase.webhook-secret}") String webhookSecret,
+            Environment environment) {
+        rejectDefaultSecretInProduction(webhookSecret, environment);
         this.rabbitTemplate = rabbitTemplate;
         this.expectedWebhookSecret = webhookSecret;
         log.info("SupabaseWebhookController initialized for exchange={}, routingKey={}",
                 EXCHANGE_NAME, ROUTING_KEY);
+    }
+
+    /**
+     * Constructor de conveniencia para tests: usa un {@link StandardEnvironment}
+     * sin perfiles activos (equivale a ejecución local), por lo que el guard de
+     * producción nunca se dispara.
+     */
+    SupabaseWebhookController(RabbitTemplate rabbitTemplate, String webhookSecret) {
+        this(rabbitTemplate, webhookSecret, new StandardEnvironment());
+    }
+
+    /**
+     * Aborta el arranque si se está usando el secreto de webhook de ejemplo en un
+     * despliegue de producción (perfil {@code aws}). En local se permite, para no
+     * entorpecer el desarrollo. Mitiga H-03: con el secreto público cualquiera
+     * podría forjar eventos user.registered y provisionar usuarios basura.
+     */
+    private void rejectDefaultSecretInProduction(String webhookSecret, Environment environment) {
+        boolean isProduction = List.of(environment.getActiveProfiles()).contains(PRODUCTION_PROFILE);
+        boolean isDefaultSecret = DEFAULT_WEBHOOK_SECRET.equals(webhookSecret);
+        if (isProduction && isDefaultSecret) {
+            String banner = """
+                    ====================================================================
+                    ⛔ ARRANQUE ABORTADO — SUPABASE_WEBHOOK_SECRET inseguro
+                    --------------------------------------------------------------------
+                    El perfil activo es de producción ('aws') pero el secreto del webhook
+                    es el valor de EJEMPLO (público y conocido). Con él, cualquiera podría
+                    forjar eventos user.registered y provisionar usuarios basura.
+
+                    Solución: definí la variable de entorno SUPABASE_WEBHOOK_SECRET con un
+                    secreto fuerte (inyectado vía AWS Secrets Manager) y usá el MISMO valor
+                    en la función de Supabase que envía el webhook (ver migración 00005).
+                    ====================================================================""";
+            log.error(banner);
+            throw new IllegalStateException(
+                    "SUPABASE_WEBHOOK_SECRET tiene el valor de ejemplo público en perfil de producción ('aws'): "
+                    + "configurá un secreto fuerte y alinealo con Supabase antes de desplegar (H-03).");
+        }
     }
 
     /**

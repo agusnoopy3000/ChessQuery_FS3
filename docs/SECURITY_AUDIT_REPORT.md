@@ -252,25 +252,29 @@ token = jwt.encode(
 
 > 🛠️ **Estado de remediación (2026-06-05) — parcial.**
 >
-> **Hecho (en código, sin AWS):** se agregó el guard de arranque en
-> `SupabaseJwtAuthFilter` (constructor). Si el perfil activo es `aws` (producción) **y**
-> el secreto empieza con `super-secret-jwt-token`, el gateway **aborta el arranque** con
-> un banner `ERROR` explicativo (visible en CloudWatch) + `IllegalStateException` que
-> indica qué variable setear. En perfil local el secreto de ejemplo se permite, para no
-> entorpecer el desarrollo. Cubierto por `SupabaseJwtAuthFilterSecretGuardTest` (5 tests:
-> bloqueo en `aws`, OK con secreto real en `aws`, OK en local, OK en otro perfil, OK por
-> el constructor de conveniencia). Los 34 tests del filtro siguen en verde.
+> **Hecho (en código, sin AWS) — los DOS secretos:**
+> - **JWT secret** — guard en `SupabaseJwtAuthFilter` (constructor). Si el perfil activo es
+>   `aws` **y** el secreto empieza con `super-secret-jwt-token`, el gateway **aborta el
+>   arranque** con banner `ERROR` (visible en CloudWatch) + `IllegalStateException`
+>   accionable. Cubierto por `SupabaseJwtAuthFilterSecretGuardTest` (5 tests).
+> - **Webhook secret** — guard equivalente en `SupabaseWebhookController` (constructor):
+>   rechaza `dev-webhook-secret` bajo perfil `aws`. Cubierto por 3 tests nuevos en
+>   `SupabaseWebhookControllerTest`.
 >
-> **Pendiente (requiere AWS):** confirmar/rotar en **AWS Secrets Manager** el valor real
-> del JWT secret del proyecto Supabase Cloud e inyectarlo vía la task definition. El guard
-> ahora **obliga** este paso: un deploy con el secreto de ejemplo no levantará el gateway.
+> En perfil local ambos secretos de ejemplo se permiten, para no entorpecer el desarrollo.
 >
-> **Nota operativa:** si el despliegue vigente corre con el secreto de ejemplo, tras
-> mergear este cambio y redesplegar el gateway dejará de arrancar hasta setear el secreto
-> real — coordinar antes de redeploy.
+> **Pendiente (requiere AWS):**
+> - Confirmar/rotar en **AWS Secrets Manager** el JWT secret real del proyecto Supabase Cloud.
+> - Definir un **webhook secret fuerte** en Secrets Manager **y usar el MISMO valor** en la
+>   función de Supabase que envía el webhook (ver migración `00005`). Si quedan desalineados,
+>   los registros se degradan a la auto-provisión por JWT (no se rompen, pero el webhook da 401).
 >
-> **Pendiente menor:** el `webhook-secret` por defecto (`dev-webhook-secret`) tiene el
-> mismo patrón y podría rechazarse con el mismo guard.
+> El guard ahora **obliga** ambos pasos: un deploy con cualquiera de los secretos de ejemplo
+> no levantará el gateway.
+>
+> **Nota operativa:** si el despliegue vigente corre con secretos de ejemplo, tras mergear y
+> redesplegar el gateway dejará de arrancar hasta setear los secretos reales — coordinar
+> antes de redeploy.
 
 ---
 

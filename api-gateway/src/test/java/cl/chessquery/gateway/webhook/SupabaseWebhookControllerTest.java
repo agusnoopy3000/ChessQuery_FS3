@@ -116,4 +116,45 @@ class SupabaseWebhookControllerTest {
         ResponseEntity<Void> resp = c.handleUserRegistered(validPayload(), SECRET);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
     }
+
+    // --- Guard de arranque: rechazo del webhook-secret de ejemplo en producción (H-03) ---
+
+    private static final String DEFAULT_WEBHOOK_SECRET = "dev-webhook-secret";
+
+    @Test
+    @DisplayName("constructor_defaultSecretUnderAwsProfile_abortsStartup")
+    void constructor_defaultSecretUnderAwsProfile_abortsStartup() {
+        org.springframework.mock.env.MockEnvironment env =
+                new org.springframework.mock.env.MockEnvironment();
+        env.setActiveProfiles("aws");
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                new SupabaseWebhookController(rabbit, DEFAULT_WEBHOOK_SECRET, env))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("SUPABASE_WEBHOOK_SECRET");
+    }
+
+    @Test
+    @DisplayName("constructor_realSecretUnderAwsProfile_startsOk")
+    void constructor_realSecretUnderAwsProfile_startsOk() {
+        org.springframework.mock.env.MockEnvironment env =
+                new org.springframework.mock.env.MockEnvironment();
+        env.setActiveProfiles("aws");
+
+        org.assertj.core.api.Assertions.assertThatCode(() ->
+                new SupabaseWebhookController(rabbit, "un-secreto-webhook-real-y-fuerte-2026", env))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("constructor_defaultSecretLocalProfile_startsOk")
+    void constructor_defaultSecretLocalProfile_startsOk() {
+        // Sin perfiles activos = ejecución local: el secreto de ejemplo se permite.
+        org.springframework.mock.env.MockEnvironment env =
+                new org.springframework.mock.env.MockEnvironment();
+
+        org.assertj.core.api.Assertions.assertThatCode(() ->
+                new SupabaseWebhookController(rabbit, DEFAULT_WEBHOOK_SECRET, env))
+                .doesNotThrowAnyException();
+    }
 }
