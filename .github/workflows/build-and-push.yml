@@ -1,8 +1,10 @@
 name: Build & push images to ECR
 
 on:
-  push:
-    branches: [main]
+  # Disparo automático en push deshabilitado: las credenciales de AWS Academy rotan
+  # cada ~4h y no se pueden mantener frescas en GitHub Secrets, así que este job
+  # fallaba en cada push a main (ruido rojo). El deploy se hace manualmente desde
+  # local (scripts/build-push-ecr.sh). Queda disponible para correr a mano.
   workflow_dispatch:
     inputs:
       tag:
