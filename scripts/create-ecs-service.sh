@@ -30,7 +30,7 @@ ok(){ echo -e "  \033[0;32m✓ $*\033[0m"; }
 step "1/3 Render + registro de task-def ($SERVICE)"
 export ECR_REGISTRY IMAGE_TAG AWS_REGION TASK_EXECUTION_ROLE_ARN DB_HOST SUPABASE_URL \
        DB_PASSWORD_ARN RABBITMQ_PASSWORD_ARN SUPABASE_SERVICE_KEY_ARN JWT_SECRET_ARN \
-       SUPABASE_WEBHOOK_SECRET_ARN
+       SUPABASE_WEBHOOK_SECRET_ARN SMTP_USERNAME SMTP_PASSWORD_ARN GATEWAY_CORS_ALLOWED_ORIGINS
 rendered="/tmp/task-def-$SERVICE.json"
 envsubst < infrastructure/aws/task-definitions/chessquery-stack.template.json > "$rendered"
 TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "file://$rendered" \

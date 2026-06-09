@@ -13,6 +13,11 @@
 #       export SUPABASE_URL=https://<ref>.supabase.co
 #       export SUPABASE_SERVICE_KEY=<service_role key>
 #       export SUPABASE_JWT_SECRET=<Legacy JWT secret>
+#   - (Opcional) SMTP para correos de bienvenida/invitación (ms-notifications):
+#       export SMTP_USERNAME=<tu-email@gmail.com>
+#       export SMTP_PASSWORD=<App Password de Google, 16 chars>
+#     Si no se exportan, se guarda un placeholder y los correos fallan hasta
+#     poner el valor real (el resto de la app funciona igual).
 #
 # Uso:  bash scripts/setup-aws.sh
 set -euo pipefail
@@ -154,12 +159,19 @@ upsert_secret "$PROJECT/supabase-service-key"    "$SUPABASE_SERVICE_KEY"
 upsert_secret "$PROJECT/jwt-secret"              "$SUPABASE_JWT_SECRET"
 upsert_secret "$PROJECT/supabase-webhook-secret" "$WEBHOOK_SECRET"
 
+# SMTP (ms-notifications). Usa SMTP_PASSWORD del entorno si está; si no, reusa el
+# secreto ya guardado; y si tampoco existe, deja un placeholder (el task-def
+# registra igual, pero los correos fallan hasta poner la App Password real).
+SMTP_PASSWORD="${SMTP_PASSWORD:-$(aws secretsmanager get-secret-value --secret-id "$PROJECT/smtp-password" --query SecretString --output text 2>/dev/null || echo 'CHANGE_ME_SMTP_APP_PASSWORD')}"
+upsert_secret "$PROJECT/smtp-password"           "$SMTP_PASSWORD"
+
 # Resolver ARNs
 DB_PASSWORD_ARN=$(aws secretsmanager describe-secret --secret-id "$PROJECT/db-password" --query ARN --output text)
 RABBITMQ_PASSWORD_ARN=$(aws secretsmanager describe-secret --secret-id "$PROJECT/rabbitmq-password" --query ARN --output text)
 SUPABASE_SERVICE_KEY_ARN=$(aws secretsmanager describe-secret --secret-id "$PROJECT/supabase-service-key" --query ARN --output text)
 JWT_SECRET_ARN=$(aws secretsmanager describe-secret --secret-id "$PROJECT/jwt-secret" --query ARN --output text)
 SUPABASE_WEBHOOK_SECRET_ARN=$(aws secretsmanager describe-secret --secret-id "$PROJECT/supabase-webhook-secret" --query ARN --output text)
+SMTP_PASSWORD_ARN=$(aws secretsmanager describe-secret --secret-id "$PROJECT/smtp-password" --query ARN --output text)
 {
   echo "SUPABASE_URL=$SUPABASE_URL"
   echo "DB_PASSWORD_ARN=$DB_PASSWORD_ARN"
@@ -167,6 +179,8 @@ SUPABASE_WEBHOOK_SECRET_ARN=$(aws secretsmanager describe-secret --secret-id "$P
   echo "SUPABASE_SERVICE_KEY_ARN=$SUPABASE_SERVICE_KEY_ARN"
   echo "JWT_SECRET_ARN=$JWT_SECRET_ARN"
   echo "SUPABASE_WEBHOOK_SECRET_ARN=$SUPABASE_WEBHOOK_SECRET_ARN"
+  echo "SMTP_USERNAME=${SMTP_USERNAME:-}"
+  echo "SMTP_PASSWORD_ARN=$SMTP_PASSWORD_ARN"
 } >> "$OUT"
 
 # ─── 5. Resumen ──────────────────────────────────────────────────────────────
