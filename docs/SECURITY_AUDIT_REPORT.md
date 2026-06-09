@@ -107,7 +107,7 @@ endurecer ECS). La mayoría son **soluciones rápidas** de pocas horas.
 |---|----------|--------------|-----------|-------------|
 | H-01 | El BFF-Organizer no valida el rol; cualquier usuario logueado actúa como organizador | A01 | **Alta** | 8.1 |
 | H-02 | El rol se puede auto-asignar al registrarse (ORGANIZER/ADMIN) | A01 / A04 | **Alta** | 8.1 |
-| H-03 | Secretos por defecto conocidos (clave JWT y clave de webhook) | A02 / A07 | **Alta** (en prod) | 8.1 |
+| H-03 | Secretos por defecto conocidos (clave JWT y clave de webhook) | A02 / A07 | **Alta** (en prod) · 🛠️ parcial | 8.1 |
 | H-04 | Acciones de torneo sin verificar propiedad (IDOR entre organizadores) | A01 | **Media** | 6.5 |
 | H-05 | Los microservicios no se autentican entre sí (confían en headers) | A05 | **Media** | 5.8 |
 | H-06 | Spring Boot 3.2.4 / Spring Cloud 2023.0.1 fuera de soporte + CVEs | A06 | **Media** | 5.0 |
@@ -249,6 +249,32 @@ token = jwt.encode(
     }
 }
 ```
+
+> 🛠️ **Estado de remediación (2026-06-05) — parcial.**
+>
+> **Hecho (en código, sin AWS) — los DOS secretos:**
+> - **JWT secret** — guard en `SupabaseJwtAuthFilter` (constructor). Si el perfil activo es
+>   `aws` **y** el secreto empieza con `super-secret-jwt-token`, el gateway **aborta el
+>   arranque** con banner `ERROR` (visible en CloudWatch) + `IllegalStateException`
+>   accionable. Cubierto por `SupabaseJwtAuthFilterSecretGuardTest` (5 tests).
+> - **Webhook secret** — guard equivalente en `SupabaseWebhookController` (constructor):
+>   rechaza `dev-webhook-secret` bajo perfil `aws`. Cubierto por 3 tests nuevos en
+>   `SupabaseWebhookControllerTest`.
+>
+> En perfil local ambos secretos de ejemplo se permiten, para no entorpecer el desarrollo.
+>
+> **Pendiente (requiere AWS):**
+> - Confirmar/rotar en **AWS Secrets Manager** el JWT secret real del proyecto Supabase Cloud.
+> - Definir un **webhook secret fuerte** en Secrets Manager **y usar el MISMO valor** en la
+>   función de Supabase que envía el webhook (ver migración `00005`). Si quedan desalineados,
+>   los registros se degradan a la auto-provisión por JWT (no se rompen, pero el webhook da 401).
+>
+> El guard ahora **obliga** ambos pasos: un deploy con cualquiera de los secretos de ejemplo
+> no levantará el gateway.
+>
+> **Nota operativa:** si el despliegue vigente corre con secretos de ejemplo, tras mergear y
+> redesplegar el gateway dejará de arrancar hasta setear los secretos reales — coordinar
+> antes de redeploy.
 
 ---
 
