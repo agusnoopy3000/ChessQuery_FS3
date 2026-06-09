@@ -1,5 +1,15 @@
 # Despliegue ChessQuery en AWS — Qué se hizo (paso a paso)
 
+> ℹ️ **¿Cuál despliegue es este?** Hay **dos despliegues independientes** (uno por cuenta):
+> - **Este documento = despliegue ORIGINAL de _Agustín_** — cuenta `672782205900`,
+>   ALB `chessquery-alb-984810293...`, buckets `chessquery-chess-portal` / `-organizer-panel`.
+> - **Réplica de _Martin_** (cuenta propia `876204681432`) → ver
+>   [`DESPLIEGUE_REPLICA_AWS.md`](DESPLIEGUE_REPLICA_AWS.md): ALB `chessquery-alb-453727502...`,
+>   buckets `...-mmora`. Es un entorno **paralelo** con sus propios endpoints y su propio Supabase.
+>
+> La **arquitectura es idéntica** en ambos; solo cambian los endpoints/IDs por cuenta. Para
+> operar la réplica de Martin usá siempre el doc de la réplica, no este.
+
 > Documento de registro del despliegue real en AWS Academy (cuenta `672782205900`,
 > región `us-east-1`). Cubre: **cluster ECS**, **manejo de credenciales**,
 > **GitHub Actions** y **ECR**. Es el "cómo quedó" — para la guía operativa

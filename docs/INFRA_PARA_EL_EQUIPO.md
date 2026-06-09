@@ -72,6 +72,22 @@ necesitamos. Las cuentas y el login los maneja un servicio externo llamado **Sup
 
 Todo esto está en la región **EE.UU. Este (us-east-1)** de AWS.
 
+### ¿Está protegido? Los "guardias" de la red (Security Groups)
+
+Cada pieza tiene un **guardia en la puerta** (en AWS se llaman *Security Groups*) que decide
+**quién puede entrar y por dónde**. Están encadenados, como los controles de un edificio:
+
+| Guardia | Qué cuida | A quién deja pasar |
+|---|---|---|
+| Guardia del **ALB** | la puerta de entrada | a **cualquiera** de internet (es la entrada pública) |
+| Guardia del **servidor (ECS)** | la app | **solo al ALB** (nadie entra directo desde la calle) |
+| Guardia de la **base de datos (RDS)** | los datos | **solo al servidor** y a la PC del desarrollador |
+
+> En una frase: **internet solo puede tocar la puerta (ALB); la puerta es la única que habla con
+> la app; y la app es la única que habla con la base de datos.** Así, aunque alguien encuentre la
+> dirección de la base de datos, el guardia no lo deja entrar. (El detalle técnico con los números
+> de cada guardia está en `docs/DESPLIEGUE_REPLICA_AWS.md §1.1`.)
+
 ---
 
 ## 3. Los servicios del backend (qué hace cada uno)

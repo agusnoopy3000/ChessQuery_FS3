@@ -1,5 +1,10 @@
 # Despliegue de la réplica en AWS (cuenta propia)
 
+> ℹ️ **Este es el despliegue de _Martin_** (cuenta propia `876204681432`). El despliegue
+> **original es de _Agustín_** (cuenta `672782205900`) y está en
+> [`DESPLIEGUE_AWS_REALIZADO.md`](DESPLIEGUE_AWS_REALIZADO.md). Misma arquitectura, endpoints
+> distintos: **operá siempre con este doc**, no con el de Agustín.
+
 > Registro de la **réplica independiente** de ChessQuery levantada en una cuenta
 > AWS + Supabase **propia**, separada de la cuenta del despliegue original. Camino
 > usado: los scripts bash del repo (`setup-aws.sh` → `build-push-ecr.sh` →
@@ -40,6 +45,47 @@
 > Es **HTTP** (sin candado). El navegador puede avisar "no seguro": esperado en esta
 > etapa. El backend en `/` devuelve 404 (es una API, no un sitio); responde en rutas
 > como `/actuator/health/readiness`, `/auth/*`, `/api/*`, `/webhooks/*`.
+
+### 1.1 Red y Security Groups (cómo está protegido)
+
+Toda la infra vive en la **VPC default** `vpc-09d87e33242cc5a64` (`us-east-1`). El tráfico
+se controla con **3 Security Groups** (los "firewalls" por recurso). La idea de diseño es
+una **cadena**: internet solo entra por el ALB → el ALB es el único que habla con la task ECS
+→ la task es la única que habla con la RDS.
+
+| Security Group | ID | Protege | Regla de entrada (ingress) |
+|---|---|---|---|
+| `chessquery-alb-sg` | `sg-03a7938a6d1e3671f` | el **ALB** | TCP **80** desde `0.0.0.0/0` (internet) |
+| `chessquery-ecs-sg` | `sg-0b894230fdd04ecf4` | la **task ECS** (gateway :8080) | TCP **8080** desde el SG del ALB (`sg-03a7938a6d1e3671f`) |
+| `chessquery-rds-sg` | `sg-0fab20772139a82ac` | la **RDS** (Postgres :5432) | TCP **5432** desde la VPC (`172.31.0.0/16`) + la IP del dev (`179.60.74.4/32`) |
+
+```
+                80/tcp                 8080/tcp                 5432/tcp
+   🌐 internet ───────► [ALB SG] ───────────► [ECS SG] ───────────► [RDS SG]
+                       sg-03a793…           sg-0b8942…            sg-0fab20…
+                    (abierto al mundo)   (solo desde ALB SG)   (solo VPC + IP dev)
+```
+
+Detalles importantes:
+- **Por qué `8080 desde el SG del ALB` y no desde una IP:** referenciar el SG del ALB hace que
+  la regla siga funcionando aunque cambie la IP de la task o del ALB. Es la práctica correcta.
+- **La RDS es `PubliclyAccessible: true`** (para poder conectarse con `psql` desde la máquina del
+  dev en Academy), pero el SG solo deja entrar desde **la VPC** y **una IP concreta** — no está
+  abierta al mundo. Si cambia tu IP de casa, hay que actualizar el `/32` (ver abajo).
+- ✅ **Hardening aplicado (2026-06-09):** se **quitó** la regla vieja `8080 desde 0.0.0.0/0` del
+  `chessquery-ecs-sg`. Ahora el gateway **solo es accesible vía ALB** (no se puede saltar el ALB
+  pegándole directo por IP). Verificado: el ALB sigue respondiendo `UP`. Comando usado:
+  ```bash
+  aws ec2 revoke-security-group-ingress --group-id sg-0b894230fdd04ecf4 \
+    --protocol tcp --port 8080 --cidr 0.0.0.0/0
+  ```
+
+Actualizar tu IP en el SG de la RDS (si dejaste de conectar con `psql`):
+```bash
+MIIP=$(curl -s https://checkip.amazonaws.com)
+aws ec2 authorize-security-group-ingress --group-id sg-0fab20772139a82ac \
+  --protocol tcp --port 5432 --cidr "${MIIP}/32"
+```
 
 ---
 
