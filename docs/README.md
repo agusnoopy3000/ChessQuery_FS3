@@ -9,6 +9,7 @@ desde el [README raíz](../README.md).
 | [CONTEXT.md](./CONTEXT.md) | Contexto compartido: ERD, contratos REST, eventos RabbitMQ, formato JWT y convenciones de naming. |
 | [IMPLEMENTACION.md](./IMPLEMENTACION.md) | Documento de implementación: arquitectura general capa por capa. |
 | [ANALISIS_PATRONES.md](./ANALISIS_PATRONES.md) | 8 patrones de diseño + 6 arquitectónicos + arquetipo Maven (rúbrica 1, 2, 5, 6). |
+| [PLAN_LICHESS_Y_UX_EN_VIVO.md](./PLAN_LICHESS_Y_UX_EN_VIVO.md) | Diseño de la integración con la API de Lichess + mejoras de UX del tablero en vivo (inspiradas en en-croissant). |
 
 ## Setup y operación
 | Doc | Contenido |
@@ -17,6 +18,19 @@ desde el [README raíz](../README.md).
 | [PLAN_SUPABASE_CLOUD.md](./PLAN_SUPABASE_CLOUD.md) | Plan paso a paso para migrar de Supabase local a Supabase Cloud (managed) de cara al deploy. |
 | [README-WINDOWS.md](./README-WINDOWS.md) | Setup en Windows con `setup.ps1`. |
 | [SELF_HOSTED_RUNNER.md](./SELF_HOSTED_RUNNER.md) | Configurar el runner self-hosted de GitHub Actions para el CI. |
+| [OPERACION_DEMO.md](./OPERACION_DEMO.md) | Cheat-sheet de operación de la demo: encender/apagar el stack, usuarios y verificación. |
+| [ENDPOINTS_QA.md](./ENDPOINTS_QA.md) | Listado de endpoints de la plataforma para QA / pruebas manuales. |
+
+## Despliegue y AWS
+| Doc | Contenido |
+|---|---|
+| [INFRA_PARA_EL_EQUIPO.md](./INFRA_PARA_EL_EQUIPO.md) | Cómo está desplegado ChessQuery, explicado de forma simple para el equipo. |
+| [DESPLIEGUE_REPLICA_AWS.md](./DESPLIEGUE_REPLICA_AWS.md) | Despliegue y operación de la réplica en AWS (cuenta propia): encender/apagar, costos. |
+| [DESPLIEGUE_AWS_REALIZADO.md](./DESPLIEGUE_AWS_REALIZADO.md) | Bitácora paso a paso de lo que se hizo en el despliegue AWS. |
+| [FRONTEND_S3_Y_ALB.md](./FRONTEND_S3_Y_ALB.md) | Guía de implementación del frontend en S3 + ALB para el gateway. |
+| [PENDIENTE_HTTPS.md](./PENDIENTE_HTTPS.md) | Plan pendiente para habilitar HTTPS (CloudFront) en el frontend. |
+
+> Detalle de infraestructura ECS en [`infrastructure/aws/`](../infrastructure/aws/) (`DEPLOY_ECS.md`, `RUNBOOK_ECS.md`).
 
 ## Pruebas
 | Doc | Contenido |
@@ -30,7 +44,8 @@ desde el [README raíz](../README.md).
 ## Seguridad y cumplimiento
 | Doc | Contenido |
 |---|---|
-| [SECURITY_PLAN.md](./SECURITY_PLAN.md) | Auditoría de seguridad + plan priorizado (Supabase, API Gateway, microservicios). |
+| [SECURITY_AUDIT_REPORT.md](./SECURITY_AUDIT_REPORT.md) | Informe de auditoría de seguridad (hallazgos H-01..H-14). |
+| [SECURITY_PLAN.md](./SECURITY_PLAN.md) | Plan de hardening priorizado (Supabase, API Gateway, microservicios). |
 | [specs/SPEC_LEY21719.md](./specs/SPEC_LEY21719.md) | Cumplimiento de la Ley 21.719 (protección de datos personales). |
 
 ## Especificaciones
@@ -50,6 +65,3 @@ desde el [README raíz](../README.md).
 | Doc | Contenido |
 |---|---|
 | [MAGIC_LINK_LAN.md](./MAGIC_LINK_LAN.md) | Investigación + workaround del magic link de Supabase Auth sobre IP de LAN. |
-
----
-_Despliegue AWS: ver [`infrastructure/aws/`](../infrastructure/aws/) (`DEPLOY_ECS.md`, `RUNBOOK_ECS.md`)._
