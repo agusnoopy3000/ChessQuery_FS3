@@ -342,6 +342,19 @@ public class PlayerService {
             p.setRegion(req.region());
             changed.add("region");
         }
+        if (StringUtils.hasText(req.chesscomUsername())) {
+            String username = req.chesscomUsername().trim();
+            // Pre-chequeo de unicidad (mismo criterio que lichess_username en
+            // provision): si otro Player ya lo vinculó, 409 en vez de 500.
+            playerRepo.findByChesscomUsername(username)
+                    .filter(other -> !other.getId().equals(p.getId()))
+                    .ifPresent(other -> {
+                        throw new ApiException(409, "CHESSCOM_USERNAME_TAKEN",
+                                "Ese usuario de Chess.com ya está vinculado a otro jugador");
+                    });
+            p.setChesscomUsername(username);
+            changed.add("chesscomUsername");
+        }
 
         playerRepo.save(p);
 
@@ -475,6 +488,11 @@ public class PlayerService {
                 p.getEloLichessBlitz(),
                 p.getEloLichessRapid(),
                 p.getEloLichessClassical(),
+                p.getChesscomUsername(),
+                p.getEloChesscomBullet(),
+                p.getEloChesscomBlitz(),
+                p.getEloChesscomRapid(),
+                p.getEloChesscomDaily(),
                 title,
                 p.getCreatedAt(),
                 p.getUpdatedAt()

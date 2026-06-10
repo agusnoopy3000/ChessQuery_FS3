@@ -235,4 +235,62 @@ class RatingUpdatedConsumerTest {
 
         verify(playerRepo, never()).save(any());
     }
+
+    // ── CHESSCOM (mismo contrato que LICHESS: enriquece por username) ─────────
+
+    private static ChessEvent chesscomEvent(String eventId, List<Map<String, Object>> players) {
+        ChessEvent e = new ChessEvent();
+        e.setEventId(eventId);
+        e.setEventType("rating.updated");
+        e.setTimestamp(Instant.now());
+        e.setPayload(Map.of("source", "CHESSCOM", "players", players));
+        return e;
+    }
+
+    private static Map<String, Object> chesscomPayload(String username, Integer bullet,
+                                                       Integer blitz, Integer rapid, Integer daily) {
+        java.util.Map<String, Object> m = new java.util.HashMap<>();
+        m.put("chesscomUsername", username);
+        m.put("eloChesscomBullet", bullet);
+        m.put("eloChesscomBlitz", blitz);
+        m.put("eloChesscomRapid", rapid);
+        m.put("eloChesscomDaily", daily);
+        m.put("source", "CHESSCOM");
+        return m;
+    }
+
+    @Test
+    void chesscomMatchesByUsernameAndSetsRatingsWithoutTouchingOthers() {
+        Player existing = Player.builder()
+                .id(9L).firstName("Ana").lastName("López")
+                .chesscomUsername("anita_chesscom").eloNational(1500)
+                .build();
+        when(playerRepo.findByChesscomUsername("anita_chesscom")).thenReturn(Optional.of(existing));
+
+        consumer.onRatingUpdated(chesscomEvent(UUID.randomUUID().toString(), List.of(
+                chesscomPayload("anita_chesscom", 1900, 1850, 1800, 1600)
+        )));
+
+        ArgumentCaptor<Player> captor = ArgumentCaptor.forClass(Player.class);
+        verify(playerRepo).save(captor.capture());
+        Player saved = captor.getValue();
+        assertThat(saved.getEloChesscomBullet()).isEqualTo(1900);
+        assertThat(saved.getEloChesscomBlitz()).isEqualTo(1850);
+        assertThat(saved.getEloChesscomRapid()).isEqualTo(1800);
+        assertThat(saved.getEloChesscomDaily()).isEqualTo(1600);
+        assertThat(saved.getEnrichmentSource()).isEqualTo("CHESSCOM");
+        // No pisa el rating nacional ni otras fuentes
+        assertThat(saved.getEloNational()).isEqualTo(1500);
+    }
+
+    @Test
+    void chesscomSkipsWhenUsernameNotLinked() {
+        when(playerRepo.findByChesscomUsername("ghost")).thenReturn(Optional.empty());
+
+        consumer.onRatingUpdated(chesscomEvent(UUID.randomUUID().toString(), List.of(
+                chesscomPayload("ghost", 1500, 1500, 1500, 1500)
+        )));
+
+        verify(playerRepo, never()).save(any());
+    }
 }

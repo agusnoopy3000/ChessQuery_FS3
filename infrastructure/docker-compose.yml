@@ -358,6 +358,11 @@ services:
       REDIS_PORT: "6379"
       REDIS_PASSWORD: ${REDIS_PASSWORD:-chessquery_dev}
       MS_USERS_URL: http://ms-users:8081
+      # Fuentes online: con *_USE_MOCK=false pegan a la API pública real.
+      LICHESS_USE_MOCK: ${LICHESS_USE_MOCK:-true}
+      CHESSCOM_USE_MOCK: ${CHESSCOM_USE_MOCK:-true}
+      LICHESS_USERNAMES: ${LICHESS_USERNAMES:-}
+      CHESSCOM_USERNAMES: ${CHESSCOM_USERNAMES:-}
       ETL_FIDE_SHOULD_FAIL: ${ETL_FIDE_SHOULD_FAIL:-false}
       ETL_AJEFECH_SHOULD_FAIL: ${ETL_AJEFECH_SHOULD_FAIL:-false}
       ETL_LICHESS_SHOULD_FAIL: ${ETL_LICHESS_SHOULD_FAIL:-false}
