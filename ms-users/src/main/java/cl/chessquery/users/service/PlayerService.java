@@ -4,6 +4,7 @@ import cl.chessquery.users.dto.*;
 import cl.chessquery.users.entity.*;
 import cl.chessquery.users.exception.ApiException;
 import cl.chessquery.users.repository.*;
+import cl.chessquery.users.util.Emails;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
@@ -74,7 +75,7 @@ public class PlayerService {
                         .setParameter("id", req.id())
                         .setParameter("fn", StringUtils.hasText(req.firstName()) ? req.firstName() : "Jugador")
                         .setParameter("ln", StringUtils.hasText(req.lastName())  ? req.lastName()  : String.valueOf(req.id()))
-                        .setParameter("em", req.email())
+                        .setParameter("em", Emails.normalize(req.email()))
                         .setParameter("lu", StringUtils.hasText(req.lichessUsername()) ? req.lichessUsername().trim() : null)
                         .setParameter("ts", now)
                         .executeUpdate();
@@ -132,7 +133,7 @@ public class PlayerService {
     private void applyAuthFields(Player p, AuthSyncRequest req) {
         if (StringUtils.hasText(req.firstName())) p.setFirstName(req.firstName());
         if (StringUtils.hasText(req.lastName()))  p.setLastName(req.lastName());
-        if (StringUtils.hasText(req.email()) && p.getEmail() == null) p.setEmail(req.email());
+        if (StringUtils.hasText(req.email()) && p.getEmail() == null) p.setEmail(Emails.normalize(req.email()));
         if (StringUtils.hasText(req.lichessUsername()) && p.getLichessUsername() == null
                 && playerRepo.findByLichessUsername(req.lichessUsername().trim()).isEmpty()) {
             p.setLichessUsername(req.lichessUsername().trim());
@@ -172,6 +173,7 @@ public class PlayerService {
     @Transactional(noRollbackFor = org.springframework.dao.DataIntegrityViolationException.class)
     public PlayerProfileResponse provisionBySupabaseId(ProvisionPlayerRequest req) {
         UUID supabaseUserId = req.supabaseUserId();
+        String email = Emails.normalize(req.email());
 
         // 1. Idempotencia: ya existe Player con ese UUID → return as-is.
         Player existing = playerRepo.findBySupabaseUserId(supabaseUserId).orElse(null);
@@ -186,8 +188,8 @@ public class PlayerService {
                 : null;
 
         // 2. Match por email → asociar.
-        if (StringUtils.hasText(req.email())) {
-            Player byEmail = playerRepo.findByEmail(req.email()).orElse(null);
+        if (email != null) {
+            Player byEmail = playerRepo.findByEmail(email).orElse(null);
             if (byEmail != null) {
                 byEmail.setSupabaseUserId(supabaseUserId);
                 if (StringUtils.hasText(req.lichessUsername())
@@ -229,7 +231,7 @@ public class PlayerService {
         Player p = Player.builder()
                 .firstName(firstName)
                 .lastName(lastName)
-                .email(StringUtils.hasText(req.email()) ? req.email() : null)
+                .email(email)
                 .supabaseUserId(supabaseUserId)
                 .lichessUsername(lichess)
                 .club(club)
@@ -243,8 +245,8 @@ public class PlayerService {
                     supabaseUserId);
             em.clear();
             Player winner = playerRepo.findBySupabaseUserId(supabaseUserId)
-                    .or(() -> StringUtils.hasText(req.email())
-                            ? playerRepo.findByEmail(req.email())
+                    .or(() -> email != null
+                            ? playerRepo.findByEmail(email)
                             : java.util.Optional.empty())
                     .orElseThrow(() -> dup);
             String wTitle = titleRepo.findByPlayerIdAndIsCurrentTrue(winner.getId())
@@ -263,7 +265,7 @@ public class PlayerService {
         if (!StringUtils.hasText(email)) {
             throw new ApiException(400, "INVALID_EMAIL", "El parámetro 'email' es obligatorio");
         }
-        Player p = playerRepo.findByEmail(email.trim().toLowerCase())
+        Player p = playerRepo.findByEmail(Emails.normalize(email))
                 .orElseThrow(() -> new ApiException(404, "PLAYER_NOT_FOUND",
                         "Jugador con email " + email + " no encontrado"));
         String title = titleRepo.findByPlayerIdAndIsCurrentTrue(p.getId())
