@@ -98,9 +98,12 @@ export class OrganizerService {
   async join(tournamentId: string, userId: string, body: Record<string, unknown>) {
     const { msTournament } = this.http.urls;
     const payload = { ...body, playerId: body.playerId ?? Number(userId) };
+    // Con identidad de organizador: ms-tournament valida que el torneo sea
+    // suyo cuando inscribe a un jugador distinto de sí mismo.
     return this.http.post<unknown>(
       `${msTournament}/tournaments/${tournamentId}/registrations`,
       payload,
+      { headers: { 'X-User-Role': 'ORGANIZER', 'X-User-Id': userId } },
     );
   }
 
@@ -129,11 +132,12 @@ export class OrganizerService {
     );
   }
 
-  async patchPairingResult(pairingId: string, body: Record<string, unknown>) {
+  async patchPairingResult(pairingId: string, organizerId: string, body: Record<string, unknown>) {
     const { msTournament } = this.http.urls;
     return this.http.patch<unknown>(
       `${msTournament}/tournaments/pairings/${pairingId}/result`,
       body,
+      { headers: { 'X-User-Role': 'ORGANIZER', 'X-User-Id': organizerId } },
     );
   }
 

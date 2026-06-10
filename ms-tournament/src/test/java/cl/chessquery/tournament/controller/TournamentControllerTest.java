@@ -3,6 +3,7 @@ package cl.chessquery.tournament.controller;
 import cl.chessquery.tournament.dto.*;
 import cl.chessquery.tournament.entity.TournamentFormat;
 import cl.chessquery.tournament.entity.TournamentStatus;
+import cl.chessquery.tournament.exception.ApiException;
 import cl.chessquery.tournament.service.TournamentService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,7 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -129,14 +131,41 @@ class TournamentControllerTest {
     }
 
     @Test
-    @DisplayName("joinTournament_returns201")
+    @DisplayName("joinTournament_self_returns201")
     void joinTournament_returns201() throws Exception {
         when(service.joinTournament(eq(1L), eq(5L)))
                 .thenReturn(new RegistrationResponse(1L, 1L, 5L, "PENDING", 1500, Instant.now()));
         mvc.perform(post("/tournaments/1/registrations")
+                        .header("X-User-Role", "PLAYER")
+                        .header("X-User-Id", 5L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"playerId\":5}"))
                 .andExpect(status().isCreated());
+    }
+
+    @Test
+    @DisplayName("joinTournament_otherPlayerWithoutOrganizerRole_returns403")
+    void joinTournament_otherPlayerWithoutOrganizerRole_returns403() throws Exception {
+        // Un PLAYER no puede inscribir a un playerId distinto del suyo.
+        mvc.perform(post("/tournaments/1/registrations")
+                        .header("X-User-Role", "PLAYER")
+                        .header("X-User-Id", 9L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"playerId\":5}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("joinTournament_organizerOnForeignTournament_returns403")
+    void joinTournament_organizerOnForeignTournament_returns403() throws Exception {
+        doThrow(new ApiException(403, "FORBIDDEN", "no es tu torneo"))
+                .when(service).assertCanManage(eq(1L), eq(9L), eq(false));
+        mvc.perform(post("/tournaments/1/registrations")
+                        .header("X-User-Role", "ORGANIZER")
+                        .header("X-User-Id", 9L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"playerId\":5}"))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -194,14 +223,38 @@ class TournamentControllerTest {
     }
 
     @Test
-    @DisplayName("recordResult_returns200")
+    @DisplayName("recordResult_ownerOrganizer_returns200")
     void recordResult_returns200() throws Exception {
         when(service.recordResult(eq(1L), eq("1-0")))
                 .thenReturn(new PairingResponse(1L, 7L, 1L, 2L, "1-0", 1, null));
         mvc.perform(patch("/tournaments/pairings/1/result")
+                        .header("X-User-Role", "ORGANIZER")
+                        .header("X-User-Id", 9L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"result\":\"1-0\"}"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("recordResult_withoutRole_returns403")
+    void recordResult_withoutRole_returns403() throws Exception {
+        mvc.perform(patch("/tournaments/pairings/1/result")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"result\":\"1-0\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("recordResult_organizerOnForeignPairing_returns403")
+    void recordResult_organizerOnForeignPairing_returns403() throws Exception {
+        doThrow(new ApiException(403, "FORBIDDEN", "no es tu torneo"))
+                .when(service).assertCanManagePairing(eq(1L), eq(9L), eq(false));
+        mvc.perform(patch("/tournaments/pairings/1/result")
+                        .header("X-User-Role", "ORGANIZER")
+                        .header("X-User-Id", 9L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"result\":\"1-0\"}"))
+                .andExpect(status().isForbidden());
     }
 
     @Test
