@@ -95,6 +95,19 @@ class SupabaseJwtAuthFilterTest {
     }
 
     @Test
+    @DisplayName("filter_pathThatOnlySharesPrefixWithPublic_requiresAuth")
+    void filter_pathThatOnlySharesPrefixWithPublic_requiresAuth() {
+        // "/actuatorfoo" comparte prefijo de texto con "/actuator" pero NO es
+        // un segmento público: debe exigir token (401), no saltarse el auth.
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/actuatorfoo"));
+
+        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        verify(chain, never()).filter(exchange);
+    }
+
+    @Test
     @DisplayName("filter_missingAuthHeader_returns401")
     void filter_missingAuthHeader_returns401() {
         MockServerWebExchange exchange = MockServerWebExchange.from(
