@@ -8,7 +8,7 @@ router = APIRouter()
 
 @router.post("/sync/{source}", status_code=201)
 async def trigger_sync(source: str, db: Session = Depends(get_db)):
-    valid_sources = ["fide", "ajefech", "chess_results", "lichess"]
+    valid_sources = ["fide", "ajefech", "chess_results", "lichess", "chesscom"]
     if source not in valid_sources:
         raise HTTPException(status_code=400, detail=f"Invalid source. Valid: {valid_sources}")
     log = await etl_service.run_sync(source, db)
