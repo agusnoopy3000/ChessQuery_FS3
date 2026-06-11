@@ -395,6 +395,20 @@ El fix completo de estas 3 requiere `npm audit fix --force` (sube NestJS de majo
 romper los BFFs antes de v1. **Decisión:** corregir lo seguro ahora (axios) y agendar el bump de
 NestJS como tarea propia junto con la actualización de Spring de **H-06**.
 
+### OBS-02 · Longitud mínima de contraseña · ✅ RESUELTO (2026-06-11)
+
+Hallazgo del roadmap (T2): la política de contraseñas debía exigir **mínimo 8** caracteres.
+Verificado el 2026-06-11 en la réplica de Martin (`ChessQuery_DEMO_2`,
+`gagixvidkgjkgybqczyk`): el proyecto **hosted ya tiene `password_min_length = 8`**
+(confirmado vía Management API). El `supabase/config.toml` (dev local) estaba en 6 →
+**subido a 8** por consistencia. **Limpieza de usuarios de prueba:** no aplica en esta réplica
+(0 usuarios `smoke+*`/`webhooktest+*`; solo existen los usuarios reales del entorno).
+
+> Nota sobre **H-01/H-02** (rol auto-asignable desde `user_metadata`): tras el H-04 de Agustín
+> (autorización por propiedad en ms-tournament) el radio de daño bajó —un usuario solo opera
+> sus propios recursos—. Queda pendiente como decisión de producto el endurecer **ADMIN** para
+> que solo se reconozca desde `app_metadata` (no editable por el usuario). Ver §T2 del roadmap.
+
 ---
 
 ## 4. Priorización y esfuerzo estimado
