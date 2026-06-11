@@ -180,7 +180,7 @@ class PlayerServiceTest {
         @DisplayName("updateProfile_notFound_throws404")
         void updateProfile_notFound_throws404() {
             when(playerRepo.findById(1L)).thenReturn(Optional.empty());
-            UpdateProfileRequest req = new UpdateProfileRequest("A", "B", null, null);
+            UpdateProfileRequest req = new UpdateProfileRequest("A", "B", null, null, null);
             assertThatThrownBy(() -> service.updateProfile(1L, req))
                     .isInstanceOf(ApiException.class);
         }
@@ -191,7 +191,7 @@ class PlayerServiceTest {
             Player p = Player.builder().firstName("Old").lastName("Last").build();
             p.setId(1L);
             when(playerRepo.findById(1L)).thenReturn(Optional.of(p));
-            service.updateProfile(1L, new UpdateProfileRequest("New", "Name", null, null));
+            service.updateProfile(1L, new UpdateProfileRequest("New", "Name", null, null, null));
             assertThat(p.getFirstName()).isEqualTo("New");
             verify(events).publishUserUpdated(eq(1L), any());
         }
@@ -204,7 +204,7 @@ class PlayerServiceTest {
             when(playerRepo.findById(1L)).thenReturn(Optional.of(p));
             when(clubRepo.findById(99)).thenReturn(Optional.empty());
             assertThatThrownBy(() -> service.updateProfile(1L,
-                    new UpdateProfileRequest(null, null, 99, null)))
+                    new UpdateProfileRequest(null, null, 99, null, null)))
                     .isInstanceOf(ApiException.class)
                     .matches(e -> ((ApiException) e).getStatus() == 404);
         }
@@ -217,7 +217,7 @@ class PlayerServiceTest {
             when(playerRepo.findById(1L)).thenReturn(Optional.of(p));
             Club c = Club.builder().id(7).name("Club").build();
             when(clubRepo.findById(7)).thenReturn(Optional.of(c));
-            service.updateProfile(1L, new UpdateProfileRequest(null, null, 7, "Region"));
+            service.updateProfile(1L, new UpdateProfileRequest(null, null, 7, "Region", null));
             assertThat(p.getClub()).isSameAs(c);
             assertThat(p.getRegion()).isEqualTo("Region");
         }
@@ -228,7 +228,7 @@ class PlayerServiceTest {
             Player p = Player.builder().firstName("A").build();
             p.setId(1L);
             when(playerRepo.findById(1L)).thenReturn(Optional.of(p));
-            service.updateProfile(1L, new UpdateProfileRequest(null, null, null, null));
+            service.updateProfile(1L, new UpdateProfileRequest(null, null, null, null, null));
             verify(events, never()).publishUserUpdated(any(), any());
         }
     }

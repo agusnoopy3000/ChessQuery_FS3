@@ -117,7 +117,7 @@ class PlayerIntegrationTest {
     @DisplayName("PUT /users/{id}/profile actualiza nombre y región y persiste en H2")
     void updateProfile_validRequest_persistsChanges() throws Exception {
         UpdateProfileRequest req = new UpdateProfileRequest(
-                "Carlos", "López", null, "Valparaíso");
+                "Carlos", "López", null, "Valparaíso", null);
 
         mockMvc.perform(put("/users/{id}/profile", seededPlayer.getId())
                         .contentType(MediaType.APPLICATION_JSON)

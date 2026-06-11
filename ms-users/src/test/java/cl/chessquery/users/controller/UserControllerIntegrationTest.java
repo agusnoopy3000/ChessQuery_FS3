@@ -115,7 +115,7 @@ class UserControllerIntegrationTest {
 
     @Test
     void updateProfile_validRequest_returns200() throws Exception {
-        UpdateProfileRequest req = new UpdateProfileRequest("Carlos", "López", null, "Valparaíso");
+        UpdateProfileRequest req = new UpdateProfileRequest("Carlos", "López", null, "Valparaíso", null);
         PlayerProfileResponse updated = sampleProfile(4L, "Carlos", "López");
         when(playerService.updateProfile(eq(4L), any())).thenReturn(updated);
 
