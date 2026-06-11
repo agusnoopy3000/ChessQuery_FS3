@@ -119,6 +119,7 @@ endurecer ECS). La mayoría son **soluciones rápidas** de pocas horas.
 | H-12 | GitHub Actions sin fijar por SHA + runner self-hosted en PRs | A08 / ASI04 | **Baja** | 3.5 |
 | H-13 | Endurecimiento ECS pendiente (readonlyRootFilesystem, circuit breaker, rol mínimo) | A05 | **Baja** | 3.5 |
 | H-14 | Archivos `.env` de frontend en disco con la anon key (pública) | A05 | **Info** | — |
+| H-15 | Escaneo `npm audit` (T2): 0 críticas; axios y `ws` corregidos · 🛠️ parcial | A06 | **Baja** | 3.5 |
 
 ---
 
@@ -344,9 +345,10 @@ aceptado sin importar el emisor. **Solución:** `Jwts.parser().requireIssuer(<is
 credenciales `chessquery/chessquery_dev`. **Solución:** bindear a `127.0.0.1:15672`, credenciales
 fuertes vía `.env`, no exponer la consola en ECS.
 
-### H-11 · Dependencia `ws` con advisory · **BAJA** · A06
-`npm audit` (frontend) reporta `ws` (GHSA-58qx-3vcg-4xpx, severidad moderada). **Solución:**
-`npm audit fix`.
+### H-11 · Dependencia `ws` con advisory · **BAJA** · A06 · ✅ RESUELTO (2026-06-11)
+`npm audit` (frontend) reportaba `ws` (GHSA-58qx-3vcg-4xpx, severidad moderada). **Resuelto** con
+`npm audit fix` el 2026-06-11 (rama `fix/deps-audit-t2`): el frontend quedó en **0 vulnerabilidades
+de runtime**. Ver detalle del escaneo completo en **H-15**.
 
 ### H-12 · Supply chain de CI/CD · **BAJA** · A08 / ASI04
 Las GitHub Actions se referencian por tag móvil (`@v4`, `@v6`) en un runner **self-hosted**, y
@@ -367,6 +369,31 @@ Dockerfile ya corre como usuario `chessquery` (no root) — bien.
 segura para frontends y limitada por RLS) y URLs locales. Hoy **no** están trackeados en git
 (verificado). **Recomendación:** mantenerlos fuera de git y documentar que la anon key no es
 un secreto.
+
+### H-15 · Escaneo de dependencias npm (T2) · **BAJA** · A06 · 🛠️ parcial (2026-06-11)
+
+`npm audit` corrido el 2026-06-11 sobre los 3 BFFs y el frontend (rama `fix/deps-audit-t2`).
+**Resultado clave: cero vulnerabilidades CRÍTICAS de runtime** en los 4 proyectos. La mayoría de
+los hallazgos están en *devDependencies* (toolchain de NestJS/Angular CLI, `webpack`, `glob`,
+`tmp`, etc.) que corren en *build*, no en el contenedor desplegado.
+
+**Corregido (sin breaking changes):**
+- **`axios`** `1.15.2 → 1.17.0` en los 4 proyectos (NO_PROXY bypass con IPv6-mapped). Fix dentro
+  del major 1.x; solo cambiaron los `package-lock.json`. Suites verdes después: BFFs 82 tests,
+  frontend 75 tests (chess-portal 37 + organizer-panel 38).
+- **`ws`** del frontend (ver H-11): el frontend quedó en **0 vulnerabilidades de runtime**.
+
+**Highs de runtime restantes en los BFFs (justificadas, sin crítico):**
+
+| Paquete | Advisory | Por qué no nos pega hoy | Acción |
+|---|---|---|---|
+| `lodash` | Code injection vía `_.template` | Entra como dep **transitiva**; no usamos `_.template` con input de usuario | Diferir; se va con el bump de NestJS |
+| `multer` | DoS por *cleanup* incompleto | Los BFFs **no reciben uploads de archivos** vía multer | Diferir |
+| `@nestjs/platform-express` | Varios del ciclo NestJS | Framework; el fix completo exige **major de NestJS** | Coordinar con la actualización de framework (relac. **H-06**) |
+
+El fix completo de estas 3 requiere `npm audit fix --force` (sube NestJS de major), lo que puede
+romper los BFFs antes de v1. **Decisión:** corregir lo seguro ahora (axios) y agendar el bump de
+NestJS como tarea propia junto con la actualización de Spring de **H-06**.
 
 ---
 
