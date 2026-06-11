@@ -59,8 +59,13 @@ export class OrganizerController {
   }
 
   @Patch('pairings/:pid/result')
-  async patchResult(@Param('pid') pid: string, @Body() body: Record<string, unknown>) {
-    return this.organizerService.patchPairingResult(pid, body);
+  async patchResult(
+    @Req() req: Request,
+    @Param('pid') pid: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    const userId = getUserId(req);
+    return this.organizerService.patchPairingResult(pid, userId, body);
   }
 
   @Get('tournaments/:id/standings')

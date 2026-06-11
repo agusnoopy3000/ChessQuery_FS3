@@ -80,10 +80,7 @@ public class TournamentService {
     public void deleteTournament(Long tournamentId, Long requesterId, boolean isAdmin) {
         Tournament t = findOrThrow(tournamentId);
 
-        if (!isAdmin && (requesterId == null || !requesterId.equals(t.getOrganizerId()))) {
-            throw new ApiException(403, "FORBIDDEN",
-                    "Solo el organizador dueño del torneo puede eliminarlo");
-        }
+        assertOwnership(t, requesterId, isAdmin);
 
         if (!isAdmin && (t.getStatus() == TournamentStatus.IN_PROGRESS
                       || t.getStatus() == TournamentStatus.FINISHED)) {
@@ -613,6 +610,45 @@ public class TournamentService {
         return tournamentRepo.findById(id)
                 .orElseThrow(() -> new ApiException(404, "TOURNAMENT_NOT_FOUND",
                         "Torneo con id " + id + " no encontrado"));
+    }
+
+    // ── Autorización por propiedad (H-04) ────────────────────────────────────
+    //
+    // El rol (X-User-Role) viene del JWT y dice QUÉ puede hacer el usuario;
+    // estos checks validan SOBRE QUÉ torneo puede hacerlo: solo el organizador
+    // dueño (organizerId) o un ADMIN. El consumer interno de game.finished
+    // NO pasa por acá (llama recordResult(pairingId, result) directo).
+
+    /** Valida que requesterId sea el organizador dueño del torneo (o admin). */
+    @Transactional(readOnly = true)
+    public void assertCanManage(Long tournamentId, Long requesterId, boolean isAdmin) {
+        assertOwnership(findOrThrow(tournamentId), requesterId, isAdmin);
+    }
+
+    /** Igual que {@link #assertCanManage} pero partiendo de una inscripción. */
+    @Transactional(readOnly = true)
+    public void assertCanManageRegistration(Long registrationId, Long requesterId, boolean isAdmin) {
+        TournamentRegistration reg = registrationRepo.findById(registrationId)
+                .orElseThrow(() -> new ApiException(404, "REGISTRATION_NOT_FOUND",
+                        "Inscripción no encontrada: " + registrationId));
+        assertOwnership(reg.getTournament(), requesterId, isAdmin);
+    }
+
+    /** Igual que {@link #assertCanManage} pero partiendo de un emparejamiento. */
+    @Transactional(readOnly = true)
+    public void assertCanManagePairing(Long pairingId, Long requesterId, boolean isAdmin) {
+        TournamentPairing pairing = pairingRepo.findById(pairingId)
+                .orElseThrow(() -> new ApiException(404, "PAIRING_NOT_FOUND",
+                        "Emparejamiento con id " + pairingId + " no encontrado"));
+        assertOwnership(pairing.getRound().getTournament(), requesterId, isAdmin);
+    }
+
+    private void assertOwnership(Tournament t, Long requesterId, boolean isAdmin) {
+        if (isAdmin) return;
+        if (requesterId == null || !requesterId.equals(t.getOrganizerId())) {
+            throw new ApiException(403, "FORBIDDEN",
+                    "Solo el organizador dueño del torneo puede realizar esta acción");
+        }
     }
 
     private TournamentResponse toResponse(Tournament t) {

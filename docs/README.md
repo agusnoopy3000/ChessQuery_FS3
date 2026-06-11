@@ -19,6 +19,7 @@ desde el [README raíz](../README.md).
 | [README-WINDOWS.md](./README-WINDOWS.md) | Setup en Windows con `setup.ps1`. |
 | [SELF_HOSTED_RUNNER.md](./SELF_HOSTED_RUNNER.md) | Configurar el runner self-hosted de GitHub Actions para el CI. |
 | [OPERACION_DEMO.md](./OPERACION_DEMO.md) | Cheat-sheet de operación de la demo: encender/apagar el stack, usuarios y verificación. |
+| [ENDPOINTS.md](./ENDPOINTS.md) | Referencia en español de todas las rutas: qué hace cada una, quién la llama, headers y renombres propuestos. |
 | [ENDPOINTS_QA.md](./ENDPOINTS_QA.md) | Listado de endpoints de la plataforma para QA / pruebas manuales. |
 
 ## Despliegue y AWS

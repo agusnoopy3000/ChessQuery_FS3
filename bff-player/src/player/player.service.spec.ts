@@ -405,12 +405,15 @@ describe('PlayerService', () => {
       expect(r.status).toBe('CONFIRMED');
     });
 
-    it('registerToTournament POSTea con playerId numérico', async () => {
+    it('registerToTournament POSTea con playerId numérico y su identidad en headers', async () => {
       http.post.mockResolvedValue({ id: 1 });
       await service.registerToTournament('1', '5');
       expect(http.post).toHaveBeenCalledWith(
         'http://ms-tournament:8082/tournaments/1/registrations',
         { playerId: 5 },
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'X-User-Role': 'PLAYER', 'X-User-Id': '5' }),
+        }),
       );
     });
   });
