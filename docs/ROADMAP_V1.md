@@ -54,16 +54,23 @@
 >   usuario puede auto-asignarse **ADMIN**. Tras H-04 el daño se limita a lo propio, pero conviene
 >   **endurecer ADMIN** (que solo salga de `app_metadata`). Cambio chico en el gateway → coordinar
 >   con Agustín. ORGANIZER self-service queda como está (intencional para el demo).
-> - **T3 — ms-etl: maquinaria lista, falta desplegar en la réplica de Martin.** Agustín lo dejó
->   como **2º service ECS** (`chessquery-etl`, opción B/task aparte) con scripts y `docs/DESPLIEGUE_ETL.md`,
->   y lo probó en SU cuenta. En la réplica de Martin **todavía no está** (solo existe `chessquery-stack`).
->   ⚠️ **Trampa operativa:** Academy bloquea Service Discovery → el deploy hornea la **IP privada**
->   del stack; **cada apagado/encendido del stack obliga a re-correr `deploy-etl-service.sh`** o el
->   ETL falla en silencio (timeouts a RabbitMQ). Y es un **2º consumidor de créditos** → apagar
->   aparte (`update-service --service chessquery-etl --desired-count 0`).
-> - **T6 — bloqueo descubierto:** el **runner self-hosted está offline**, así que los checks de
->   cualquier PR quedan en `queued` para siempre (no fallan, no corren). Configurarlo bien es parte
->   de T6 y **desbloquea el gate de T1**.
+> - **T3 — ✅ HECHO en la réplica de Martin.** `ms-etl` desplegado como 2º service ECS
+>   (`chessquery-etl`, opción B) y **verificado e2e**: `POST /etl/sync/lichess` → SUCCESS (1 registro).
+>   Se encontró y arregló un bug (PR #32): `chesscom` faltaba en `valid_sources` del router.
+>   ⚠️ **Trampa operativa que queda:** Academy bloquea Service Discovery → el deploy hornea la **IP
+>   privada** del stack; **cada apagado/encendido del stack obliga a re-correr `deploy-etl-service.sh`**.
+>   El ETL es un **2º consumidor de créditos** → apagar aparte (`--service chessquery-etl --desired-count 0`).
+> - **T6 — bloqueos descubiertos:** (1) el **runner self-hosted está offline** → los checks de
+>   cualquier PR quedan en `queued` (no fallan, no corren); desbloquearlo habilita el gate de T1.
+>   (2) **Correos NO se envían:** la task-def de `ms-notifications` tiene `MAIL_FROM=""` → `setFrom("")`
+>   → JavaMail `Could not parse mail` → cae a log. **Fix pendiente:** desplegar con
+>   `MAIL_FROM=martindevalvarez@gmail.com` (Gmail exige From = cuenta autenticada). Fix durable de
+>   código: `from: ${MAIL_FROM:${SMTP_USERNAME:no-reply@chessquery.cl}}` en `application-aws.yml`.
+
+> **🌙 Cierre de jornada 2026-06-11:** se completó **T3** (ETL + fix #32) y **T5** (CloudWatch: logs+
+> retención, Container Insights, 5 alarmas, dashboard `ChessQuery-Replica`, doc `CLOUDWATCH_REPLICA.md`).
+> **T2** quedó casi cerrado (PRs #29, #30 mergeados). Infra AWS **apagada** al cerrar. Próximo:
+> el fix de correos (T6) en un próximo encendido, y lo de Agustín (H-06, ADMIN, gate de T1).
 
 ---
 
@@ -113,10 +120,10 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ hecho · ⏸️ diferido — *ir 
 | 🧪 **T1** | Pruebas unitarias → **80% + gate en CI** | 🆕 Paso 0: la suite debe correr **en Docker** antes de arrancar | **P0** | 6–8 | 🟨 línea base verde en Docker; core casi 80% (ms-users 78%); gate bloqueado por runner (T6) |
 | 🔒 **T2** | **Seguridad** + hardening | Cerrar SG 8080, deps, secrets, H-01/H-02 | **P0** | 3 | 🟨 casi cerrado (H-04 ✅, SG ✅, deps PR#29 ✅, OBS-02 PR#30 ✅); falta H-06/H-07 + decisión ADMIN |
 | 🎤 **T8** | 🆕 **Ensayo final + informe + presentación** | Recorrido completo del front pre-entrega; presentación pensada para quien no conoce la app | **P0** | 1.5–2 | ⬜ |
-| 🧩 **T3** | **Integrar `ms-etl`** en AWS | Deploy (límite 10 contenedores) + migraciones + tests + e2e | **P1** | 3 | 🟨 maquinaria lista + desplegado en cuenta de Agustín; **falta desplegar+e2e en la réplica de Martin** (ver trampa de la IP) |
+| 🧩 **T3** | **Integrar `ms-etl`** en AWS | Deploy (límite 10 contenedores) + migraciones + tests + e2e | **P1** | 3 | ✅ **HECHO (11-jun):** desplegado y verificado e2e en la réplica de Martin (Lichess SUCCESS) + fix de chesscom (PR #32) |
 | 🧩 **T4** | **QA funcional** paneles organizador | 🆕 Caso explícito: un organizador **no** modifica torneos de otro (UI + API) | **P1** | 2 | 🟨 caso de aislamiento blindado por H-04; falta el QA manual (UI + API) |
-| 👁️ **T5** | **CloudWatch** | Logs + métricas + alarmas + dashboard | **P2** | 2 | ⬜ |
-| ⚙️ **T6** | **CI/CD real** + operación | Runner self-hosted · 🆕 probar correos en la réplica AWS de Martin · backups RDS | **P2** | 2 | ⬜ runner self-hosted **offline** → checks en cola; desbloquea el gate de T1 |
+| 👁️ **T5** | **CloudWatch** | Logs + métricas + alarmas + dashboard | **P2** | 2 | 🟢 **montado (11-jun):** logs+retención, Container Insights, 5 alarmas, dashboard `ChessQuery-Replica`, doc `CLOUDWATCH_REPLICA.md`; falta opcional SNS+mail |
+| ⚙️ **T6** | **CI/CD real** + operación | Runner self-hosted · 🆕 probar correos en la réplica AWS de Martin · backups RDS | **P2** | 2 | 🟨 runner **offline** (checks en cola); **correos diagnosticados:** `MAIL_FROM=""` → no envía, fix pendiente; backups RDS pendiente |
 | 🔐 **T7** | HTTPS | Plan en `PENDIENTE_HTTPS.md`; bloqueado por dominio | **P3** | 1–4 | ⏸️ |
 
 > P0–P2 suman ~20–22 días-dev sobre ~16 disponibles ⇒ **hay que paralelizar y recortar alcance**
