@@ -42,6 +42,29 @@
 > - Nueva sección **§6 Backlog de ideas** (menú de configuración de usuario, temas de tablero) — post-v1, sin compromiso.
 > - "CI/CD pipeline" e "integrar ETL" ya estaban cubiertos (T6 y T3); no se duplican.
 
+> **📌 Actualización 2026-06-11 (sesión de Martin — estado real tras el trabajo de Agustín):**
+> El código está **mejor de lo que el roadmap asumía**. Resumen de avances y hallazgos:
+> - **T2 casi cerrado:** **H-04 hecho** por Agustín (autorización por propiedad en TODAS las
+>   escrituras de ms-tournament, commit `9864a8d`). **SG 8080 ya estaba cerrado** (solo ALB).
+>   **Deps escaneadas:** 0 críticas, `axios` bumpeado (PR #29, mergeado). **OBS-02 cerrado:**
+>   pass length hosted ya en 8 + `config.toml` local a 8 (PR #30, mergeado); **0 test users** que
+>   limpiar en la réplica. *Falta de T2:* **H-06** (bump Spring/NestJS, arrastra 3 highs de los
+>   BFFs) y **H-07** (Trivy, va con T6).
+> - **Decisión pendiente (H-01/H-02):** el gateway saca el rol de `user_metadata` (editable) → un
+>   usuario puede auto-asignarse **ADMIN**. Tras H-04 el daño se limita a lo propio, pero conviene
+>   **endurecer ADMIN** (que solo salga de `app_metadata`). Cambio chico en el gateway → coordinar
+>   con Agustín. ORGANIZER self-service queda como está (intencional para el demo).
+> - **T3 — ms-etl: maquinaria lista, falta desplegar en la réplica de Martin.** Agustín lo dejó
+>   como **2º service ECS** (`chessquery-etl`, opción B/task aparte) con scripts y `docs/DESPLIEGUE_ETL.md`,
+>   y lo probó en SU cuenta. En la réplica de Martin **todavía no está** (solo existe `chessquery-stack`).
+>   ⚠️ **Trampa operativa:** Academy bloquea Service Discovery → el deploy hornea la **IP privada**
+>   del stack; **cada apagado/encendido del stack obliga a re-correr `deploy-etl-service.sh`** o el
+>   ETL falla en silencio (timeouts a RabbitMQ). Y es un **2º consumidor de créditos** → apagar
+>   aparte (`update-service --service chessquery-etl --desired-count 0`).
+> - **T6 — bloqueo descubierto:** el **runner self-hosted está offline**, así que los checks de
+>   cualquier PR quedan en `queued` para siempre (no fallan, no corren). Configurarlo bien es parte
+>   de T6 y **desbloquea el gate de T1**.
+
 ---
 
 ## 1. ¿Qué convierte una demo en "producto v1"?
@@ -87,13 +110,13 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ hecho · ⏸️ diferido — *ir 
 
 | # | Tarea | Incluye | Prioridad | Días-dev | Estado |
 |---|---|---|---|---|---|
-| 🧪 **T1** | Pruebas unitarias → **80% + gate en CI** | 🆕 Paso 0: la suite debe correr **en Docker** antes de arrancar | **P0** | 6–8 | ⬜ |
-| 🔒 **T2** | **Seguridad** + hardening | Cerrar SG 8080, deps, secrets, H-01/H-02 | **P0** | 3 | ⬜ |
+| 🧪 **T1** | Pruebas unitarias → **80% + gate en CI** | 🆕 Paso 0: la suite debe correr **en Docker** antes de arrancar | **P0** | 6–8 | 🟨 línea base verde en Docker; core casi 80% (ms-users 78%); gate bloqueado por runner (T6) |
+| 🔒 **T2** | **Seguridad** + hardening | Cerrar SG 8080, deps, secrets, H-01/H-02 | **P0** | 3 | 🟨 casi cerrado (H-04 ✅, SG ✅, deps PR#29 ✅, OBS-02 PR#30 ✅); falta H-06/H-07 + decisión ADMIN |
 | 🎤 **T8** | 🆕 **Ensayo final + informe + presentación** | Recorrido completo del front pre-entrega; presentación pensada para quien no conoce la app | **P0** | 1.5–2 | ⬜ |
-| 🧩 **T3** | **Integrar `ms-etl`** en AWS | Deploy (límite 10 contenedores) + migraciones + tests + e2e | **P1** | 3 | ⬜ |
-| 🧩 **T4** | **QA funcional** paneles organizador | 🆕 Caso explícito: un organizador **no** modifica torneos de otro (UI + API) | **P1** | 2 | ⬜ |
+| 🧩 **T3** | **Integrar `ms-etl`** en AWS | Deploy (límite 10 contenedores) + migraciones + tests + e2e | **P1** | 3 | 🟨 maquinaria lista + desplegado en cuenta de Agustín; **falta desplegar+e2e en la réplica de Martin** (ver trampa de la IP) |
+| 🧩 **T4** | **QA funcional** paneles organizador | 🆕 Caso explícito: un organizador **no** modifica torneos de otro (UI + API) | **P1** | 2 | 🟨 caso de aislamiento blindado por H-04; falta el QA manual (UI + API) |
 | 👁️ **T5** | **CloudWatch** | Logs + métricas + alarmas + dashboard | **P2** | 2 | ⬜ |
-| ⚙️ **T6** | **CI/CD real** + operación | Runner self-hosted · 🆕 probar correos en la réplica AWS de Martin · backups RDS | **P2** | 2 | ⬜ |
+| ⚙️ **T6** | **CI/CD real** + operación | Runner self-hosted · 🆕 probar correos en la réplica AWS de Martin · backups RDS | **P2** | 2 | ⬜ runner self-hosted **offline** → checks en cola; desbloquea el gate de T1 |
 | 🔐 **T7** | HTTPS | Plan en `PENDIENTE_HTTPS.md`; bloqueado por dominio | **P3** | 1–4 | ⏸️ |
 
 > P0–P2 suman ~20–22 días-dev sobre ~16 disponibles ⇒ **hay que paralelizar y recortar alcance**
