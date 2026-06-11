@@ -395,7 +395,12 @@ public class SupabaseJwtAuthFilter implements GlobalFilter, Ordered {
     }
 
     private boolean isPublicPath(String path) {
-        return PUBLIC_PATHS.stream().anyMatch(path::startsWith);
+        // Match por segmento, no por prefijo de texto: "/actuator" habilita
+        // "/actuator" y "/actuator/health", pero NO "/actuatorfoo".
+        return PUBLIC_PATHS.stream().anyMatch(pub -> {
+            String base = pub.endsWith("/") ? pub.substring(0, pub.length() - 1) : pub;
+            return path.equals(base) || path.startsWith(base + "/");
+        });
     }
 
     private Mono<Void> unauthorized(ServerWebExchange exchange, String message) {

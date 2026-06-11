@@ -32,10 +32,7 @@ public class TournamentController {
             @RequestHeader(value = "X-User-Role", required = false) String userRole,
             @RequestHeader(value = "X-User-Id", required = false) Long userId) {
 
-        if (!"ORGANIZER".equalsIgnoreCase(userRole) && !"ADMIN".equalsIgnoreCase(userRole)) {
-            throw new ApiException(403, "FORBIDDEN",
-                    "Solo los organizadores pueden crear torneos");
-        }
+        requireOrganizerRole(userRole, "Solo los organizadores pueden crear torneos");
 
         Long organizerId = userId != null ? userId
                 : (request.organizerId() != null ? request.organizerId() : null);
@@ -77,39 +74,44 @@ public class TournamentController {
             @RequestHeader(value = "X-User-Role", required = false) String userRole,
             @RequestHeader(value = "X-User-Id", required = false) Long userId) {
 
-        if (!"ORGANIZER".equalsIgnoreCase(userRole) && !"ADMIN".equalsIgnoreCase(userRole)) {
-            throw new ApiException(403, "FORBIDDEN",
-                    "Solo los organizadores pueden eliminar torneos");
-        }
-        boolean isAdmin = "ADMIN".equalsIgnoreCase(userRole);
-        tournamentService.deleteTournament(id, userId, isAdmin);
+        requireOrganizerRole(userRole, "Solo los organizadores pueden eliminar torneos");
+        tournamentService.deleteTournament(id, userId, isAdmin(userRole));
     }
 
     // ── Transición de estado ──────────────────────────────────────────────────
 
-    @Operation(summary = "Cambiar el estado del torneo (DRAFT→OPEN→IN_PROGRESS→FINISHED)")
+    @Operation(summary = "Cambiar el estado del torneo (DRAFT→OPEN→IN_PROGRESS→FINISHED). " +
+            "Solo el organizador dueño o un admin.")
     @PatchMapping("/{id}/status")
     public TournamentResponse transitionStatus(
             @PathVariable Long id,
             @Valid @RequestBody StatusTransitionRequest request,
-            @RequestHeader(value = "X-User-Role", required = false) String userRole) {
+            @RequestHeader(value = "X-User-Role", required = false) String userRole,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
 
-        if (!"ORGANIZER".equalsIgnoreCase(userRole) && !"ADMIN".equalsIgnoreCase(userRole)) {
-            throw new ApiException(403, "FORBIDDEN",
-                    "Solo los organizadores pueden cambiar el estado del torneo");
-        }
-
+        requireOrganizerRole(userRole, "Solo los organizadores pueden cambiar el estado del torneo");
+        tournamentService.assertCanManage(id, userId, isAdmin(userRole));
         return tournamentService.transitionStatus(id, request.newStatus());
     }
 
     // ── Inscripciones ─────────────────────────────────────────────────────────
 
-    @Operation(summary = "Inscribir jugador en el torneo")
+    @Operation(summary = "Inscribir jugador en el torneo. Un jugador solo puede inscribirse " +
+            "a sí mismo; inscribir a terceros requiere ser el organizador dueño (o admin).")
     @PostMapping("/{id}/registrations")
     @ResponseStatus(HttpStatus.CREATED)
     public RegistrationResponse joinTournament(
             @PathVariable Long id,
-            @Valid @RequestBody JoinTournamentRequest request) {
+            @Valid @RequestBody JoinTournamentRequest request,
+            @RequestHeader(value = "X-User-Role", required = false) String userRole,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+
+        boolean self = userId != null && userId.equals(request.playerId());
+        if (!self) {
+            requireOrganizerRole(userRole,
+                    "Solo puedes inscribirte a ti mismo; inscribir a otro jugador requiere ser organizador");
+            tournamentService.assertCanManage(id, userId, isAdmin(userRole));
+        }
         return tournamentService.joinTournament(id, request.playerId());
     }
 
@@ -119,47 +121,44 @@ public class TournamentController {
         return tournamentService.listRegistrations(id);
     }
 
-    @Operation(summary = "Aprobar una inscripción PENDING (organizador)")
+    @Operation(summary = "Aprobar una inscripción PENDING (solo el organizador dueño o admin)")
     @PatchMapping("/registrations/{registrationId}/approve")
     public RegistrationResponse approveRegistration(
             @PathVariable Long registrationId,
-            @RequestHeader(value = "X-User-Role", required = false) String userRole) {
-        if (!"ORGANIZER".equalsIgnoreCase(userRole) && !"ADMIN".equalsIgnoreCase(userRole)) {
-            throw new ApiException(403, "FORBIDDEN",
-                    "Solo los organizadores pueden aprobar inscripciones");
-        }
+            @RequestHeader(value = "X-User-Role", required = false) String userRole,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        requireOrganizerRole(userRole, "Solo los organizadores pueden aprobar inscripciones");
+        tournamentService.assertCanManageRegistration(registrationId, userId, isAdmin(userRole));
         return tournamentService.approveRegistration(registrationId);
     }
 
-    @Operation(summary = "Rechazar una inscripción PENDING (organizador)")
+    @Operation(summary = "Rechazar una inscripción PENDING (solo el organizador dueño o admin)")
     @PatchMapping("/registrations/{registrationId}/reject")
     public RegistrationResponse rejectRegistration(
             @PathVariable Long registrationId,
             @RequestBody(required = false) RejectRegistrationRequest request,
-            @RequestHeader(value = "X-User-Role", required = false) String userRole) {
-        if (!"ORGANIZER".equalsIgnoreCase(userRole) && !"ADMIN".equalsIgnoreCase(userRole)) {
-            throw new ApiException(403, "FORBIDDEN",
-                    "Solo los organizadores pueden rechazar inscripciones");
-        }
+            @RequestHeader(value = "X-User-Role", required = false) String userRole,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        requireOrganizerRole(userRole, "Solo los organizadores pueden rechazar inscripciones");
+        tournamentService.assertCanManageRegistration(registrationId, userId, isAdmin(userRole));
         String reason = request == null ? null : request.reason();
         return tournamentService.rejectRegistration(registrationId, reason);
     }
 
     // ── Rondas ────────────────────────────────────────────────────────────────
 
-    @Operation(summary = "Generar una ronda del torneo con emparejamientos automáticos")
+    @Operation(summary = "Generar una ronda del torneo con emparejamientos automáticos " +
+            "(solo el organizador dueño o admin)")
     @PostMapping("/{id}/rounds/{roundNumber}")
     @ResponseStatus(HttpStatus.CREATED)
     public RoundResponse generateRound(
             @PathVariable Long id,
             @PathVariable int roundNumber,
-            @RequestHeader(value = "X-User-Role", required = false) String userRole) {
+            @RequestHeader(value = "X-User-Role", required = false) String userRole,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
 
-        if (!"ORGANIZER".equalsIgnoreCase(userRole) && !"ADMIN".equalsIgnoreCase(userRole)) {
-            throw new ApiException(403, "FORBIDDEN",
-                    "Solo los organizadores pueden generar rondas");
-        }
-
+        requireOrganizerRole(userRole, "Solo los organizadores pueden generar rondas");
+        tournamentService.assertCanManage(id, userId, isAdmin(userRole));
         return tournamentService.generateRound(id, roundNumber);
     }
 
@@ -173,11 +172,17 @@ public class TournamentController {
 
     // ── Resultado de emparejamiento ───────────────────────────────────────────
 
-    @Operation(summary = "Registrar resultado de una partida en el torneo")
+    @Operation(summary = "Registrar resultado manual de una mesa (solo el organizador dueño " +
+            "o admin). El resultado automático de partidas en vivo entra por el consumer " +
+            "de game.finished, no por este endpoint.")
     @PatchMapping("/pairings/{pairingId}/result")
     public PairingResponse recordResult(
             @PathVariable Long pairingId,
-            @Valid @RequestBody PairingResultRequest request) {
+            @Valid @RequestBody PairingResultRequest request,
+            @RequestHeader(value = "X-User-Role", required = false) String userRole,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        requireOrganizerRole(userRole, "Solo los organizadores pueden registrar resultados");
+        tournamentService.assertCanManagePairing(pairingId, userId, isAdmin(userRole));
         return tournamentService.recordResult(pairingId, request.result());
     }
 
@@ -187,5 +192,17 @@ public class TournamentController {
     @GetMapping("/{id}/standings")
     public List<StandingEntry> getStandings(@PathVariable Long id) {
         return tournamentService.getStandings(id);
+    }
+
+    // ── Helpers de autorización ───────────────────────────────────────────────
+
+    private static void requireOrganizerRole(String userRole, String message) {
+        if (!"ORGANIZER".equalsIgnoreCase(userRole) && !isAdmin(userRole)) {
+            throw new ApiException(403, "FORBIDDEN", message);
+        }
+    }
+
+    private static boolean isAdmin(String userRole) {
+        return "ADMIN".equalsIgnoreCase(userRole);
     }
 }

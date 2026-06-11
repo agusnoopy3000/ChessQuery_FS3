@@ -189,6 +189,44 @@ class TournamentIntegrationTest {
         assertThat(reloaded.getStatus()).isEqualTo(TournamentStatus.OPEN);
     }
 
+    @Test
+    @DisplayName("PATCH /tournaments/{id}/status de un organizador AJENO devuelve 403 (H-04)")
+    void transition_byForeignOrganizer_returns403() throws Exception {
+        Tournament t = tournamentRepository.save(Tournament.builder()
+                .name("Ajeno")
+                .format(TournamentFormat.SWISS)
+                .status(TournamentStatus.DRAFT)
+                .organizerId(42L)
+                .roundsTotal(7)
+                .requiresApproval(true)
+                .build());
+        StatusTransitionRequest req = new StatusTransitionRequest(TournamentStatus.OPEN);
+
+        // Organizador 99 (no dueño) intenta operar el torneo de 42 por API directa.
+        mockMvc.perform(patch("/tournaments/{id}/status", t.getId())
+                        .header("X-User-Role", "ORGANIZER")
+                        .header("X-User-Id", 99L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(req)))
+                .andExpect(status().isForbidden());
+
+        Tournament reloaded = tournamentRepository.findById(t.getId()).orElseThrow();
+        assertThat(reloaded.getStatus()).isEqualTo(TournamentStatus.DRAFT);
+    }
+
+    @Test
+    @DisplayName("PATCH /tournaments/{id}/status sin X-User-Id devuelve 403")
+    void transition_withoutUserId_returns403() throws Exception {
+        Tournament t = tournamentRepository.save(seed("SinIdentidad", TournamentStatus.DRAFT, 42L));
+        StatusTransitionRequest req = new StatusTransitionRequest(TournamentStatus.OPEN);
+
+        mockMvc.perform(patch("/tournaments/{id}/status", t.getId())
+                        .header("X-User-Role", "ORGANIZER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(req)))
+                .andExpect(status().isForbidden());
+    }
+
     // ── DELETE /tournaments/{id} ──────────────────────────────────────────────
 
     @Test

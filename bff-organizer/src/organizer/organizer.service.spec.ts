@@ -98,12 +98,15 @@ describe('OrganizerService', () => {
     });
   });
 
-  it('join inyecta playerId del userId si no viene en el body', async () => {
+  it('join inyecta playerId del userId si no viene en el body, con identidad en headers', async () => {
     http.post.mockResolvedValue({});
     await service.join('1', '5', {});
     expect(http.post).toHaveBeenCalledWith(
       expect.stringContaining('/registrations'),
       expect.objectContaining({ playerId: 5 }),
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'X-User-Role': 'ORGANIZER', 'X-User-Id': '5' }),
+      }),
     );
   });
 
@@ -133,12 +136,15 @@ describe('OrganizerService', () => {
     });
   });
 
-  it('patchPairingResult delega a ms-tournament', async () => {
+  it('patchPairingResult delega a ms-tournament con identidad del organizador', async () => {
     http.patch.mockResolvedValue({});
-    await service.patchPairingResult('99', { result: '1-0' });
+    await service.patchPairingResult('99', '9', { result: '1-0' });
     expect(http.patch).toHaveBeenCalledWith(
       expect.stringContaining('/pairings/99/result'),
       { result: '1-0' },
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'X-User-Role': 'ORGANIZER', 'X-User-Id': '9' }),
+      }),
     );
   });
 

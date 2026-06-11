@@ -481,9 +481,12 @@ export class PlayerService {
 
   async registerToTournament(tournamentId: string, userId: string): Promise<unknown> {
     const { msTournament } = this.http.urls;
+    // ms-tournament exige playerId == X-User-Id para auto-inscripción
+    // (inscribir a un tercero requiere ser el organizador dueño del torneo).
     return this.http.post<unknown>(
       `${msTournament}/tournaments/${tournamentId}/registrations`,
       { playerId: Number(userId) },
+      { headers: { 'X-User-Role': 'PLAYER', 'X-User-Id': userId } },
     );
   }
 }
