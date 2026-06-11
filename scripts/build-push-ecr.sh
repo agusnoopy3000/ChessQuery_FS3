@@ -27,6 +27,7 @@ SERVICES=(
   "ms-notifications:infrastructure/docker/ms-notifications/Dockerfile"
   "bff-player:infrastructure/docker/bff-player/Dockerfile"
   "bff-organizer:infrastructure/docker/bff-organizer/Dockerfile"
+  "ms-etl:infrastructure/docker/ms-etl/Dockerfile"
 )
 
 echo "▶ Login a ECR ($ECR_REGISTRY)"
