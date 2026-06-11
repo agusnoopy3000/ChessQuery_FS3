@@ -4,7 +4,8 @@ Servicio Python (FastAPI) que sincroniza datos federados desde fuentes
 externas:
 
 - **AJEFECH** — Federación Ajedrez Chile (scraping GraphQL)
-- **Lichess API** — ratings online
+- **Lichess API** — ratings online (bullet/blitz/rapid/classical, match por `lichess_username`)
+- **Chess.com API** — ratings online (bullet/blitz/rapid/daily, match por `chesscom_username`; API pública `api.chess.com/pub`, sin API key)
 
 - **Puerto:** 8086
 - **DB:** `etl_db` (PostgreSQL :5438)

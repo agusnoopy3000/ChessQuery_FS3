@@ -94,6 +94,22 @@ public class Player {
     @Column(name = "elo_lichess_classical")
     private Integer eloLichessClassical;
 
+    @Column(name = "chesscom_username", length = 100, unique = true)
+    private String chesscomUsername;
+
+    // Ratings de Chess.com por modalidad (sync desde ms-etl, match por chesscom_username).
+    @Column(name = "elo_chesscom_bullet")
+    private Integer eloChesscomBullet;
+
+    @Column(name = "elo_chesscom_blitz")
+    private Integer eloChesscomBlitz;
+
+    @Column(name = "elo_chesscom_rapid")
+    private Integer eloChesscomRapid;
+
+    @Column(name = "elo_chesscom_daily")
+    private Integer eloChesscomDaily;
+
     /** Fuente de la última enriquecimiento federado: AJEFECH, LICHESS, FIDE, null. */
     @Column(name = "enrichment_source", length = 20)
     private String enrichmentSource;

@@ -6,5 +6,6 @@ public record UpdateProfileRequest(
         @Size(min = 1, max = 100) String firstName,
         @Size(min = 1, max = 100) String lastName,
         Integer clubId,
-        @Size(max = 100) String region
+        @Size(max = 100) String region,
+        @Size(max = 100) String chesscomUsername
 ) {}

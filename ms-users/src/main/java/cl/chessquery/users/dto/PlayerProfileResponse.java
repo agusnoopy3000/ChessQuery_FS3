@@ -30,6 +30,12 @@ public record PlayerProfileResponse(
         Integer eloLichessBlitz,
         Integer eloLichessRapid,
         Integer eloLichessClassical,
+        // Ratings oficiales de Chess.com por modalidad (sync por chesscomUsername)
+        String chesscomUsername,
+        Integer eloChesscomBullet,
+        Integer eloChesscomBlitz,
+        Integer eloChesscomRapid,
+        Integer eloChesscomDaily,
         // Título vigente (null si no tiene)
         String currentTitle,
         Instant createdAt,

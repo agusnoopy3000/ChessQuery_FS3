@@ -1,0 +1,52 @@
+{
+  "family": "chessquery-etl",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "${TASK_EXECUTION_ROLE_ARN}",
+  "containerDefinitions": [
+    {
+      "name": "ms-etl",
+      "image": "${ECR_REGISTRY}/chessquery/ms-etl:${IMAGE_TAG}",
+      "essential": true,
+      "portMappings": [{ "containerPort": 8086, "protocol": "tcp" }],
+      "environment": [
+        { "name": "DB_HOST", "value": "${DB_HOST}" },
+        { "name": "DB_PORT", "value": "5432" },
+        { "name": "DB_USER", "value": "chessquery" },
+        { "name": "DB_NAME", "value": "etl_db" },
+        { "name": "RABBITMQ_HOST", "value": "${STACK_PRIVATE_IP}" },
+        { "name": "RABBITMQ_PORT", "value": "5672" },
+        { "name": "RABBITMQ_USER", "value": "chessquery" },
+        { "name": "RABBITMQ_EXCHANGE", "value": "ChessEvents" },
+        { "name": "REDIS_HOST", "value": "${STACK_PRIVATE_IP}" },
+        { "name": "REDIS_PORT", "value": "6379" },
+        { "name": "MS_USERS_URL", "value": "http://${STACK_PRIVATE_IP}:8081" },
+        { "name": "LICHESS_USE_MOCK", "value": "false" },
+        { "name": "CHESSCOM_USE_MOCK", "value": "false" },
+        { "name": "AJEFECH_USE_MOCK", "value": "true" }
+      ],
+      "secrets": [
+        { "name": "DB_PASSWORD",       "valueFrom": "${DB_PASSWORD_ARN}" },
+        { "name": "RABBITMQ_PASSWORD", "valueFrom": "${RABBITMQ_PASSWORD_ARN}" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/chessquery/ms-etl",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "ecs",
+          "awslogs-create-group": "true"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if b'UP' in urllib.request.urlopen('http://localhost:8086/health', timeout=4).read() else 1)\""],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 30
+      }
+    }
+  ]
+}

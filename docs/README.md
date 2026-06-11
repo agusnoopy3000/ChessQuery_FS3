@@ -27,6 +27,7 @@ desde el [README raíz](../README.md).
 | [INFRA_PARA_EL_EQUIPO.md](./INFRA_PARA_EL_EQUIPO.md) | Cómo está desplegado ChessQuery, explicado de forma simple para el equipo. |
 | [DESPLIEGUE_REPLICA_AWS.md](./DESPLIEGUE_REPLICA_AWS.md) | Despliegue y operación de la réplica en AWS (cuenta propia): encender/apagar, costos. |
 | [DESPLIEGUE_AWS_REALIZADO.md](./DESPLIEGUE_AWS_REALIZADO.md) | Bitácora paso a paso de lo que se hizo en el despliegue AWS. |
+| [DESPLIEGUE_ETL.md](./DESPLIEGUE_ETL.md) | ms-etl como task ECS separada (T3): deploy, Auto Scaling, verificación Lichess/Chess.com. |
 | [FRONTEND_S3_Y_ALB.md](./FRONTEND_S3_Y_ALB.md) | Guía de implementación del frontend en S3 + ALB para el gateway. |
 | [PENDIENTE_HTTPS.md](./PENDIENTE_HTTPS.md) | Plan pendiente para habilitar HTTPS (CloudFront) en el frontend. |
 

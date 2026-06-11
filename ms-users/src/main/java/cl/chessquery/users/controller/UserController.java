@@ -74,6 +74,12 @@ public class UserController {
         return playerRepository.findAllLichessUsernames();
     }
 
+    @Operation(summary = "Usernames de Chess.com vinculados (usado por ms-etl para sincronizar ratings)")
+    @GetMapping("/chesscom-usernames")
+    public java.util.List<String> getChesscomUsernames() {
+        return playerRepository.findAllChesscomUsernames();
+    }
+
     @Operation(summary = "Sincroniza los ratings oficiales de Lichess del jugador (API pública de Lichess)")
     @PostMapping("/{id}/lichess-sync")
     public PlayerProfileResponse syncLichess(@PathVariable Long id) {

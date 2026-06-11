@@ -117,9 +117,13 @@ public class RatingUpdatedConsumer {
     private enum Result { UPDATED, CREATED, SKIPPED }
 
     private Result applyOne(Map<String, Object> p, String source) {
-        // Lichess: enriquece por lichess_username (no crea players: no hay identidad real).
+        // Plataformas online: enriquecen por username (no crean players: un
+        // username no aporta identidad real).
         if ("LICHESS".equalsIgnoreCase(source)) {
             return applyLichess(p);
+        }
+        if ("CHESSCOM".equalsIgnoreCase(source)) {
+            return applyChesscom(p);
         }
         String federationId = asString(p.get("federationId"));
         String fideId = asString(p.get("fideId"));
@@ -170,6 +174,33 @@ public class RatingUpdatedConsumer {
         if (rapid != null && rapid > 0) player.setEloLichessRapid(rapid);
         if (classical != null && classical > 0) player.setEloLichessClassical(classical);
         player.setEnrichmentSource("LICHESS");
+        player.setEnrichedAt(Instant.now());
+        playerRepo.save(player);
+        return Result.UPDATED;
+    }
+
+    /**
+     * Enriquecimiento Chess.com: mismo criterio que {@link #applyLichess} —
+     * matchea por chesscom_username, actualiza los ratings por modalidad y
+     * no crea players ni toca eloNational/eloFide/eloPlatform.
+     */
+    private Result applyChesscom(Map<String, Object> p) {
+        String username = asString(p.get("chesscomUsername"));
+        if (username == null) return Result.SKIPPED;
+
+        Optional<Player> match = playerRepo.findByChesscomUsername(username);
+        if (match.isEmpty()) return Result.SKIPPED;
+
+        Player player = match.get();
+        Integer bullet = asInt(p.get("eloChesscomBullet"));
+        Integer blitz = asInt(p.get("eloChesscomBlitz"));
+        Integer rapid = asInt(p.get("eloChesscomRapid"));
+        Integer daily = asInt(p.get("eloChesscomDaily"));
+        if (bullet != null && bullet > 0) player.setEloChesscomBullet(bullet);
+        if (blitz != null && blitz > 0) player.setEloChesscomBlitz(blitz);
+        if (rapid != null && rapid > 0) player.setEloChesscomRapid(rapid);
+        if (daily != null && daily > 0) player.setEloChesscomDaily(daily);
+        player.setEnrichmentSource("CHESSCOM");
         player.setEnrichedAt(Instant.now());
         playerRepo.save(player);
         return Result.UPDATED;

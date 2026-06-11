@@ -13,12 +13,23 @@ from app.sources.fide_mock import FideMockSource
 from app.sources.ajefech_mock import AjefechMockSource
 from app.sources.ajefech_real import AjefechRealSource
 from app.sources.chess_results_mock import ChessResultsMockSource
+from app.sources.chesscom_mock import ChesscomMockSource
+from app.sources.chesscom_real import ChesscomRealSource
 from app.sources.lichess_mock import LichessMockSource
 from app.sources.lichess_real import LichessRealSource
 
 logger = logging.getLogger(__name__)
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+# REDIS_URL explícito o construido desde partes (igual que database.py: en
+# ECS el password viene de Secrets Manager como REDIS_PASSWORD, y
+# docker-compose ya pasaba REDIS_HOST/PORT/PASSWORD que antes se ignoraban).
+REDIS_URL = os.getenv("REDIS_URL")
+if not REDIS_URL:
+    _rhost = os.getenv("REDIS_HOST", "localhost")
+    _rport = os.getenv("REDIS_PORT", "6379")
+    _rpass = os.getenv("REDIS_PASSWORD", "")
+    _rauth = f":{_rpass}@" if _rpass else ""
+    REDIS_URL = f"redis://{_rauth}{_rhost}:{_rport}/0"
 MS_USERS_URL = os.getenv("MS_USERS_URL", "http://localhost:8081")
 
 # Un CircuitBreaker por fuente
@@ -27,18 +38,22 @@ circuit_breakers: dict[str, CircuitBreaker] = {
     "ajefech":       CircuitBreaker("ajefech"),
     "chess_results": CircuitBreaker("chess_results"),
     "lichess":       CircuitBreaker("lichess"),
+    "chesscom":      CircuitBreaker("chesscom"),
 }
 
 AJEFECH_USE_MOCK = os.getenv("AJEFECH_USE_MOCK", "false").lower() == "true"
-# Lichess real solo cuando se habilita explícitamente (evita llamadas externas
-# por defecto y en tests). Con LICHESS_USE_MOCK=false usa la API pública real.
+# Fuentes online reales solo cuando se habilitan explícitamente (evita
+# llamadas externas por defecto y en tests). Con *_USE_MOCK=false se usa
+# la API pública real de cada plataforma.
 LICHESS_USE_MOCK = os.getenv("LICHESS_USE_MOCK", "true").lower() == "true"
+CHESSCOM_USE_MOCK = os.getenv("CHESSCOM_USE_MOCK", "true").lower() == "true"
 
 sources = {
     "fide":          FideMockSource(),
     "ajefech":       AjefechMockSource() if AJEFECH_USE_MOCK else AjefechRealSource(),
     "chess_results": ChessResultsMockSource(),
     "lichess":       LichessMockSource() if LICHESS_USE_MOCK else LichessRealSource(),
+    "chesscom":      ChesscomMockSource() if CHESSCOM_USE_MOCK else ChesscomRealSource(),
 }
 
 
