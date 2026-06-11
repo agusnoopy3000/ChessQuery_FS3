@@ -27,8 +27,11 @@ desde el [README raíz](../README.md).
 |---|---|
 | [INFRA_PARA_EL_EQUIPO.md](./INFRA_PARA_EL_EQUIPO.md) | Cómo está desplegado ChessQuery, explicado de forma simple para el equipo. |
 | [DESPLIEGUE_REPLICA_AWS.md](./DESPLIEGUE_REPLICA_AWS.md) | Despliegue y operación de la réplica en AWS (cuenta propia): encender/apagar, costos. |
+| [SETUP_AWS_COMPLETO.md](./SETUP_AWS_COMPLETO.md) | Setup completo de AWS desde cero para replicar toda la infra en otra cuenta Academy. |
+| [SETUP_SUPABASE_REPLICA.md](./SETUP_SUPABASE_REPLICA.md) | Setup del Supabase propio (hosted) para una réplica independiente apuntando a tu ALB. |
 | [DESPLIEGUE_AWS_REALIZADO.md](./DESPLIEGUE_AWS_REALIZADO.md) | Bitácora paso a paso de lo que se hizo en el despliegue AWS. |
 | [DESPLIEGUE_ETL.md](./DESPLIEGUE_ETL.md) | ms-etl como task ECS separada (T3): deploy, Auto Scaling, verificación Lichess/Chess.com. |
+| [CLOUDWATCH_REPLICA.md](./CLOUDWATCH_REPLICA.md) | Observabilidad (T5) en la réplica: logs, Container Insights, alarmas, dashboard y accesos a la consola. |
 | [FRONTEND_S3_Y_ALB.md](./FRONTEND_S3_Y_ALB.md) | Guía de implementación del frontend en S3 + ALB para el gateway. |
 | [PENDIENTE_HTTPS.md](./PENDIENTE_HTTPS.md) | Plan pendiente para habilitar HTTPS (CloudFront) en el frontend. |
 
@@ -40,6 +43,7 @@ desde el [README raíz](../README.md).
 | [PRUEBAS.md](./PRUEBAS.md) | Estrategia y detalle de pruebas unitarias e integración, cobertura JaCoCo y pasos futuros. |
 | [PLAN_TESTS_ORGANIZER_TOURNAMENTS.md](./PLAN_TESTS_ORGANIZER_TOURNAMENTS.md) | Plan (Prioridad 1) para subir `organizer-panel` de 52% a ≥75% cubriendo `OrganizerTournaments.tsx`. |
 | [PLAN_TESTS_JWT_FILTER.md](./PLAN_TESTS_JWT_FILTER.md) | Plan (Prioridad 2) para subir `api-gateway` a ≥80% cubriendo la maquinaria ES256/JWKS de `SupabaseJwtAuthFilter`. |
+| [REVISION_CODIGO_FASES_0-2.md](./REVISION_CODIGO_FASES_0-2.md) | Informe de revisión de código (línea base de cobertura + hallazgos transversales y de los servicios core). |
 
 > Para los **comandos** de ejecución de tests ver [`TESTING.md`](../TESTING.md) en la raíz.
 
@@ -60,6 +64,7 @@ desde el [README raíz](../README.md).
 | Doc | Contenido |
 |---|---|
 | [repositorios.txt](./repositorios.txt) | Enlaces a los repositorios (requisito de entrega). |
+| [ROADMAP_V1.md](./ROADMAP_V1.md) | Plan a producto final v1: 8 tareas priorizadas (T1–T8), estado y plan de 2 semanas. |
 | [ORAL_DEFENSE_CHEAT_SHEET.md](./ORAL_DEFENSE_CHEAT_SHEET.md) | Argumentos clave para la defensa oral (rúbrica 5, 6, 8). |
 | [minutas/](./minutas/) | Minutas de reuniones (PDF/PNG). |
 
