@@ -1,0 +1,443 @@
+#!/usr/bin/env bash
+# ════════════════════════════════════════════════════════════════════════════
+#  ♟ lazychess — gestión visual de la infra y despliegue de ChessQuery
+#
+#  Interactivo:  tools/lazychess            (menú con dashboard)
+#  Directo:      tools/lazychess <comando>  (ver: tools/lazychess help)
+#
+#  Comandos: creds · status · up · down · deploy · etl · logs · ci · prs ·
+#            smoke · urls · costo · help
+#
+#  Accesibilidad: respeta NO_COLOR=1 y terminales sin tty (sin colores ni
+#  spinners). Cada prompt indica el formato exacto que espera, con ejemplo.
+#
+#  Requisitos: aws cli, gh, curl, jq. Pensado para AWS Academy (creds ~4h).
+# ════════════════════════════════════════════════════════════════════════════
+set -uo pipefail
+
+# ─── Constantes de la infra (cuenta Academy) ────────────────────────────────
+REGION="us-east-1"
+ACCOUNT="672782205900"
+CLUSTER="chessquery-cluster"
+SVC_STACK="chessquery-stack"
+SVC_ETL="chessquery-etl"
+RDS_ID="chessquery-pg"
+TG_ARN="arn:aws:elasticloadbalancing:us-east-1:672782205900:targetgroup/chessquery-gw-tg/9ad837066ce1f97c"
+ALB_DNS="chessquery-alb-984810293.us-east-1.elb.amazonaws.com"
+URL_PORTAL="http://chessquery-chess-portal.s3-website-us-east-1.amazonaws.com"
+URL_ORGANIZER="http://chessquery-organizer-panel.s3-website-us-east-1.amazonaws.com"
+LOG_STACK="/ecs/chessquery/stack"
+LOG_ETL="/ecs/chessquery/ms-etl"
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# ─── Estética y accesibilidad ───────────────────────────────────────────────
+# Colores solo si hay tty y no está NO_COLOR. Los estados SIEMPRE llevan
+# además una etiqueta de texto ([OK]/[..]/[NO]) para no depender del color.
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+  B='\033[1m'; DIM='\033[2m'; G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'
+  C='\033[0;36m'; M='\033[0;35m'; N='\033[0m'; TTY=1
+else
+  B=''; DIM=''; G=''; Y=''; R=''; C=''; M=''; N=''; TTY=0
+fi
+ok(){   echo -e "   ${G}[OK]${N} $*"; }
+warn(){ echo -e "   ${Y}[!!]${N} $*"; }
+err(){  echo -e "   ${R}[NO]${N} $*"; }
+info(){ echo -e "   ${DIM}     $*${N}"; }
+step(){ echo -e "\n ${C}${B}▶ $*${N}"; }
+hr(){   echo -e " ${DIM}──────────────────────────────────────────────────────────────────────${N}"; }
+
+banner(){
+  echo -e "${M}${B}   ♜ ♞ ♝ ♛  l a z y c h e s s  ♚ ♝ ♞ ♜${N}"
+  echo -e "${DIM}   ChessQuery · AWS Academy ${ACCOUNT} · ${REGION}${N}"
+}
+
+# pregunta con formato explícito → ask VAR "pregunta" "formato esperado" "ejemplo" [regex] [default]
+ask(){
+  local -n _out=$1; local q=$2 fmt=$3 ej=$4 rx=${5:-'.*'} def=${6:-}
+  while true; do
+    echo -e "   ${C}?${N} ${q}"
+    echo -e "     ${DIM}formato: ${fmt} · ejemplo: ${ej}${def:+ · ENTER = $def}${N}"
+    read -rp "     > " _out
+    [ -z "$_out" ] && [ -n "$def" ] && _out="$def"
+    [[ "$_out" =~ $rx ]] && return 0
+    err "\"$_out\" no cumple el formato esperado (${fmt}). Probá de nuevo."
+  done
+}
+
+confirm(){
+  local q="$1" ans
+  read -rp "$(echo -e "   ${Y}?${N} ${q}  ${DIM}escribí: s = sí · n = no [ENTER = no]${N}  > ")" ans
+  [[ "$ans" =~ ^[sSyY] ]]
+}
+
+# espera con spinner (o puntos si no hay tty) hasta que un check devuelva 0
+wait_for(){
+  local msg="$1"; shift
+  local frames='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏' i=0 t0=$SECONDS
+  until "$@" 2>/dev/null; do
+    if [ "$TTY" = 1 ]; then
+      printf "\r   ${C}%s${N} %s ${DIM}(%ss)${N}  " "${frames:i++%10:1}" "$msg" "$((SECONDS-t0))"
+    else
+      echo "   ... $msg ($((SECONDS-t0))s)"
+    fi
+    sleep 5
+  done
+  [ "$TTY" = 1 ] && printf "\r%-75s\r" " "
+  ok "$msg — listo en $((SECONDS-t0))s"
+}
+
+aws_ok(){ aws sts get-caller-identity --query Account --output text 2>/dev/null | grep -q "$ACCOUNT"; }
+
+need_creds(){
+  if ! aws_ok; then
+    err "Credenciales de AWS vencidas o ausentes (Academy las rota cada ~4h)."
+    info "Solución: opción ${B}c${N}${DIM} del menú (o ${B}lazychess creds${N}${DIM}) y pegá el bloque del lab."
+    return 1
+  fi
+}
+
+# tag actualmente desplegado (referencia para deploy/etl)
+current_tag(){
+  aws ecs describe-task-definition --task-definition "$SVC_STACK" \
+    --query 'taskDefinition.containerDefinitions[2].image' --output text 2>/dev/null \
+    | sed 's/.*://' || true
+}
+
+# ─── Dashboard (semáforo con texto, no solo color) ──────────────────────────
+dot(){ case "$1" in
+  on)  echo -e "${G}● ON ${N}";; off) echo -e "${R}● OFF${N}";;
+  mid) echo -e "${Y}● ...${N}";; *)   echo -e "${DIM}● ?  ${N}";;
+esac; }
+dashboard(){
+  local creds_s="off" rds="—" rds_s="unk" stack="—" stack_s="unk"
+  local etl="—" etl_s="unk" tgt="—" tgt_s="unk"
+  if aws_ok; then
+    creds_s="on"
+    rds=$(aws rds describe-db-instances --db-instance-identifier "$RDS_ID" \
+          --query 'DBInstances[0].DBInstanceStatus' --output text 2>/dev/null || echo "?")
+    case "$rds" in available) rds_s=on;; stopped) rds_s=off;; *) rds_s=mid;; esac
+    local svc; svc=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SVC_STACK" "$SVC_ETL" \
+          --query 'services[].{n:serviceName,d:desiredCount,r:runningCount}' --output json 2>/dev/null)
+    stack=$(jq -r '.[]|select(.n=="'"$SVC_STACK"'")|"\(.r)/\(.d)"' <<<"$svc" 2>/dev/null || echo "—")
+    etl=$(jq -r '.[]|select(.n=="'"$SVC_ETL"'")|"\(.r)/\(.d)"' <<<"$svc" 2>/dev/null || echo "—")
+    [[ "$stack" =~ ^[1-9] ]] && stack_s=on || { [ "$stack" = "0/0" ] && stack_s=off || stack_s=mid; }
+    [[ "$etl" =~ ^[1-9] ]] && etl_s=on || { [[ "$etl" == "0/0" || "$etl" == "—" ]] && etl_s=off || etl_s=mid; }
+    tgt=$(aws elbv2 describe-target-health --target-group-arn "$TG_ARN" \
+          --query 'TargetHealthDescriptions[0].TargetHealth.State' --output text 2>/dev/null || echo "—")
+    case "$tgt" in healthy) tgt_s=on;; None|"—") tgt_s=off; tgt="apagado";; *) tgt_s=mid;; esac
+  fi
+  hr
+  echo -e "   ESTADO ACTUAL  ${DIM}(● ON = anda · ● OFF = apagado · ● ... = transición · ● ? = sin creds)${N}"
+  printf "   creds %b │ RDS %b %-10s │ stack %b %-4s │ etl %b %-4s │ ALB %b %s\n" \
+    "$(dot $creds_s)" "$(dot $rds_s)" "$rds" "$(dot $stack_s)" "$stack" \
+    "$(dot $etl_s)" "$etl" "$(dot $tgt_s)" "$tgt"
+  hr
+}
+
+# ─── creds ──────────────────────────────────────────────────────────────────
+cmd_creds(){
+  step "Configurar credenciales de AWS Academy"
+  echo -e "   Pegá el bloque tal cual lo da el lab (AWS Details → AWS CLI), es decir:"
+  echo -e "   ${DIM}┌─────────────────────────────────────────────┐"
+  echo -e "   │ [default]                                   │"
+  echo -e "   │ aws_access_key_id=ASIA...                   │"
+  echo -e "   │ aws_secret_access_key=...                   │"
+  echo -e "   │ aws_session_token=IQoJ... (línea larga)     │"
+  echo -e "   └─────────────────────────────────────────────┘${N}"
+  echo -e "   Al terminar de pegar: ${B}ENTER y una línea vacía${N} (o Ctrl-D)."
+  local input="" line
+  while IFS= read -r line; do
+    [ -z "$line" ] && [ -n "$input" ] && break
+    input+="$line"$'\n'
+  done
+  local id secret token
+  id=$(grep -oP 'aws_access_key_id\s*=\s*\K\S+' <<<"$input" || true)
+  secret=$(grep -oP 'aws_secret_access_key\s*=\s*\K\S+' <<<"$input" || true)
+  token=$(grep -oP 'aws_session_token\s*=\s*\K\S+' <<<"$input" || true)
+  [ -z "$id" ]     && { err "No encontré ${B}aws_access_key_id=${N} en lo pegado."; return 1; }
+  [ -z "$secret" ] && { err "No encontré ${B}aws_secret_access_key=${N} en lo pegado."; return 1; }
+  [ -z "$token" ]  && { err "No encontré ${B}aws_session_token=${N} en lo pegado (¿se cortó la línea larga?)."; return 1; }
+  aws configure set aws_access_key_id "$id"
+  aws configure set aws_secret_access_key "$secret"
+  aws configure set aws_session_token "$token"
+  aws configure set region "$REGION"
+  if aws_ok; then ok "Credenciales válidas — cuenta $ACCOUNT. Duran ~4 horas."
+  else err "AWS las rechazó (sts falló). ¿El lab está iniciado? ¿Copiaste el token completo?"; return 1; fi
+}
+
+# ─── status ─────────────────────────────────────────────────────────────────
+cmd_status(){
+  need_creds || return 1
+  step "RDS  $RDS_ID"
+  local rds; rds=$(aws rds describe-db-instances --db-instance-identifier "$RDS_ID" \
+        --query 'DBInstances[0].DBInstanceStatus' --output text 2>/dev/null)
+  [ "$rds" = "available" ] && ok "estado: $rds" || warn "estado: ${rds:-desconocido} ${DIM}(available = lista para usar)${N}"
+
+  step "ECS  $CLUSTER"
+  aws ecs describe-services --cluster "$CLUSTER" --services "$SVC_STACK" "$SVC_ETL" \
+    --query 'services[].{s:serviceName,d:desiredCount,r:runningCount,t:taskDefinition}' --output json 2>/dev/null \
+    | jq -r '.[] | "\(.s)|\(.r)/\(.d)|\(.t | sub(".*task-definition/";""))"' \
+    | while IFS='|' read -r s rd t; do
+        if [ "${rd%%/*}" -gt 0 ] 2>/dev/null; then
+          ok "$(printf '%-18s' "$s") running/desired=$rd  ${DIM}$t${N}"
+        else
+          warn "$(printf '%-18s' "$s") running/desired=$rd  ${DIM}$t (apagado)${N}"
+        fi
+      done
+
+  step "ALB  $ALB_DNS"
+  local tg; tg=$(aws elbv2 describe-target-health --target-group-arn "$TG_ARN" \
+        --query 'TargetHealthDescriptions[0].TargetHealth.State' --output text 2>/dev/null)
+  [ "$tg" = "healthy" ] && ok "target: $tg (el gateway recibe tráfico)" \
+                        || warn "target: ${tg:-sin targets} ${DIM}(healthy = recibe tráfico)${N}"
+
+  step "Auto Scaling del ETL"
+  local as; as=$(aws application-autoscaling describe-scalable-targets --service-namespace ecs \
+    --query 'ScalableTargets[].{r:ResourceId,min:MinCapacity,max:MaxCapacity}' --output json 2>/dev/null \
+    | jq -r '.[] | "\(.r | sub("service/'"$CLUSTER"'/";"")): \(.min)–\(.max) tasks"')
+  [ -n "$as" ] && ok "$as (agrega la 2ª task si CPU > 70%)" || warn "sin autoscaling registrado (corré: etl)"
+
+  step "Alarmas CloudWatch"
+  aws cloudwatch describe-alarms --alarm-name-prefix chessquery \
+    --query 'MetricAlarms[].{n:AlarmName,s:StateValue}' --output json 2>/dev/null \
+    | jq -r '.[] | "\(.n)|\(.s)"' \
+    | while IFS='|' read -r n s; do
+        [ "$s" = "OK" ] && ok "$n" || { [ "$s" = "ALARM" ] && err "$n EN ALARMA" || warn "$n (sin datos)"; }
+      done
+}
+
+# ─── up ─────────────────────────────────────────────────────────────────────
+rds_available(){ [ "$(aws rds describe-db-instances --db-instance-identifier "$RDS_ID" \
+      --query 'DBInstances[0].DBInstanceStatus' --output text 2>/dev/null)" = "available" ]; }
+tg_healthy(){ [ "$(aws elbv2 describe-target-health --target-group-arn "$TG_ARN" \
+      --query 'TargetHealthDescriptions[0].TargetHealth.State' --output text 2>/dev/null)" = "healthy" ]; }
+
+cmd_up(){
+  need_creds || return 1
+  local rev="${1:-}"
+  if [ -z "$rev" ] && [ -t 0 ]; then
+    ask rev "¿Qué revisión de task-def prendo?" "número entero o vacío" "13" '^[0-9]*$' "la actual"
+    [ "$rev" = "la actual" ] && rev=""
+  fi
+  step "Prendiendo ChessQuery (RDS → stack → healthy) — total ~6-8 min"
+  aws rds start-db-instance --db-instance-identifier "$RDS_ID" >/dev/null 2>&1 || true
+  wait_for "RDS arrancando (paso 1/3, ~3-5 min)" rds_available
+  if [ -n "$rev" ]; then
+    aws ecs update-service --cluster "$CLUSTER" --service "$SVC_STACK" \
+      --task-definition "$SVC_STACK:$rev" --desired-count 1 --force-new-deployment >/dev/null
+  else
+    aws ecs update-service --cluster "$CLUSTER" --service "$SVC_STACK" \
+      --desired-count 1 --force-new-deployment >/dev/null
+  fi
+  ok "stack desired=1 ${rev:+(rev $rev)} (paso 2/3)"
+  wait_for "target del ALB poniéndose healthy (paso 3/3, ~2-3 min)" tg_healthy
+  curl -s -m 10 "http://$ALB_DNS/actuator/health/readiness" | grep -q '"UP"' \
+    && ok "readiness UP — la app quedó lista" || warn "readiness aún no responde UP (dale ~1 min más)"
+  warn "El ETL no se prende solo: usá la opción ${B}e${N} (etl) para levantarlo."
+  cmd_urls
+}
+
+# ─── down ───────────────────────────────────────────────────────────────────
+cmd_down(){
+  need_creds || return 1
+  echo -e "   Esto apaga: stack ECS → 0 tasks · ETL → 0 tasks · RDS → stopped."
+  echo -e "   ${DIM}No se pierde nada: los datos quedan en RDS y los links no cambian.${N}"
+  confirm "¿Apagar todo ahora?" || { warn "Cancelado, no se apagó nada."; return 0; }
+  step "Apagando"
+  aws ecs update-service --cluster "$CLUSTER" --service "$SVC_STACK" --desired-count 0 >/dev/null && ok "$SVC_STACK → 0 tasks"
+  aws ecs update-service --cluster "$CLUSTER" --service "$SVC_ETL" --desired-count 0 >/dev/null 2>&1 \
+    && ok "$SVC_ETL → 0 tasks" || warn "$SVC_ETL no existe o ya estaba en 0"
+  aws rds stop-db-instance --db-instance-identifier "$RDS_ID" >/dev/null 2>&1 \
+    && ok "RDS deteniéndose" || warn "RDS ya estaba detenida"
+  ok "Listo. Gasto variable ≈ \$0. Para volver: opción u (up)."
+}
+
+# ─── deploy ─────────────────────────────────────────────────────────────────
+cmd_deploy(){
+  need_creds || return 1
+  local tag="${1:-}" cur; cur=$(current_tag)
+  echo -e "   Publica una versión nueva: build de 9 imágenes → ECR → task-def nueva → redeploy."
+  [ -n "$cur" ] && info "Versión desplegada ahora: ${B}$cur${N}"
+  if [ -z "$tag" ]; then
+    ask tag "¿Con qué tag publico las imágenes?" "vMAYOR.MENOR.PARCHE" "v0.3.1" '^v[0-9]+\.[0-9]+\.[0-9]+$'
+  elif ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    err "Tag \"$tag\" inválido. Formato: vMAYOR.MENOR.PARCHE (ej: v0.3.1)."; return 1
+  fi
+  confirm "¿Buildear y publicar $tag? (build ≈ 10-20 min la primera vez)" || { warn "Cancelado."; return 0; }
+  step "Build & push de 9 imágenes ($tag, x86_64)"
+  ( cd "$REPO_ROOT" && source infrastructure/aws/.deploy-outputs.env && \
+    IMAGE_TAG="$tag" bash scripts/build-push-ecr.sh ) || { err "El build falló — revisá el error de arriba."; return 1; }
+  step "Task definition nueva (config actual + imágenes $tag)"
+  local td new_rev
+  td=$(aws ecs describe-task-definition --task-definition "$SVC_STACK" --query 'taskDefinition' --output json)
+  new_rev=$(echo "$td" \
+    | jq --arg t "$tag" '{family, executionRoleArn, networkMode, containerDefinitions, requiresCompatibilities, cpu, memory}
+        | .containerDefinitions |= map(if .image | contains("'"$ACCOUNT"'") then .image |= sub(":[^:]+$"; ":" + $t) else . end)' \
+    | aws ecs register-task-definition --cli-input-json file:///dev/stdin \
+        --query 'taskDefinition.revision' --output text)
+  ok "registrada $SVC_STACK:$new_rev"
+  aws ecs update-service --cluster "$CLUSTER" --service "$SVC_STACK" \
+    --task-definition "$SVC_STACK:$new_rev" --force-new-deployment >/dev/null
+  ok "Rollout iniciado."
+  warn "Pasos siguientes: 1) ${B}status${N} hasta ver running=1/1 y target healthy · 2) ${B}etl $tag${N} (la IP del stack cambió)."
+}
+
+# ─── etl ────────────────────────────────────────────────────────────────────
+cmd_etl(){
+  need_creds || return 1
+  local tag="${1:-}" cur; cur=$(current_tag)
+  if [ -z "$tag" ] && [ -t 0 ]; then
+    ask tag "¿Qué tag de imagen uso para el ETL?" "vMAYOR.MENOR.PARCHE" "v0.3.0" '^v[0-9]+\.[0-9]+\.[0-9]+$' "${cur:-v0.3.0}"
+  fi
+  tag="${tag:-${cur:-v0.3.0}}"
+  echo -e "   Re-despliega $SVC_ETL apuntando a la IP actual del stack (RabbitMQ/Redis/ms-users)"
+  echo -e "   ${DIM}y deja el autoscaling 1–2 tasks activo. Requiere el stack RUNNING (si no, corta).${N}"
+  step "Deploy de $SVC_ETL (IMAGE_TAG=$tag)"
+  ( cd "$REPO_ROOT" && IMAGE_TAG="$tag" bash scripts/deploy-etl-service.sh )
+}
+
+# ─── logs ───────────────────────────────────────────────────────────────────
+cmd_logs(){
+  need_creds || return 1
+  local which="${1:-}"
+  if [ -z "$which" ] && [ -t 0 ]; then
+    echo -e "   ¿Qué logs querés ver en vivo?"
+    echo -e "     ${C}1${N}) stack — los 10 contenedores (gateway, microservicios, BFFs, Rabbit, Redis)"
+    echo -e "     ${C}2${N}) etl   — solo el servicio de sincronización"
+    ask which "Elegí una opción" "1 o 2" "1" '^[12]$' "1"
+  fi
+  local lg; { [ "$which" = "etl" ] || [ "$which" = "2" ]; } && lg="$LOG_ETL" || lg="$LOG_STACK"
+  step "Logs en vivo de $lg — salir con Ctrl-C"
+  aws logs tail "$lg" --follow --format short
+}
+
+# ─── ci / prs ───────────────────────────────────────────────────────────────
+cmd_ci(){
+  step "Runner self-hosted (la máquina que corre los tests)"
+  gh api repos/agusnoopy3000/ChessQuery_FS3/actions/runners \
+    --jq '.runners[] | "\(.status)|\(.name)|\(.busy)"' 2>/dev/null \
+    | while IFS='|' read -r st nm bz; do
+        [ "$st" = "online" ] && ok "$nm online (ocupado: $bz)" || err "$nm OFFLINE — los jobs van a quedar en cola"
+      done || warn "No pude consultar runners (¿gh auth login?)"
+  step "Últimos 8 runs de Actions"
+  info "leyenda: [OK] pasó · [NO] falló · [..] en cola/corriendo · [--] cancelado"
+  gh run list --limit 8 --json status,conclusion,displayTitle,headBranch \
+    --jq '.[] | "\(.status)|\(.conclusion // "")|\(.headBranch)|\(.displayTitle)"' 2>/dev/null \
+    | while IFS='|' read -r st co br ti; do
+        case "${co:-$st}" in
+          success)            ok   "$(printf '%-10s' success) [$br] ${ti:0:55}";;
+          failure)            err  "$(printf '%-10s' failure) [$br] ${ti:0:55}";;
+          cancelled)          echo -e "   ${DIM}[--] $(printf '%-10s' cancelled) [$br] ${ti:0:55}${N}";;
+          queued|in_progress) warn "$(printf '%-10s' "${co:-$st}") [$br] ${ti:0:55}";;
+          *)                  info "$(printf '%-10s' "${co:-$st}") [$br] ${ti:0:55}";;
+        esac
+      done || err "gh falló"
+}
+cmd_prs(){
+  step "PRs abiertos"
+  local prs; prs=$(gh pr list --limit 10 2>/dev/null)
+  [ -n "$prs" ] && sed 's/^/   /' <<<"$prs" || info "no hay PRs abiertos"
+  step "Ramas con commits sin mergear a main"
+  git -C "$REPO_ROOT" fetch -q origin 2>/dev/null
+  git -C "$REPO_ROOT" for-each-ref --format='%(refname:short)' refs/remotes/origin \
+    | grep -v 'origin/HEAD\|origin/main' | while read -r b; do
+        local n; n=$(git -C "$REPO_ROOT" rev-list --count origin/main.."$b" 2>/dev/null)
+        [ "${n:-0}" -gt 0 ] && echo -e "   🌿 $b ${DIM}(+$n commits)${N}"
+      done || true
+}
+
+# ─── smoke ──────────────────────────────────────────────────────────────────
+cmd_smoke(){
+  step "Smoke test — 4 chequeos rápidos contra la infra"
+  local r
+  r=$(curl -s -o /dev/null -w '%{http_code}' -m 8 "http://$ALB_DNS/actuator/health/readiness")
+  [ "$r" = "200" ] && ok "API viva (readiness → 200)" || err "API no responde (readiness → $r). Si está apagada: opción u"
+  r=$(curl -s -o /dev/null -w '%{http_code}' -m 8 "http://$ALB_DNS/api/player/profile")
+  [ "$r" = "401" ] && ok "auth funciona (ruta protegida sin JWT → 401)" || warn "ruta protegida → $r (se esperaba 401)"
+  r=$(curl -s -o /dev/null -w '%{http_code}' -m 8 "http://$ALB_DNS/actuatorfoo")
+  [ "$r" = "404" ] && ok "rutas públicas bien acotadas (/actuatorfoo → 404)" || warn "/actuatorfoo → $r (se esperaba 404)"
+  r=$(curl -s -o /dev/null -w '%{http_code}' -m 8 "$URL_PORTAL")
+  [ "$r" = "200" ] && ok "portal S3 arriba (→ 200)" || warn "portal S3 → $r"
+}
+
+# ─── urls / costo ───────────────────────────────────────────────────────────
+cmd_urls(){
+  step "Links de la app (estables: el DNS nunca cambia, aun apagando todo)"
+  echo -e "   🎮 Portal jugador:  ${C}$URL_PORTAL${N}"
+  echo -e "   🏆 Organizador:     ${C}$URL_ORGANIZER${N}"
+  echo -e "   🔌 API (ALB):       ${C}http://$ALB_DNS${N}"
+}
+cmd_costo(){
+  step "Estimación de gasto"
+  echo -e "   PRENDIDO  ≈ ${B}\$0.26/hora${N}  (stack 4vCPU/8GB \$0.197 + ETL \$0.025 + RDS \$0.04)"
+  echo -e "   APAGADO   ≈ \$0 variable  (queda solo el fijo: ALB ≈ \$16/mes, S3/ECR/alarmas ≈ \$1/mes)"
+  echo -e "   ${DIM}Diseño ya optimizado: sin NAT Gateway, sin Container Insights, sin CloudFront.${N}"
+  echo -e "   Regla de oro: ${B}down${N} al terminar la sesión."
+}
+
+cmd_help(){
+  banner; hr
+  echo -e "   ${B}USO${N}  tools/lazychess [comando] [argumento]   ${DIM}· sin comando abre el menú${N}\n"
+  printf "   ${C}%-18s${N} %s\n" \
+    "creds"            "configurar credenciales del lab (pegar bloque [default])" \
+    "status"           "estado detallado: RDS, ECS, target, autoscaling, alarmas" \
+    "up [rev]"         "prender todo: RDS → stack → healthy (rev opcional, ej: 13)" \
+    "down"             "apagar todo con confirmación (no borra datos)" \
+    "deploy [vX.Y.Z]"  "publicar versión: build 9 imágenes + task-def + redeploy" \
+    "etl [vX.Y.Z]"     "re-desplegar el ETL apuntando a la IP actual del stack" \
+    "logs [stack|etl]" "logs de CloudWatch en vivo (Ctrl-C para salir)" \
+    "ci"               "estado del runner y últimos runs de Actions" \
+    "prs"              "PRs abiertos y ramas con commits sin mergear" \
+    "smoke"            "4 chequeos rápidos: API, auth, rutas, portal" \
+    "urls"             "links estables de la app" \
+    "costo"            "cuánto gasta prendido vs apagado"
+  echo -e "\n   ${DIM}Accesibilidad: NO_COLOR=1 desactiva colores; los estados llevan${N}"
+  echo -e "   ${DIM}etiqueta de texto ([OK]/[!!]/[NO]) además del color.${N}"
+}
+
+# ─── Menú interactivo ───────────────────────────────────────────────────────
+menu_item(){ printf "   ${C}%s${N}) %-7s ${DIM}%s${N}\n" "$1" "$2" "$3"; }
+menu(){
+  while true; do
+    clear 2>/dev/null || true
+    banner
+    dashboard
+    echo -e "   ${B}INFRA — prender, apagar y mirar${N}"
+    menu_item c "creds"  "configurar credenciales del lab (se vencen cada ~4h)"
+    menu_item s "status" "estado detallado de RDS, ECS, ALB, autoscaling y alarmas"
+    menu_item u "up"     "prender todo en orden (RDS → stack → healthy, ~6-8 min)"
+    menu_item o "down"   "apagar todo para no gastar (pide confirmación, no borra datos)"
+    echo -e "\n   ${B}DESPLIEGUE — publicar y observar código${N}"
+    menu_item d "deploy" "publicar versión nueva (pide tag vX.Y.Z, build ≈ 10-20 min)"
+    menu_item e "etl"    "re-desplegar el ETL (necesario tras cada deploy/up del stack)"
+    menu_item l "logs"   "ver logs en vivo (elegís stack o etl, Ctrl-C para salir)"
+    echo -e "\n   ${B}GIT / VERIFICACIÓN${N}"
+    menu_item i "ci"     "runner + últimos runs de Actions ([OK]/[NO]/[..])"
+    menu_item p "prs"    "PRs abiertos y ramas sin mergear"
+    menu_item k "smoke"  "4 chequeos rápidos de que la app responde bien"
+    menu_item w "urls"   "links de portal, organizador y API"
+    menu_item \$ "costo" "cuánto gasta prendido vs apagado"
+    echo
+    echo -e "   ${DIM}r) refrescar estado · q) salir${N}"
+    read -rp "$(echo -e "   elegí una letra y ENTER ${B}→${N} ")" op
+    echo
+    case "$op" in
+      c) cmd_creds;; s) cmd_status;; u) cmd_up;; o) cmd_down;;
+      d) cmd_deploy;; e) cmd_etl;; l) cmd_logs;;
+      i) cmd_ci;; p) cmd_prs;; k) cmd_smoke;; w) cmd_urls;; '$') cmd_costo;;
+      r) continue;; q|Q) echo -e "   ${DIM}♟ hasta la próxima${N}"; exit 0;;
+      *) warn "\"$op\" no es una opción. Elegí una letra del menú (ej: s) y ENTER.";;
+    esac
+    echo
+    read -rp "$(echo -e "   ${DIM}ENTER para volver al menú…${N}")" _
+  done
+}
+
+case "${1:-}" in
+  creds) cmd_creds;; status) cmd_status;; up) shift; cmd_up "$@";; down) cmd_down;;
+  deploy) shift; cmd_deploy "$@";; etl) shift; cmd_etl "$@";; logs) shift; cmd_logs "$@";;
+  ci) cmd_ci;; prs) cmd_prs;; smoke) cmd_smoke;; urls) cmd_urls;; costo) cmd_costo;;
+  help|-h|--help) cmd_help;; "") menu;;
+  *) err "comando desconocido: \"$1\""; echo; cmd_help; exit 1;;
+esac
