@@ -13,6 +13,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -48,6 +50,7 @@ class PlayerServiceTest {
     @Mock private RatingHistoryRepository historyRepo;
     @Mock private PlayerTitleHistoryRepository titleRepo;
     @Mock private EventPublisherService events;
+    @Mock private LichessClient lichessClient;
     @Mock private EntityManager em;
 
     @InjectMocks private PlayerService service;
@@ -268,6 +271,51 @@ class PlayerServiceTest {
             service.updateElo(1L, new UpdateEloRequest(RatingType.FIDE_RAPID, 1450, null));
             assertThat(p.getEloFideRapid()).isEqualTo(1450);
         }
+
+        @ParameterizedTest
+        @EnumSource(RatingType.class)
+        @DisplayName("updateElo_allRatingTypes_writeCorrectFieldAndCaptureOld")
+        void updateElo_allRatingTypes_writeCorrectFieldAndCaptureOld(RatingType type) {
+            Player p = Player.builder().build();
+            p.setId(1L);
+            setElo(p, type, 1200); // valor previo → ejercita la rama de currentElo
+            when(playerRepo.findById(1L)).thenReturn(Optional.of(p));
+
+            service.updateElo(1L, new UpdateEloRequest(type, 1300, "ETL"));
+
+            assertThat(getElo(p, type)).isEqualTo(1300); // applyElo escribió el campo correcto
+            verify(events).publishEloUpdated(eq(1L), eq(1200), eq(1300), eq(type), eq(null));
+            verify(historyRepo).save(any(RatingHistory.class));
+        }
+    }
+
+    /** Espejo de los switch de currentElo/applyElo, para cubrir las 9 ramas por tipo. */
+    private static void setElo(Player p, RatingType type, int v) {
+        switch (type) {
+            case NATIONAL          -> p.setEloNational(v);
+            case FIDE_STANDARD     -> p.setEloFideStandard(v);
+            case FIDE_RAPID        -> p.setEloFideRapid(v);
+            case FIDE_BLITZ        -> p.setEloFideBlitz(v);
+            case PLATFORM          -> p.setEloPlatform(v);
+            case LICHESS_BULLET    -> p.setEloLichessBullet(v);
+            case LICHESS_BLITZ     -> p.setEloLichessBlitz(v);
+            case LICHESS_RAPID     -> p.setEloLichessRapid(v);
+            case LICHESS_CLASSICAL -> p.setEloLichessClassical(v);
+        }
+    }
+
+    private static Integer getElo(Player p, RatingType type) {
+        return switch (type) {
+            case NATIONAL          -> p.getEloNational();
+            case FIDE_STANDARD     -> p.getEloFideStandard();
+            case FIDE_RAPID        -> p.getEloFideRapid();
+            case FIDE_BLITZ        -> p.getEloFideBlitz();
+            case PLATFORM          -> p.getEloPlatform();
+            case LICHESS_BULLET    -> p.getEloLichessBullet();
+            case LICHESS_BLITZ     -> p.getEloLichessBlitz();
+            case LICHESS_RAPID     -> p.getEloLichessRapid();
+            case LICHESS_CLASSICAL -> p.getEloLichessClassical();
+        };
     }
 
     @Nested
@@ -343,6 +391,55 @@ class PlayerServiceTest {
 
             AuthSyncRequest req = new AuthSyncRequest(5L, "m@c.cl", "Magnus", "Carlsen", null);
             service.syncFromAuth(req);
+        }
+    }
+
+    @Nested
+    @DisplayName("syncLichess")
+    class SyncLichess {
+
+        @Test
+        @DisplayName("syncLichess_noUsername_returnsProfileWithoutFetching")
+        void syncLichess_noUsername_returnsProfileWithoutFetching() {
+            Player p = Player.builder().firstName("A").lastName("B").build(); // lichessUsername null
+            p.setId(1L);
+            when(playerRepo.findById(1L)).thenReturn(Optional.of(p));
+
+            service.syncLichess(1L);
+
+            verify(lichessClient, never()).fetchRatings(any());
+            verify(playerRepo, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("syncLichess_withRatings_setsElosAndSaves")
+        void syncLichess_withRatings_setsElosAndSaves() {
+            Player p = Player.builder().firstName("A").lastName("B").lichessUsername("magnus").build();
+            p.setId(1L);
+            when(playerRepo.findById(1L)).thenReturn(Optional.of(p));
+            when(lichessClient.fetchRatings("magnus"))
+                    .thenReturn(Optional.of(new LichessClient.LichessRatings(2800, 2900, 2700, null)));
+
+            service.syncLichess(1L);
+
+            assertThat(p.getEloLichessBullet()).isEqualTo(2800);
+            assertThat(p.getEloLichessBlitz()).isEqualTo(2900);
+            assertThat(p.getEloLichessRapid()).isEqualTo(2700);
+            assertThat(p.getEloLichessClassical()).isNull(); // null en el rating → no se setea
+            verify(playerRepo).save(p);
+        }
+
+        @Test
+        @DisplayName("syncLichess_fetchEmpty_doesNotSave")
+        void syncLichess_fetchEmpty_doesNotSave() {
+            Player p = Player.builder().lichessUsername("ghost").build();
+            p.setId(1L);
+            when(playerRepo.findById(1L)).thenReturn(Optional.of(p));
+            when(lichessClient.fetchRatings("ghost")).thenReturn(Optional.empty());
+
+            service.syncLichess(1L);
+
+            verify(playerRepo, never()).save(any());
         }
     }
 

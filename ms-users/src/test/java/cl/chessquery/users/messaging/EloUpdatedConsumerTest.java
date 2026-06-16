@@ -8,6 +8,8 @@ import cl.chessquery.users.repository.RatingHistoryRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -111,5 +113,70 @@ class EloUpdatedConsumerTest {
                 "playerId", 3, "oldElo", 1300, "newElo", 1350, "ratingType", "PLATFORM");
         consumer.onEloUpdated(event("elo.updated", payload));
         assertThat(p.getEloPlatform()).isEqualTo(1350);
+    }
+
+    @ParameterizedTest
+    @EnumSource(RatingType.class)
+    @DisplayName("onEloUpdated_allRatingTypes_updateCorrectField")
+    void onEloUpdated_allRatingTypes_updateCorrectField(RatingType type) {
+        Player p = Player.builder().build();
+        p.setId(7L);
+        when(playerRepo.findById(eq(7L))).thenReturn(Optional.of(p));
+        Map<String, Object> payload = Map.of(
+                "playerId", 7, "oldElo", 1000, "newElo", 1234, "ratingType", type.name());
+
+        consumer.onEloUpdated(event("elo.updated", payload));
+
+        assertThat(getElo(p, type)).isEqualTo(1234); // applyElo escribió el campo correcto
+        verify(historyRepo).save(any(RatingHistory.class));
+    }
+
+    @Test
+    @DisplayName("onEloUpdated_stringNumbers_parsedViaToLongToInt")
+    void onEloUpdated_stringNumbers_parsedViaToLongToInt() {
+        // playerId/elos llegan como String (p. ej. desde JSON laxo) → toLong/toInt los parsean.
+        Player p = Player.builder().eloNational(1400).build();
+        p.setId(5L);
+        when(playerRepo.findById(eq(5L))).thenReturn(Optional.of(p));
+        Map<String, Object> payload = Map.of(
+                "playerId", "5", "oldElo", "1400", "newElo", "1450", "ratingType", "NATIONAL");
+
+        consumer.onEloUpdated(event("elo.updated", payload));
+
+        assertThat(p.getEloNational()).isEqualTo(1450);
+    }
+
+    @Test
+    @DisplayName("onEloUpdated_nullTimestamp_recordsWithNow")
+    void onEloUpdated_nullTimestamp_recordsWithNow() {
+        Player p = Player.builder().eloNational(1500).build();
+        p.setId(8L);
+        when(playerRepo.findById(eq(8L))).thenReturn(Optional.of(p));
+        ChessEvent e = new ChessEvent();
+        e.setEventId("evt-x");
+        e.setEventType("elo.updated");
+        e.setTimestamp(null); // sin timestamp → usa Instant.now()
+        e.setPayload(Map.of("playerId", 8, "oldElo", 1500, "newElo", 1510, "ratingType", "NATIONAL"));
+
+        consumer.onEloUpdated(e);
+
+        ArgumentCaptor<RatingHistory> cap = ArgumentCaptor.forClass(RatingHistory.class);
+        verify(historyRepo).save(cap.capture());
+        assertThat(cap.getValue().getRecordedAt()).isNotNull();
+    }
+
+    /** Espejo del switch de applyElo, para verificar el campo escrito por tipo. */
+    private static Integer getElo(Player p, RatingType type) {
+        return switch (type) {
+            case NATIONAL          -> p.getEloNational();
+            case FIDE_STANDARD     -> p.getEloFideStandard();
+            case FIDE_RAPID        -> p.getEloFideRapid();
+            case FIDE_BLITZ        -> p.getEloFideBlitz();
+            case PLATFORM          -> p.getEloPlatform();
+            case LICHESS_BULLET    -> p.getEloLichessBullet();
+            case LICHESS_BLITZ     -> p.getEloLichessBlitz();
+            case LICHESS_RAPID     -> p.getEloLichessRapid();
+            case LICHESS_CLASSICAL -> p.getEloLichessClassical();
+        };
     }
 }

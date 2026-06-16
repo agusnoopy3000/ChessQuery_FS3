@@ -149,6 +149,32 @@
                         <phase>test</phase>
                         <goals><goal>report</goal></goals>
                     </execution>
+                    <!--
+                        Gate de cobertura (T1). Enlazado a la fase 'test' (no 'verify')
+                        para que el CI actual `mvn test` lo aplique sin cambios. Falla el
+                        build si la cobertura de instrucciones del módulo baja del 90%
+                        (respeta los mismos <excludes> de arriba). Es un piso tipo ratchet:
+                        subirlo a medida que mejora, nunca bajarlo.
+                    -->
+                    <execution>
+                        <id>check</id>
+                        <phase>test</phase>
+                        <goals><goal>check</goal></goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.90</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
         </plugins>

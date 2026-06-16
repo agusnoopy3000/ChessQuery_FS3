@@ -16,7 +16,7 @@ pensada para la escena de ajedrez casual y de club en Chile.**
   <img src="https://img.shields.io/badge/AWS-ECS-444?style=flat-square&logo=amazonaws&logoColor=white" alt="AWS">
   <br>
   <img src="https://img.shields.io/badge/status-en%20desarrollo-blue?style=flat-square" alt="Estado: en desarrollo">
-  <img src="https://img.shields.io/badge/tests-~530-444?style=flat-square" alt="~530 tests">
+  <img src="https://img.shields.io/badge/tests-659-444?style=flat-square" alt="659 tests">
 </p>
 
 </div>
@@ -94,7 +94,7 @@ funcionando de punta a punta — todavía con piezas por terminar y pulir:
 - ✅ **Desplegada en AWS** — en la nube (ECS Fargate + RDS + S3 + ALB), verificada de registro a
   partida. Ver [`docs/DESPLIEGUE_REPLICA_AWS.md`](./docs/DESPLIEGUE_REPLICA_AWS.md).
 - ✅ **Integración con Lichess** — sincronización de ratings oficiales por modalidad.
-- ✅ **~530 pruebas automatizadas** (Java + BFFs + Frontend) y CI en GitHub Actions.
+- ✅ **659 pruebas automatizadas** (Java + BFFs + Frontend), con **gate de cobertura ≥90%** en los 6 módulos Java y CI en GitHub Actions.
 - 🔜 **En curso** — analítica/ETL, HTTPS público vía CloudFront y mejoras de UX, entre otras cosas.
 
 ## 🚧 Work in progress
@@ -215,7 +215,7 @@ Frontend (monorepo NPM): `npm run dev:portal` (5173) y `npm run dev:organizer` (
 | [`docs/IMPLEMENTACION.md`](./docs/IMPLEMENTACION.md) | Arquitectura general capa por capa |
 | [`docs/CONTEXT.md`](./docs/CONTEXT.md) | ERD completo, contratos REST, eventos |
 | [`docs/specs/HISTORIAS_USUARIO.md`](./docs/specs/HISTORIAS_USUARIO.md) | Historias de usuario (qué hace, para quién, bajo qué reglas) |
-| [`TESTING.md`](./TESTING.md) | Comandos para correr los ~530 tests (Java + BFFs + Frontend) |
+| [`TESTING.md`](./TESTING.md) | Comandos para correr los 659 tests (Java + BFFs + Frontend) |
 | [`docs/PRUEBAS.md`](./docs/PRUEBAS.md) | Estrategia y detalle de pruebas (unitarias e integración, JaCoCo) |
 | [`docs/DESPLIEGUE_REPLICA_AWS.md`](./docs/DESPLIEGUE_REPLICA_AWS.md) | Despliegue y operación de la réplica en AWS |
 | [`infrastructure/aws/RUNBOOK_ECS.md`](./infrastructure/aws/RUNBOOK_ECS.md) | Runbook ECS Fargate paso a paso |

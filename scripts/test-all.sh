@@ -19,7 +19,7 @@ if ! java -version 2>&1 | grep -q 'version "17'; then
 fi
 
 JAVA_MODULES=(api-gateway ms-users ms-tournament ms-game ms-notifications ms-analytics)
-NODE_BFFS=(bff-player bff-organizer)
+NODE_BFFS=(bff-player bff-organizer bff-admin)
 FRONTEND_APPS=(frontend/apps/chess-portal frontend/apps/organizer-panel)
 
 # Metadata para la tabla final (capa + tipo de prueba por módulo).
@@ -32,6 +32,7 @@ LAYER[ms-notifications]="Backend Java"; TYPE[ms-notifications]="Unit + Integraci
 LAYER[ms-analytics]="Backend Java";  TYPE[ms-analytics]="Unit + Integración H2"
 LAYER[bff-player]="BFF (NestJS)";    TYPE[bff-player]="Unit service + http (Jest)"
 LAYER[bff-organizer]="BFF (NestJS)"; TYPE[bff-organizer]="Unit service + http (Jest)"
+LAYER[bff-admin]="BFF (NestJS)";     TYPE[bff-admin]="Unit service + http (Jest)"
 LAYER[chess-portal]="Frontend";      TYPE[chess-portal]="Page specs (Vitest + RTL)"
 LAYER[organizer-panel]="Frontend";   TYPE[organizer-panel]="Page specs (Vitest + RTL)"
 
@@ -56,6 +57,29 @@ count_node() {
     | grep -oE 'Tests[^0-9]*[0-9]+ passed' \
     | grep -oE '[0-9]+ passed' | grep -oE '^[0-9]+' | head -1 || true
 }
+
+# ─────────────────────────── Preflight JS ───────────────────────────────────
+# Maven resuelve sus deps solo, pero los tests JS necesitan node_modules. En vez
+# de reventar con un críptico "jest/vitest: not found", chequeamos cada workspace
+# y, si falta, lo instalamos (npm ci si hay lock, npm install si no). El frontend
+# es un npm workspace → sus deps viven en frontend/node_modules (raíz), así que
+# alcanza con chequear esa raíz para cubrir ambas apps.
+JS_WORKSPACES=(bff-player bff-organizer bff-admin frontend)
+
+echo "============================================================"
+echo "  0/3  Preflight — dependencias JS"
+echo "============================================================"
+for ws in "${JS_WORKSPACES[@]}"; do
+  if [ -d "$ws/node_modules" ]; then
+    echo "    $ws → deps OK"
+  elif [ -f "$ws/package-lock.json" ]; then
+    echo "    $ws → falta node_modules; instalando con 'npm ci'…"
+    (cd "$ws" && npm ci)
+  else
+    echo "    $ws → falta node_modules y no hay package-lock.json; instalando con 'npm install'…"
+    (cd "$ws" && npm install)
+  fi
+done
 
 echo "============================================================"
 echo "  1/3  Microservicios Java (Spring Boot + JaCoCo)"
