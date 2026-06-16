@@ -33,7 +33,9 @@ Paginación: { content, page, size, totalElements, totalPages }
 - Exponer solo el puerto del servicio, no puertos de debug
 
 ### Testing
-- Mínimo 60% cobertura por módulo
+- Backend Java: gate JaCoCo a 90% por módulo (regla `jacoco:check`
+  en la fase `test`; un PR que baje del 90% rompe el build)
+- Node/frontend: best-effort, sin gate aún
 - Tests en src/test/ (Java), src/**/*.spec.ts (NestJS),
   tests/ (Python)
 - Usar H2 en memoria para tests de integración Java

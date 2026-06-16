@@ -72,6 +72,17 @@
 > **T2** quedó casi cerrado (PRs #29, #30 mergeados). Infra AWS **apagada** al cerrar. Próximo:
 > el fix de correos (T6) en un próximo encendido, y lo de Agustín (H-06, ADMIN, gate de T1).
 
+> **✅ Cierre de jornada 2026-06-16 — T1 TERMINADO:** los **6 módulos Java quedaron ≥90% de cobertura
+> con gate JaCoCo `check` a 0.90** (regla BUNDLE/INSTRUCTION) enlazado a la fase `test` → el `mvn test`
+> del CI lo aplica solo, **sin tocar el workflow**, y falla el build si algún módulo baja del 90%.
+> Cobertura real: api-gateway 97.6%, ms-users 91.1%, ms-tournament 93.6%, ms-game 93.1%,
+> ms-notifications 96.4%, ms-analytics 93.5%. Se subió ms-users (82.7→91.1), ms-tournament (85→93.6,
+> + exclude de `ChessEvent` por consistencia) y ms-analytics (76→93.5) con tests nuevos; `LichessClient`
+> recibió un refactor **seguro** (constructor para tests, prod intacto). **`scripts/test-all.sh`** corre
+> toda la suite (Java+BFF+frontend), ahora con **bff-admin** y un **preflight JS** que autoinstala deps:
+> **659 tests, 0 fallos**. Pendiente menor de T1: `coverageThreshold` en Node (best-effort) y que el
+> gate "muerda" en CI cuando el runner self-hosted vuelva online (T6).
+
 ---
 
 ## 1. ¿Qué convierte una demo en "producto v1"?
@@ -81,7 +92,7 @@ primeros cuatro, y al menos iniciado en los demás:
 
 | Pilar | Pregunta que responde | Tarea(s) en este roadmap |
 |---|---|---|
-| 🧪 **Calidad** | "¿cómo sé que no rompí nada al cambiar código?" | T1 (tests 80% + gate) |
+| 🧪 **Calidad** | "¿cómo sé que no rompí nada al cambiar código?" | T1 (tests ≥90% + gate) ✅ |
 | 🔒 **Seguridad** | "¿puede un tercero entrar/abusar?" | T2 (hardening + auditoría) |
 | 🧩 **Funcionalidad completa** | "¿está TODO el producto, no un recorte?" | T3 (ETL), T4 (QA paneles) |
 | 👁️ **Observabilidad** | "¿me entero cuándo y por qué falla?" | T5 (CloudWatch) |
@@ -117,7 +128,7 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ hecho · ⏸️ diferido — *ir 
 
 | # | Tarea | Incluye | Prioridad | Días-dev | Estado |
 |---|---|---|---|---|---|
-| 🧪 **T1** | Pruebas unitarias → **80% + gate en CI** | 🆕 Paso 0: la suite debe correr **en Docker** antes de arrancar | **P0** | 6–8 | 🟨 línea base verde en Docker; core casi 80% (ms-users 78%); gate bloqueado por runner (T6) |
+| 🧪 **T1** | Pruebas unitarias → **gate en CI** | Suite completa vía `scripts/test-all.sh` | **P0** | 6–8 | ✅ **HECHO (16-jun):** 6 módulos Java **≥90% con gate JaCoCo a 0.90** en fase `test`; 659 tests, 0 fallos. Falta menor: `coverageThreshold` Node (best-effort) y que el gate corra en CI (depende del runner, T6) |
 | 🔒 **T2** | **Seguridad** + hardening | Cerrar SG 8080, deps, secrets, H-01/H-02 | **P0** | 3 | 🟨 casi cerrado (H-04 ✅, SG ✅, deps PR#29 ✅, OBS-02 PR#30 ✅); falta H-06/H-07 + decisión ADMIN |
 | 🎤 **T8** | 🆕 **Ensayo final + informe + presentación** | Recorrido completo del front pre-entrega; presentación pensada para quien no conoce la app | **P0** | 1.5–2 | ⬜ |
 | 🧩 **T3** | **Integrar `ms-etl`** en AWS | Deploy (límite 10 contenedores) + migraciones + tests + e2e | **P1** | 3 | ✅ **HECHO (11-jun):** desplegado y verificado e2e en la réplica de Martin (Lichess SUCCESS) + fix de chesscom (PR #32) |
@@ -202,9 +213,12 @@ arreglarlo **antes** de empezar a escribir tests nuevos.
 **Definición de hecho:** backend core (gateway, ms-users, ms-tournament, ms-game) ≥80% con gate
 activo en CI; analytics/notifications/BFF/front en best-effort documentado.
 
-> ⚠️ **Realismo:** 80% **parejo en TODO** + el resto de tareas en 2 semanas es muy ambicioso.
-> Recomendado: 80% **obligatorio en backend core**, best-effort en el resto. **Acordar el número
-> con el profesor** para no comprometer una meta irreal.
+> ✅ **HECHO (2026-06-16) — superado:** los **6 módulos Java** quedaron **≥90%** (no solo el core) con
+> gate JaCoCo `check` a **0.90** en la fase `test` (regla BUNDLE/INSTRUCTION; respeta los `<excludes>`
+> de cada `pom`: app, config, dto, entity, exception, migration, ChessEvent). Falla el build si baja.
+> Reales: gateway 97.6%, ms-users 91.1%, ms-tournament 93.6%, ms-game 93.1%, ms-notifications 96.4%,
+> ms-analytics 93.5%. **659 tests, 0 fallos** (`scripts/test-all.sh`). Pendiente menor: `coverageThreshold`
+> en Node (best-effort) y que el gate corra efectivamente en CI cuando el runner self-hosted vuelva (T6).
 
 ---
 
@@ -389,7 +403,7 @@ presentación ensayada de punta a punta.
 - **Fin semana 2:** 80% en core con gate, v1.0.0 desplegado y verificado e2e en AWS, ensayo final
   hecho, informe y presentación listos.
 
-**Innegociable para v1:** T1 (core 80% + gate), T2 y T8 (informe/presentación son parte de la nota).
+**Innegociable para v1:** T1 (✅ hecho — los 6 módulos Java ≥90% + gate), T2 y T8 (informe/presentación son parte de la nota).
 **Muy deseable:** T3 y T5. **Si sobra:** T6. **Fuera:** T7.
 
 ---

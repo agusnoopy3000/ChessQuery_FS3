@@ -1,5 +1,6 @@
 package cl.chessquery.users.messaging;
 
+import cl.chessquery.users.entity.Club;
 import cl.chessquery.users.entity.Player;
 import cl.chessquery.users.entity.ProcessedEvent;
 import cl.chessquery.users.repository.ClubRepository;
@@ -13,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -292,5 +294,156 @@ class RatingUpdatedConsumerTest {
         )));
 
         verify(playerRepo, never()).save(any());
+    }
+
+    // ── Ramas de borde: payloads vacíos/raros, cascada por rut, club y errores ──
+
+    @Test
+    void emptyPlayers_persistsProcessedWithoutSaving() {
+        UUID id = UUID.randomUUID();
+        when(processedRepo.existsById(id)).thenReturn(false);
+
+        consumer.onRatingUpdated(event(id.toString(), List.of()));
+
+        verify(playerRepo, never()).save(any());
+        verify(processedRepo).save(any(ProcessedEvent.class));
+    }
+
+    @Test
+    void playersNotAList_persistsProcessedWithoutSaving() {
+        UUID id = UUID.randomUUID();
+        when(processedRepo.existsById(id)).thenReturn(false);
+        ChessEvent e = new ChessEvent();
+        e.setEventId(id.toString());
+        e.setEventType("rating.updated");
+        e.setPayload(Map.of("source", "AJEFECH", "players", "no-soy-lista"));
+
+        consumer.onRatingUpdated(e);
+
+        verify(playerRepo, never()).save(any());
+        verify(processedRepo).save(any(ProcessedEvent.class));
+    }
+
+    @Test
+    void nonMapPlayerItem_isSkipped() {
+        UUID id = UUID.randomUUID();
+        when(processedRepo.existsById(id)).thenReturn(false);
+        ChessEvent e = new ChessEvent();
+        e.setEventId(id.toString());
+        e.setEventType("rating.updated");
+        e.setPayload(Map.of("source", "AJEFECH", "players", List.of("no-soy-map")));
+
+        consumer.onRatingUpdated(e);
+
+        verify(playerRepo, never()).save(any());
+        verify(processedRepo).save(any(ProcessedEvent.class));
+    }
+
+    @Test
+    void missingFirstName_skipsPlayer() {
+        UUID id = UUID.randomUUID();
+        when(processedRepo.existsById(id)).thenReturn(false);
+
+        consumer.onRatingUpdated(event(id.toString(), List.of(
+                payload("f", "fi", "r", null, "OnlyLast", 1, 1)
+        )));
+
+        verify(playerRepo, never()).save(any());
+        verify(processedRepo).save(any(ProcessedEvent.class));
+    }
+
+    @Test
+    void matchByRut_enrichesNullFieldsAndResolvesNewClub() {
+        Player existing = Player.builder().id(4L).firstName("Luis").lastName("Rojas").build();
+        when(playerRepo.findByFederationId("F-X")).thenReturn(Optional.empty());
+        when(playerRepo.findByFideId("FIDE-X")).thenReturn(Optional.empty());
+        when(playerRepo.findByRut("11-1")).thenReturn(Optional.of(existing));
+        when(clubRepo.findFirstByNameIgnoreCase("Club Viña")).thenReturn(Optional.empty());
+        when(clubRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Map<String, Object> p = payload("F-X", "FIDE-X", "11-1", "Luis", "Rojas", 2000, 2100);
+        p.put("birthDate", "1990-05-12");
+        p.put("clubName", "Club Viña");
+        consumer.onRatingUpdated(event(UUID.randomUUID().toString(), List.of(p)));
+
+        ArgumentCaptor<Player> cap = ArgumentCaptor.forClass(Player.class);
+        verify(playerRepo).save(cap.capture());
+        Player saved = cap.getValue();
+        assertThat(saved.getFideId()).isEqualTo("FIDE-X");
+        assertThat(saved.getRut()).isEqualTo("11-1");
+        assertThat(saved.getBirthDate()).isEqualTo(LocalDate.parse("1990-05-12"));
+        assertThat(saved.getClub()).isNotNull();
+        assertThat(saved.getEloNational()).isEqualTo(2000);
+        verify(clubRepo).save(any(Club.class)); // club inexistente → find-or-create lo crea
+    }
+
+    @Test
+    void createsNewPlayer_withExistingClubAndBirthDate() {
+        when(playerRepo.findByFederationId("nf")).thenReturn(Optional.empty());
+        when(playerRepo.findByFideId(any())).thenReturn(Optional.empty());
+        when(playerRepo.findByRut(any())).thenReturn(Optional.empty());
+        when(playerRepo.findByFullNameIgnoreCase(any(), any())).thenReturn(Optional.empty());
+        Club club = Club.builder().id(3).name("Mate Club").build();
+        when(clubRepo.findFirstByNameIgnoreCase("Mate Club")).thenReturn(Optional.of(club));
+
+        Map<String, Object> p = payload("nf", "fn", "rn", "Pedro", "Díaz", 1700, 1800);
+        p.put("birthDate", "2001-01-01");
+        p.put("clubName", "Mate Club");
+        consumer.onRatingUpdated(event(UUID.randomUUID().toString(), List.of(p)));
+
+        ArgumentCaptor<Player> cap = ArgumentCaptor.forClass(Player.class);
+        verify(playerRepo).save(cap.capture());
+        Player saved = cap.getValue();
+        assertThat(saved.getClub()).isSameAs(club); // club ya existe → no se crea otro
+        assertThat(saved.getBirthDate()).isEqualTo(LocalDate.parse("2001-01-01"));
+    }
+
+    @Test
+    void createCollision_dataIntegrityViolation_skipsGracefully() {
+        when(playerRepo.findByFederationId("col")).thenReturn(Optional.empty());
+        when(playerRepo.findByFideId(any())).thenReturn(Optional.empty());
+        when(playerRepo.findByRut(any())).thenReturn(Optional.empty());
+        when(playerRepo.findByFullNameIgnoreCase(any(), any())).thenReturn(Optional.empty());
+        when(playerRepo.save(any())).thenThrow(
+                new org.springframework.dao.DataIntegrityViolationException("dup"));
+
+        // No debe propagar: el catch convierte la colisión por unique constraint en SKIPPED.
+        consumer.onRatingUpdated(event(UUID.randomUUID().toString(), List.of(
+                payload("col", "fc", "rc", "Caro", "Soto", 1500, null)
+        )));
+
+        verify(playerRepo).save(any());
+    }
+
+    @Test
+    void malformedValues_areToleratedAsNulls() {
+        Player existing = Player.builder().id(7L).firstName("Z").lastName("W").federationId("mf").build();
+        when(playerRepo.findByFederationId("mf")).thenReturn(Optional.of(existing));
+
+        Map<String, Object> p = new java.util.HashMap<>();
+        p.put("federationId", "mf");
+        p.put("firstName", "Z");
+        p.put("lastName", "W");
+        p.put("birthDate", "no-es-fecha"); // asLocalDate → null
+        p.put("eloNational", "abc");        // asInt → null
+        consumer.onRatingUpdated(event(UUID.randomUUID().toString(), List.of(p)));
+
+        ArgumentCaptor<Player> cap = ArgumentCaptor.forClass(Player.class);
+        verify(playerRepo).save(cap.capture());
+        assertThat(cap.getValue().getBirthDate()).isNull();
+    }
+
+    @Test
+    void invalidEventId_skipsIdempotencyAndProcessedPersist() {
+        // eventId no-UUID → parseUuid devuelve null → ni consulta ni persiste ProcessedEvent.
+        when(playerRepo.findByFederationId("738")).thenReturn(Optional.empty());
+        when(playerRepo.findByFullNameIgnoreCase(any(), any())).thenReturn(Optional.empty());
+
+        consumer.onRatingUpdated(event("not-a-uuid", List.of(
+                payload("738", null, null, "X", "Y", 1, 1)
+        )));
+
+        verify(processedRepo, never()).existsById(any());
+        verify(processedRepo, never()).save(any());
     }
 }

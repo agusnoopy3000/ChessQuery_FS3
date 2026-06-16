@@ -128,4 +128,34 @@ class UserControllerTest {
                         .content("{\"ratingType\":\"NATIONAL\",\"newValue\":1500,\"source\":\"ETL\"}"))
                 .andExpect(status().isNoContent());
     }
+
+    @Test
+    @DisplayName("getLichessUsernames_returns200")
+    void getLichessUsernames_returns200() throws Exception {
+        when(playerRepository.findAllLichessUsernames()).thenReturn(List.of("magnus", "hikaru"));
+        mvc.perform(get("/users/lichess-usernames")).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("getChesscomUsernames_returns200")
+    void getChesscomUsernames_returns200() throws Exception {
+        when(playerRepository.findAllChesscomUsernames()).thenReturn(List.of("magnus"));
+        mvc.perform(get("/users/chesscom-usernames")).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("syncLichess_returns200")
+    void syncLichess_returns200() throws Exception {
+        when(playerService.syncLichess(eq(1L))).thenReturn(sample(1L));
+        mvc.perform(post("/users/1/lichess-sync")).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("list_sizeZero_totalPagesZero")
+    void list_sizeZero_totalPagesZero() throws Exception {
+        when(playerRepository.count()).thenReturn(10L);
+        mvc.perform(get("/users").param("size", "0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalPages").value(0));
+    }
 }

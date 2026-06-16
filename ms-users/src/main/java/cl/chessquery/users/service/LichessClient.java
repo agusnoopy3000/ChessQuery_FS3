@@ -21,13 +21,22 @@ import java.util.Optional;
 @Component
 public class LichessClient {
 
-    private static final String BASE =
-            System.getenv().getOrDefault("LICHESS_API_BASE", "https://lichess.org");
+    private final String base;
 
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(8))
             .build();
     private final ObjectMapper mapper = new ObjectMapper();
+
+    /** Constructor de producción: la URL base sale de LICHESS_API_BASE (o lichess.org por defecto). */
+    public LichessClient() {
+        this(System.getenv().getOrDefault("LICHESS_API_BASE", "https://lichess.org"));
+    }
+
+    /** Visible para tests: permite apuntar a un stub HTTP local. */
+    LichessClient(String base) {
+        this.base = base;
+    }
 
     public record LichessRatings(Integer bullet, Integer blitz, Integer rapid, Integer classical) {}
 
@@ -35,7 +44,7 @@ public class LichessClient {
         if (username == null || username.isBlank()) return Optional.empty();
         try {
             HttpRequest req = HttpRequest.newBuilder()
-                    .uri(URI.create(BASE + "/api/user/" + username.trim()))
+                    .uri(URI.create(base + "/api/user/" + username.trim()))
                     .timeout(Duration.ofSeconds(10))
                     .header("Accept", "application/json")
                     .GET()

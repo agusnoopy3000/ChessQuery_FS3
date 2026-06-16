@@ -85,7 +85,11 @@ cp infrastructure/.env.example infrastructure/.env
 cd frontend && npm install && cd ..
 cd bff-player && npm install && cd ..
 cd bff-organizer && npm install && cd ..
+cd bff-admin && npm install && cd ..
 ```
+
+> 💡 Si te salteás este paso, `scripts/test-all.sh` tiene un **preflight** que detecta el
+> `node_modules` faltante y lo instala solo (`npm ci`/`npm install`) antes de correr la suite.
 
 Los microservicios Java descargan dependencias automáticamente la primera vez que corras `mvn`.
 
@@ -93,25 +97,31 @@ Los microservicios Java descargan dependencias automáticamente la primera vez q
 
 ## 1. Panorama de pruebas
 
-| Servicio | Framework | Tipos de prueba | Total tests | Cobertura objetivo |
+| Servicio | Framework | Tipos de prueba | Total tests | Cobertura (gate) |
 |---|---|---|---:|---:|
-| `api-gateway` | JUnit 5 + Mockito + WebTestClient | Unit + Filter slice | 44 | 80% |
-| `ms-users` | JUnit 5 + Mockito + `@SpringBootTest` | Unit + Integration H2 | 110 | 85% |
-| `ms-tournament` | JUnit 5 + Mockito + `@SpringBootTest` | Unit + Integration H2 | 94 | 85% |
-| `ms-game` | JUnit 5 + Mockito + `@SpringBootTest` | Unit + Integration H2 | 91 | 85% |
-| `ms-notifications` | JUnit 5 + Mockito + `@SpringBootTest` | Unit + Integration H2 | 65 | 85% |
-| `ms-analytics` | JUnit 5 + Mockito + `@SpringBootTest` | Unit + Integration H2 | 14 | 75% |
-| `bff-player` | Jest (NestJS) | Unit service + http | 47 | 96% líneas |
-| `bff-organizer` | Jest (NestJS) | Unit service + http | 28 | 94% líneas |
-| `chess-portal` (frontend) | Vitest + RTL + jsdom | Page specs | 37 | 76% líneas |
-| `organizer-panel` (frontend) | Vitest + RTL + jsdom | Page specs | 38 | 75% líneas |
-| **Total** | — | — | **568** | — |
+| `api-gateway` | JUnit 5 + Mockito + WebTestClient | Unit + Filter slice | 53 | 97.6% · **gate 0.90** |
+| `ms-users` | JUnit 5 + Mockito + `@SpringBootTest` | Unit + Integration H2 | 160 | 91.1% · **gate 0.90** |
+| `ms-tournament` | JUnit 5 + Mockito + `@SpringBootTest` | Unit + Integration H2 | 112 | 93.6% · **gate 0.90** |
+| `ms-game` | JUnit 5 + Mockito + `@SpringBootTest` | Unit + Integration H2 | 91 | 93.1% · **gate 0.90** |
+| `ms-notifications` | JUnit 5 + Mockito + `@SpringBootTest` | Unit + Integration H2 | 66 | 96.4% · **gate 0.90** |
+| `ms-analytics` | JUnit 5 + Mockito + `@SpringBootTest` | Unit + Integration H2 | 20 | 93.5% · **gate 0.90** |
+| `bff-player` | Jest (NestJS) | Unit service + http | 47 | 96% líneas (best-effort) |
+| `bff-organizer` | Jest (NestJS) | Unit service + http | 28 | 94% líneas (best-effort) |
+| `bff-admin` | Jest (NestJS) | Unit service + http | 7 | best-effort |
+| `chess-portal` (frontend) | Vitest + RTL + jsdom | Page specs | 37 | 76% líneas (best-effort) |
+| `organizer-panel` (frontend) | Vitest + RTL + jsdom | Page specs | 38 | 75% líneas (best-effort) |
+| **Total** | — | — | **659** | — |
+
+> **Gate de cobertura (T1):** los **6 módulos Java** tienen una regla `jacoco:check` a **0.90**
+> (instrucciones, nivel BUNDLE) enlazada a la fase `test` → el `mvn test` (local y CI) **falla el
+> build si la cobertura del módulo baja del 90%**. Node/frontend quedan best-effort (sin gate aún).
+> ⚠️ `bff-admin` se corre en `scripts/test-all.sh` (local) pero **todavía no está en el CI** (`ci.yml`).
 
 **Patrones aplicados:**
 - **Unit**: servicios + controllers con dependencias mockeadas (Mockito / Jest mocks / `vi.mock`).
 - **Integration backend**: `@SpringBootTest + @AutoConfigureMockMvc + @ActiveProfiles("test")` con H2 in-memory en modo PostgreSQL; `RabbitMQConfig` excluido con `@Profile("!test")`.
 - **Frontend**: React Testing Library + mocks de `@tanstack/react-query`, `@chessquery/ui-lib` y `../api`.
-- **Cobertura**: JaCoCo (Java) y v8 (Vite) con exclusiones de `config/**`, `dto/**`, `entity/**`, `exception/**`.
+- **Cobertura**: JaCoCo (Java) y v8 (Vite) con exclusiones de `config/**`, `dto/**`, `entity/**`, `exception/**`, `migration/**` y el envelope `messaging/ChessEvent`.
 
 ---
 
@@ -165,7 +175,7 @@ Cada módulo debe terminar con `BUILD SUCCESS` y la línea:
 ### 2.2 BFFs (NestJS + Jest)
 
 ```bash
-cd bff-player        # o bff-organizer
+cd bff-player        # o bff-organizer, bff-admin
 
 # Suite completa
 npm test
@@ -177,7 +187,7 @@ npm run test:watch
 npm test -- --coverage
 ```
 
-Esperado: `Tests: 47 passed` (bff-player) y `Tests: 28 passed` (bff-organizer).
+Esperado: `Tests: 47 passed` (bff-player), `Tests: 28 passed` (bff-organizer) y `Tests: 7 passed` (bff-admin).
 
 ---
 
@@ -232,12 +242,13 @@ done
 # 2. BFFs
 (cd bff-player && npm test)
 (cd bff-organizer && npm test)
+(cd bff-admin && npm test)
 
 # 3. Frontend
 (cd frontend/apps/chess-portal && npm test)
 (cd frontend/apps/organizer-panel && npm test)
 
-echo "✅ 568 tests pasaron"
+echo "✅ 659 tests pasaron"
 ```
 
 Este script **ya está en el repo** como `scripts/test-all.sh`. Corré toda la suite con:
@@ -248,21 +259,21 @@ bash scripts/test-all.sh
 
 Al terminar imprime una **tabla-resumen** con el conteo real de tests por módulo
 (capa, tipo de prueba y total), tomado de los reportes Surefire/Jest/Vitest de esa
-misma corrida — útil para verificar de un vistazo los **568 tests** y dónde está cada uno:
+misma corrida — útil para verificar de un vistazo los **659 tests** y dónde está cada uno:
 
 ```
 Módulo           │ Capa          │ Tipo de prueba                    │ Tests
 ─────────────────┼───────────────┼───────────────────────────────────┼──────
-api-gateway      │ Backend Java  │ Unit + filtro JWT (HS256/ES256)   │    44
+api-gateway      │ Backend Java  │ Unit + filtro JWT (HS256/ES256)   │    53
 …
 organizer-panel  │ Frontend      │ Page specs (Vitest + RTL)         │    38
 ─────────────────┴───────────────┴───────────────────────────────────┴──────
-TOTAL                                                                    568
+TOTAL                                                                    659
 ```
 
-> ⚠️ Asume que ya hiciste `npm install` en `frontend/`, `bff-player/` y `bff-organizer/` (ver §0).
-> La **primera** corrida de Maven baja dependencias (~5-10 min); las siguientes, ~2 min.
-> Última corrida verificada: **568 tests, 0 fallos, 0 errores**.
+> 💡 Si falta `node_modules` en algún workspace JS, el **preflight** del script lo instala solo
+> (ver §0). La **primera** corrida de Maven baja dependencias (~5-10 min); las siguientes, ~2 min.
+> Última corrida verificada: **659 tests, 0 fallos, 0 errores**.
 
 ---
 
@@ -304,8 +315,11 @@ docker compose down
 El workflow `.github/workflows/ci.yml` corre **automáticamente** en cada `push` / `pull_request`:
 
 - **Job `java-tests`** — matriz 6 módulos × `mvn clean test` + sube artefactos `target/site/jacoco/`.
+  El gate `jacoco:check` (0.90) corre en la fase `test`, así que **un PR que baje la cobertura de un
+  módulo por debajo del 90% rompe este job** (no solo lo reporta).
 - **Job `frontend-tests`** — matriz 2 apps × `npm test` + sube `coverage/`.
-- **Job `bff-tests`** — matriz 2 BFFs × `npm test`.
+- **Job `bff-tests`** — matriz 2 BFFs (`bff-player`, `bff-organizer`) × `npm test`. `bff-admin` aún
+  **no** está en el CI; se corre solo localmente vía `scripts/test-all.sh`.
 
 Verificar localmente antes de pushear:
 

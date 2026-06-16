@@ -21,6 +21,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -54,6 +55,16 @@ class RankingServiceTest {
         assertThat(r).hasSize(2);
         assertThat(r.get(0).position()).isEqualTo(1);
         assertThat(r.get(1).position()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("getRanking_validCategory_appliesBirthDateBounds")
+    void getRanking_validCategory_appliesBirthDateBounds() {
+        // Categoría válida → cat != null → se pasan minBirthDate/maxBirthDate al repo.
+        when(playerRepo.findRanking(eq("Metropolitana"), any(), any(), any()))
+                .thenReturn(List.of());
+        service.getRanking("SUB_20", "Metropolitana", 50);
+        verify(playerRepo).findRanking(eq("Metropolitana"), any(), any(), any());
     }
 
     @Test

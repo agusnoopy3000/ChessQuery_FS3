@@ -7,8 +7,11 @@ test del proyecto, para que cualquiera que retome el desarrollo entienda el porq
 > todo tras un `git clone`. Este documento es el *de fondo*: la teoría, el diseño y la cobertura.
 > Si solo querés ejecutar los tests, andá a `TESTING.md`.
 
-Última verificación de la suite: **568 tests, 0 fallos, 0 errores** (corrida local sobre Arch Linux,
+Última verificación de la suite: **659 tests, 0 fallos, 0 errores** (corrida local sobre Arch Linux,
 Maven 3.9.16 + JDK 17 + Node 26).
+
+> **T1 cerrado (2026-06-16):** los 6 módulos Java están **≥90% de cobertura con gate `jacoco:check`
+> a 0.90** (ver §5). El `mvn test` (local y CI) falla el build si un módulo baja del 90%.
 
 ---
 
@@ -16,17 +19,18 @@ Maven 3.9.16 + JDK 17 + Node 26).
 
 | Capa | Servicio | Framework | Tests | Tipo |
 |---|---|---|---:|---|
-| Backend Java | `api-gateway` | JUnit 5 + Mockito + WebTestClient | 44 | Unit + slice de filtro |
-| Backend Java | `ms-users` | JUnit 5 + Mockito + `@SpringBootTest` | 110 | Unit + Integración H2 |
-| Backend Java | `ms-tournament` | JUnit 5 + Mockito + `@SpringBootTest` | 94 | Unit + Integración H2 |
+| Backend Java | `api-gateway` | JUnit 5 + Mockito + WebTestClient | 53 | Unit + slice de filtro |
+| Backend Java | `ms-users` | JUnit 5 + Mockito + `@SpringBootTest` | 160 | Unit + Integración H2 |
+| Backend Java | `ms-tournament` | JUnit 5 + Mockito + `@SpringBootTest` | 112 | Unit + Integración H2 |
 | Backend Java | `ms-game` | JUnit 5 + Mockito + `@SpringBootTest` | 91 | Unit + Integración H2 |
-| Backend Java | `ms-notifications` | JUnit 5 + Mockito + `@SpringBootTest` | 65 | Unit + Integración H2 |
-| Backend Java | `ms-analytics` | JUnit 5 + Mockito + `@SpringBootTest` | 14 | Unit + Integración H2 |
+| Backend Java | `ms-notifications` | JUnit 5 + Mockito + `@SpringBootTest` | 66 | Unit + Integración H2 |
+| Backend Java | `ms-analytics` | JUnit 5 + Mockito + `@SpringBootTest` | 20 | Unit + Integración H2 |
 | BFF | `bff-player` | Jest (NestJS) | 47 | Unit (service + http) |
 | BFF | `bff-organizer` | Jest (NestJS) | 28 | Unit (service + http) |
+| BFF | `bff-admin` | Jest (NestJS) | 7 | Unit (service + http) |
 | Frontend | `chess-portal` | Vitest + RTL + jsdom | 37 | Component/page specs |
 | Frontend | `organizer-panel` | Vitest + RTL + jsdom | 38 | Component/page specs |
-| | | **TOTAL** | **568** | |
+| | | **TOTAL** | **659** | |
 
 **Pirámide de pruebas aplicada:** base ancha de **unitarias** rápidas (mockean dependencias),
 una capa de **integración** por microservicio que valida el wiring real HTTP→Service→JPA contra
@@ -50,7 +54,7 @@ dependencias mockeadas**. No tocan red, broker ni base de datos. Son las más nu
 
 ### 2.2 Cobertura por módulo Java
 
-**`api-gateway` (44 tests)** — el borde de seguridad del sistema:
+**`api-gateway` (53 tests)** — el borde de seguridad del sistema:
 - `SupabaseJwtAuthFilterTest` (16) — filtro JWT, flujo **HS256**: rutas públicas (`/actuator`),
   `extractRole` (claim directo, `app_metadata.role`, fallback `PLAYER`), propagación de
   `provisionClaims` (firstName/lastName/lichessUsername/clubName del `user_metadata`), validación
@@ -66,18 +70,24 @@ dependencias mockeadas**. No tocan red, broker ni base de datos. Son las más nu
 - `SupabaseWebhookControllerTest` — endpoint `user-registered`.
 - `SupabaseAuthHealthIndicatorTest` — health del proveedor de auth.
 
-**`ms-users` (110 tests)** — dominio de jugadores y ranking:
-- `PlayerServiceTest` — sync/provision/profile/update/elo/search/history.
+**`ms-users` (160 tests)** — dominio de jugadores y ranking:
+- `PlayerServiceTest` — sync/provision/profile/update/elo/search/history (+ `syncLichess` y `updateElo`
+  parametrizado sobre los 9 `RatingType`).
 - `RankingServiceTest`, `PlayerSearchServiceTest`, `AgeCategoryTest` (lógica de categorías por edad).
-- `messaging/*ConsumerTest` — `EloUpdatedConsumer`, `RatingUpdatedConsumer`, `UserRegisteredConsumer`.
+- `messaging/*ConsumerTest` — `EloUpdatedConsumer`, `RatingUpdatedConsumer`, `UserRegisteredConsumer`
+  (ampliados con ramas de borde: parseo laxo, matching por rut, club find-or-create, colisiones, etc.).
+- `LichessClientTest` — cliente HTTP de Lichess contra un stub local (`com.sun.net.httpserver`);
+  para testearlo, `LichessClient` recibió un constructor *visible-para-tests* con la URL base (el de
+  producción sigue leyendo la env `LICHESS_API_BASE` igual).
 - `UserControllerTest` — slice `@WebMvcTest`.
 - `EventPublisherServiceTest` — publicación de eventos a RabbitMQ (mock del template).
 
-**`ms-tournament` (94 tests)** — torneos y emparejamientos:
+**`ms-tournament` (112 tests)** — torneos y emparejamientos:
 - `TournamentServiceTest` — ciclo de vida del torneo (28 casos).
 - `pairing/PairingStrategiesTest` + `SwissPairingStrategyTest` — estrategias Knockout, RoundRobin,
   Swiss y la Factory.
-- `UserEloClientTest` — cliente HTTP con **circuit breaker**.
+- `UserEloClientTest` y `LiveGameClientTest` — clientes HTTP con **circuit breaker** (camino feliz,
+  respuesta sin `id`, body null y fallback con el breaker abierto).
 - `TournamentControllerTest` — slice `@WebMvcTest` (18 casos).
 
 **`ms-game` (91 tests)** — el corazón con la lógica de ajedrez:
@@ -91,15 +101,17 @@ dependencias mockeadas**. No tocan red, broker ni base de datos. Son las más nu
 - `storage/*` — `MinioStorageServiceTest`, `SupabaseStorageServiceTest`,
   `SupabaseStorageHealthIndicatorTest` (subida del PGN).
 
-**`ms-notifications` (65 tests)** — fan-out de eventos a notificaciones:
+**`ms-notifications` (66 tests)** — fan-out de eventos a notificaciones:
 - `ConsumersTest` — los 3 consumers (Tournament/Game/Etl events) con todos sus routings y el
   manejo de idempotencia: `alreadyProcessed → ack` sin re-despachar,
   `DataIntegrityViolation → ack` (carrera de idempotencia), `exception → nack` sin requeue.
 - `NotificationServiceTest`, `PlayerNameResolverTest` (cache + fallback), `MockEmailServiceTest`.
 - `NotificationControllerTest` — slice `@WebMvcTest`.
 
-**`ms-analytics` (14 tests)** — agregaciones:
+**`ms-analytics` (20 tests)** — agregaciones:
 - `GameEventsConsumerTest` — draws, running average, best ELO, idempotencia y eventos desconocidos.
+- `EtlEventsConsumerTest` — evento `rating.updated` del ETL: idempotencia, tipo desconocido, eventId
+  null, `DataIntegrityViolation → ack` y excepción genérica → nack.
 
 ### 2.3 Cobertura por suite JS
 
@@ -231,25 +243,31 @@ datos) y **navegación** (post-mutate, links).
 
 - **Java — JaCoCo.** Reporte en `<módulo>/target/site/jacoco/index.html`. Exclusiones globales
   (no aportan a la métrica): clase `*Application`, `config/**`, `dto/**`, `entity/**`,
-  `exception/**`, `migration/**` y configs de storage (`StorageConfig`, `S3Config`).
+  `exception/**`, `migration/**`, el envelope `messaging/ChessEvent*` y configs de storage
+  (`StorageConfig`, `S3Config`).
 - **Frontend — v8 (Vitest).** Reporte en `frontend/apps/<app>/coverage/index.html`.
 
-### 5.2 Números reales (última corrida) vs objetivo
+### 5.2 Números reales (última corrida) y gate
 
-| Módulo | Objetivo | Observado | Estado |
+Cobertura de **instrucciones** (JaCoCo, BUNDLE) tras T1 — todos los módulos Java con **gate `check`
+a 0.90** enlazado a la fase `test`:
+
+| Módulo | Gate | Observado | Estado |
 |---|---:|---|---|
-| `ms-game` | ≥85% líneas | ~90% | ✅ |
-| `ms-users` / `ms-tournament` / `ms-notifications` | ≥85% líneas | en rango | ✅ |
-| `api-gateway` | ≥80% líneas | 97.9% (`SupabaseJwtAuthFilter` 60%→97%) | ✅ |
-| `ms-analytics` | ≥75% líneas | en rango | ✅ |
-| `chess-portal` | — | 76% líneas / 72.5% stmts | ✅ |
-| `organizer-panel` | ≥75% líneas | 75.3% (`OrganizerTournaments.tsx` 84%) | ✅ |
-| `bff-player` | — | 96% líneas / 71.8% ramas | ✅ |
-| `bff-organizer` | — | 94% líneas / 83.6% ramas | ✅ |
+| `api-gateway` | 0.90 | 97.6% | ✅ |
+| `ms-users` | 0.90 | 91.1% | ✅ |
+| `ms-tournament` | 0.90 | 93.6% | ✅ |
+| `ms-game` | 0.90 | 93.1% | ✅ |
+| `ms-notifications` | 0.90 | 96.4% | ✅ |
+| `ms-analytics` | 0.90 | 93.5% | ✅ |
+| `chess-portal` | — (best-effort) | 76% líneas / 72.5% stmts | ✅ |
+| `organizer-panel` | — (best-effort) | 75.3% (`OrganizerTournaments.tsx` 84%) | ✅ |
+| `bff-player` | — (best-effort) | 96% líneas / 71.8% ramas | ✅ |
+| `bff-organizer` | — (best-effort) | 94% líneas / 83.6% ramas | ✅ |
 
-> Los umbrales **no bloquean el build aún** (no hay `check` de JaCoCo que falle el `mvn verify`).
-> `OrganizerTournaments.tsx` —que antes hundía el promedio a ~35%— ahora está cubierto al **84%**
-> de líneas, llevando a `organizer-panel` a **75.3%** global.
+> **El gate de Java SÍ bloquea el build:** si la cobertura de instrucciones de un módulo baja del
+> 90%, `mvn test` (local y CI) falla con `Rule violated for bundle …`. Node/frontend siguen
+> best-effort (sin `coverageThreshold` aún).
 
 ### 5.3 Cómo ver un reporte
 
@@ -265,7 +283,7 @@ xdg-open ~/ChessQuery_FS3/frontend/apps/chess-portal/coverage/index.html
 Detalle completo en `TESTING.md`. Lo esencial:
 
 ```bash
-# Todo de un tirón (requiere JDK 17, Maven, Node, y npm install hecho en los workspaces JS)
+# Todo de un tirón (requiere JDK 17, Maven, Node; el preflight instala node_modules si falta)
 bash scripts/test-all.sh
 
 # Un módulo Java con salida detallada (sin -q)
@@ -281,9 +299,10 @@ cd frontend/apps/chess-portal && npx vitest
 
 Ordenados por relación impacto/esfuerzo:
 
-1. **Activar umbrales que fallen el build (quality gate).** Hoy los porcentajes son informativos.
-   Agregar la regla `jacoco:check` en cada `pom.xml` con el mínimo por módulo (85/80/75%) para que
-   un PR que baje la cobertura **rompa el CI**, no solo lo reporte.
+1. ~~**Activar umbrales que fallen el build (quality gate).**~~ ✅ **Hecho (T1, 2026-06-16).** Cada
+   `pom.xml` de los 6 módulos Java tiene `jacoco:check` a **0.90** (BUNDLE/INSTRUCTION) en la fase
+   `test` → un PR que baje la cobertura **rompe el build**, no solo lo reporta. Pendiente menor:
+   `coverageThreshold` equivalente en Node/frontend (hoy best-effort).
 
 2. ~~**Subir `organizer-panel` al nivel del resto.**~~ ✅ **Hecho.** Se ampliaron las specs de
    `OrganizerTournaments.tsx` (listado/KPIs, búsqueda, filtros, estados DRAFT/OPEN/IN_PROGRESS/
