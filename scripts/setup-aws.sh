@@ -159,9 +159,15 @@ upsert_secret "$PROJECT/supabase-service-key"    "$SUPABASE_SERVICE_KEY"
 upsert_secret "$PROJECT/jwt-secret"              "$SUPABASE_JWT_SECRET"
 upsert_secret "$PROJECT/supabase-webhook-secret" "$WEBHOOK_SECRET"
 
-# SMTP (ms-notifications). Usa SMTP_PASSWORD del entorno si está; si no, reusa el
-# secreto ya guardado; y si tampoco existe, deja un placeholder (el task-def
-# registra igual, pero los correos fallan hasta poner la App Password real).
+# SMTP (ms-notifications). Cuenta remitente oficial de ChessQuery: desde acá
+# salen los correos de bienvenida e invitación. Override con SMTP_USERNAME/MAIL_FROM
+# del entorno si hace falta otra cuenta. Gmail exige From == cuenta autenticada,
+# así que MAIL_FROM sigue a SMTP_USERNAME por defecto.
+SMTP_USERNAME="${SMTP_USERNAME:-chessquery.invitaciones@gmail.com}"
+MAIL_FROM="${MAIL_FROM:-$SMTP_USERNAME}"
+# Usa SMTP_PASSWORD del entorno si está; si no, reusa el secreto ya guardado; y si
+# tampoco existe, deja un placeholder (el task-def registra igual, pero los correos
+# fallan hasta poner la App Password real de la cuenta remitente).
 SMTP_PASSWORD="${SMTP_PASSWORD:-$(aws secretsmanager get-secret-value --secret-id "$PROJECT/smtp-password" --query SecretString --output text 2>/dev/null || echo 'CHANGE_ME_SMTP_APP_PASSWORD')}"
 upsert_secret "$PROJECT/smtp-password"           "$SMTP_PASSWORD"
 
@@ -179,7 +185,8 @@ SMTP_PASSWORD_ARN=$(aws secretsmanager describe-secret --secret-id "$PROJECT/smt
   echo "SUPABASE_SERVICE_KEY_ARN=$SUPABASE_SERVICE_KEY_ARN"
   echo "JWT_SECRET_ARN=$JWT_SECRET_ARN"
   echo "SUPABASE_WEBHOOK_SECRET_ARN=$SUPABASE_WEBHOOK_SECRET_ARN"
-  echo "SMTP_USERNAME=${SMTP_USERNAME:-}"
+  echo "SMTP_USERNAME=${SMTP_USERNAME}"
+  echo "MAIL_FROM=${MAIL_FROM}"
   echo "SMTP_PASSWORD_ARN=$SMTP_PASSWORD_ARN"
 } >> "$OUT"
 
