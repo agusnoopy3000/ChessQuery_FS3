@@ -106,7 +106,7 @@ jobs:
       # 2) H-07: gate de seguridad sobre la imagen construida. Falla si hay
       #    HIGH/CRITICAL con fix. Si pasa, recién ahí se publica (paso 3).
       - name: Trivy image scan (HIGH/CRITICAL)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ steps.tags.outputs.ecr_uri }}:${{ steps.tags.outputs.sha_tag }}
           severity: HIGH,CRITICAL
