@@ -1,20 +1,41 @@
-name: Deploy to ECS Fargate (task única)
+name: Deploy to AWS (stack ECS + frontends S3 + ETL)
 
-# Opción A: toda la plataforma corre en UNA task ECS (contenedores comunicados
-# por localhost) porque AWS Academy bloquea Cloud Map / Service Discovery.
-# Ver infrastructure/aws/task-definitions/chessquery-stack.template.json
+# Despliegue COMPLETO y MANUAL adaptado a la infra económica de ChessQuery:
+#   - ECS Fargate: una task única "chessquery-stack" (10 contenedores por
+#     localhost, porque Academy bloquea Cloud Map). Ver task-definitions/.
+#   - S3: dos sitios estáticos (chess-portal, organizer-panel).
+#   - ms-etl: service ECS aparte con Application Auto Scaling (extra).
+#   - RDS: dependencia; debe estar 'available' (no la gestiona este workflow).
+#
+# Manual (workflow_dispatch) a propósito: las creds de AWS Academy rotan cada ~4h
+# y no sobreviven en GitHub Secrets. Refrescás los secrets y corrés esto. Los
+# toggles permiten desplegar solo lo que cambió (más liviano).
+#
+# Runner: self-hosted por defecto; RUNNER_LABEL=ubuntu-latest para hosted.
 
 on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: 'Tag de imagen a desplegar (ej: sha-abc1234 o v0.1.0)'
+        description: 'Tag de imagen a desplegar (ej: sha-abc1234 o v0.3.1)'
         required: true
         default: 'latest'
       cluster:
         description: 'Cluster ECS objetivo'
         required: true
         default: 'chessquery-cluster'
+      deploy_stack:
+        description: 'Desplegar el stack ECS'
+        type: boolean
+        default: true
+      deploy_frontend:
+        description: 'Buildear y sincronizar los frontends a S3'
+        type: boolean
+        default: true
+      deploy_etl:
+        description: 'Desplegar/actualizar el service ms-etl (autoscaling)'
+        type: boolean
+        default: false
 
 permissions:
   id-token: write
@@ -22,8 +43,8 @@ permissions:
 
 jobs:
   deploy:
-    name: Deploy chessquery-stack
-    runs-on: [self-hosted, Linux, X64]
+    name: Deploy ChessQuery (${{ github.event.inputs.image_tag }})
+    runs-on: ${{ vars.RUNNER_LABEL || 'self-hosted' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -47,7 +68,9 @@ jobs:
         env:
           USE_OIDC: ${{ secrets.GH_OIDC_ROLE_ARN != '' && 'true' || 'false' }}
 
+      # ── 1) STACK ECS ─────────────────────────────────────────────────────
       - name: Render task definition
+        if: ${{ github.event.inputs.deploy_stack == 'true' }}
         id: render
         run: |
           export ECR_REGISTRY="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com"
@@ -61,16 +84,18 @@ jobs:
           export SUPABASE_SERVICE_KEY_ARN="${{ secrets.SUPABASE_SERVICE_KEY_ARN }}"
           export JWT_SECRET_ARN="${{ secrets.JWT_SECRET_ARN }}"
           export SUPABASE_WEBHOOK_SECRET_ARN="${{ secrets.SUPABASE_WEBHOOK_SECRET_ARN }}"
+          export GATEWAY_CORS_ALLOWED_ORIGINS="${{ secrets.GATEWAY_CORS_ALLOWED_ORIGINS }}"
+          export SMTP_USERNAME="${{ secrets.SMTP_USERNAME }}"
+          export SMTP_PASSWORD_ARN="${{ secrets.SMTP_PASSWORD_ARN }}"
+          export MAIL_FROM="${{ secrets.MAIL_FROM }}"
 
           template="infrastructure/aws/task-definitions/chessquery-stack.template.json"
           rendered="task-def-chessquery-stack.json"
           envsubst < "$template" > "$rendered"
           echo "task_def=$rendered" >> $GITHUB_OUTPUT
-          echo "::group::Task definition rendered"
-          cat "$rendered"
-          echo "::endgroup::"
 
       - name: Register new task definition revision
+        if: ${{ github.event.inputs.deploy_stack == 'true' }}
         id: register
         run: |
           TASK_DEF_ARN=$(aws ecs register-task-definition \
@@ -80,18 +105,85 @@ jobs:
           echo "::notice title=Registered::$TASK_DEF_ARN"
 
       - name: Update ECS service (force new deployment)
+        if: ${{ github.event.inputs.deploy_stack == 'true' }}
         run: |
           aws ecs update-service \
             --cluster ${{ github.event.inputs.cluster }} \
             --service chessquery-stack \
             --task-definition ${{ steps.register.outputs.task_def_arn }} \
-            --force-new-deployment \
-            > /dev/null
+            --desired-count 1 \
+            --force-new-deployment > /dev/null
           echo "::notice title=Service updated::chessquery-stack → ${{ steps.register.outputs.task_def_arn }}"
 
-      - name: Wait for service to stabilize
+      - name: Wait for stack to stabilize
+        if: ${{ github.event.inputs.deploy_stack == 'true' }}
         run: |
           aws ecs wait services-stable \
             --cluster ${{ github.event.inputs.cluster }} \
             --services chessquery-stack
           echo "::notice title=Service stable::chessquery-stack desplegado"
+
+      # ── 2) FRONTENDS → S3 ────────────────────────────────────────────────
+      - name: Setup Node 20
+        if: ${{ github.event.inputs.deploy_frontend == 'true' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build & sync frontends to S3
+        if: ${{ github.event.inputs.deploy_frontend == 'true' }}
+        working-directory: frontend
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_PORTAL_URL: ${{ secrets.VITE_PORTAL_URL }}
+          VITE_ORGANIZER_URL: ${{ secrets.VITE_ORGANIZER_URL }}
+          BUCKET_PORTAL: ${{ secrets.S3_BUCKET_PORTAL }}
+          BUCKET_ORGANIZER: ${{ secrets.S3_BUCKET_ORGANIZER }}
+        run: |
+          npm ci
+          npm --prefix apps/chess-portal run build
+          npm --prefix apps/organizer-panel run build
+          aws s3 sync apps/chess-portal/dist/    "s3://${BUCKET_PORTAL}"    --delete
+          aws s3 sync apps/organizer-panel/dist/ "s3://${BUCKET_ORGANIZER}" --delete
+          echo "::notice title=Frontends sync::portal=${BUCKET_PORTAL} organizer=${BUCKET_ORGANIZER}"
+
+      # ── 3) ms-etl (extra, con autoscaling) ───────────────────────────────
+      # Reusa el script ya probado; reconstruye .deploy-outputs.env desde secrets.
+      - name: Deploy ETL service (autoscaling)
+        if: ${{ github.event.inputs.deploy_etl == 'true' }}
+        env:
+          IMAGE_TAG: ${{ github.event.inputs.image_tag }}
+        run: |
+          mkdir -p infrastructure/aws
+          cat > infrastructure/aws/.deploy-outputs.env <<EOF
+          AWS_REGION=${{ secrets.AWS_REGION }}
+          ECR_REGISTRY=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+          VPC_ID=${{ secrets.VPC_ID }}
+          TASK_EXECUTION_ROLE_ARN=${{ secrets.TASK_EXECUTION_ROLE_ARN }}
+          DB_HOST=${{ secrets.DB_HOST }}
+          DB_PASSWORD_ARN=${{ secrets.DB_PASSWORD_ARN }}
+          RABBITMQ_PASSWORD_ARN=${{ secrets.RABBITMQ_PASSWORD_ARN }}
+          EOF
+          bash scripts/deploy-etl-service.sh
+          echo "::notice title=ETL desplegado::chessquery-etl (autoscaling 1-2 tasks)"
+
+      # ── 4) Verificación post-deploy ──────────────────────────────────────
+      - name: Smoke test (readiness del gateway)
+        if: ${{ github.event.inputs.deploy_stack == 'true' }}
+        continue-on-error: true
+        env:
+          ALB_DNS: ${{ secrets.ALB_DNS }}
+        run: |
+          if [ -z "$ALB_DNS" ]; then
+            echo "::notice title=Smoke::secret ALB_DNS no definido, se omite el smoke test"; exit 0
+          fi
+          for i in $(seq 1 10); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -m 10 "http://${ALB_DNS}/actuator/health/readiness" || true)
+            [ "$code" = "200" ] && { echo "::notice title=Smoke OK::readiness 200"; exit 0; }
+            echo "readiness=$code (intento $i/10)"; sleep 15
+          done
+          echo "::warning title=Smoke::readiness no respondió 200 (revisar logs en CloudWatch)"
