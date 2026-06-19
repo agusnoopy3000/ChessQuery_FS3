@@ -1,4 +1,4 @@
-import { SelectHTMLAttributes, forwardRef } from 'react';
+import { SelectHTMLAttributes, forwardRef, useId } from 'react';
 import { cn } from '../utils/cn';
 
 export interface SelectOption {
@@ -14,8 +14,10 @@ export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ label, error, options, placeholder, className, id, style, ...rest }, ref) => {
-    const selectId = id || (label ? `select-${label.replace(/\s+/g, '-').toLowerCase()}` : undefined);
+  ({ label, error, options, placeholder, className, id, style, 'aria-label': ariaLabel, ...rest }, ref) => {
+    const reactId = useId();
+    const selectId = id || (label ? `select-${label.replace(/\s+/g, '-').toLowerCase()}` : `select-${reactId}`);
+    const msgId = error ? `${selectId}-msg` : undefined;
     return (
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         {label && (
@@ -27,6 +29,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           ref={ref}
           id={selectId}
           className={cn('input', className)}
+          aria-label={!label ? ariaLabel : undefined}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={msgId}
           style={{ borderColor: error ? 'var(--red)' : undefined, ...style }}
           {...rest}
         >
@@ -41,7 +46,11 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             </option>
           ))}
         </select>
-        {error && <span style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>{error}</span>}
+        {error && (
+          <span id={msgId} role="alert" style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>
+            {error}
+          </span>
+        )}
       </div>
     );
   },

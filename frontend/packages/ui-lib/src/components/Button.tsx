@@ -18,12 +18,14 @@ const SIZE_STYLES: Record<Size, { height: string; padding: string; fontSize: str
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = 'primary', size = 'md', loading, fullWidth, className, children, disabled, style, ...rest }, ref) => {
+  ({ variant = 'primary', size = 'md', loading, fullWidth, className, children, disabled, style, type, ...rest }, ref) => {
     const sz = SIZE_STYLES[size];
     return (
       <button
         ref={ref}
+        type={type ?? 'button'}
         disabled={disabled || loading}
+        aria-busy={loading || undefined}
         className={cn('btn', `btn-${variant}`, className)}
         style={{
           height: sz.height,
@@ -35,7 +37,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         }}
         {...rest}
       >
-        {loading && <span className="spin">⟳</span>}
+        {loading && (
+          <span className="spin" aria-hidden="true">
+            ⟳
+          </span>
+        )}
         {children}
       </button>
     );

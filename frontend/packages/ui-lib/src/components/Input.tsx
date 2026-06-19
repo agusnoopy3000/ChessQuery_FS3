@@ -1,4 +1,4 @@
-import { InputHTMLAttributes, ReactNode, forwardRef } from 'react';
+import { InputHTMLAttributes, ReactNode, forwardRef, useId } from 'react';
 import { cn } from '../utils/cn';
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -10,8 +10,10 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, hint, leftIcon, rightIcon, className, id, style, ...rest }, ref) => {
-    const inputId = id || (label ? `input-${label.replace(/\s+/g, '-').toLowerCase()}` : undefined);
+  ({ label, error, hint, leftIcon, rightIcon, className, id, style, 'aria-label': ariaLabel, ...rest }, ref) => {
+    const reactId = useId();
+    const inputId = id || (label ? `input-${label.replace(/\s+/g, '-').toLowerCase()}` : `input-${reactId}`);
+    const msgId = error || hint ? `${inputId}-msg` : undefined;
     return (
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         {label && (
@@ -22,6 +24,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         <div style={{ position: 'relative' }}>
           {leftIcon && (
             <span
+              aria-hidden="true"
               style={{
                 position: 'absolute',
                 left: 10,
@@ -40,6 +43,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             id={inputId}
             className={cn('input', className)}
+            aria-label={!label ? ariaLabel : undefined}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={msgId}
             style={{
               paddingLeft: leftIcon ? 34 : undefined,
               paddingRight: rightIcon ? 34 : undefined,
@@ -50,6 +56,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           />
           {rightIcon && (
             <span
+              aria-hidden="true"
               style={{
                 position: 'absolute',
                 right: 10,
@@ -65,9 +72,13 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           )}
         </div>
         {error ? (
-          <span style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>{error}</span>
+          <span id={msgId} role="alert" style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>
+            {error}
+          </span>
         ) : hint ? (
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{hint}</span>
+          <span id={msgId} style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+            {hint}
+          </span>
         ) : null}
       </div>
     );
