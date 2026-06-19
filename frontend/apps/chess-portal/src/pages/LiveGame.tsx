@@ -17,6 +17,7 @@ import { supabase } from '../lib/supabase';
 import { useMyPlayerId } from '../hooks/useMyPlayerId';
 import { computeMaterialBalance, flagFromIsoCode } from '../lib/chessHelpers';
 import { copyToClipboard } from '../lib/clipboard';
+import { TransitionOverlay } from '../components/TransitionOverlay';
 
 import 'chessground/assets/chessground.base.css';
 import '../lib/pieces-staunty.css';
@@ -123,6 +124,7 @@ export const LiveGamePage = () => {
   const [opponentOnline, setOpponentOnline] = useState(false);
   const [rematchSessionId, setRematchSessionId] = useState<number | null>(null);
   const [rematchCreating, setRematchCreating] = useState(false);
+  const [finishTransition, setFinishTransition] = useState<string | null>(null);
   const stateRef = useRef<LiveGameState | null>(null);
   const opponentOnlineRef = useRef(false);
 
@@ -892,7 +894,6 @@ export const LiveGamePage = () => {
                 type="email"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="rival@ejemplo.cl"
                 disabled={inviteSending || inviteSent}
                 style={{
                   flex: 1,
@@ -1078,26 +1079,38 @@ export const LiveGamePage = () => {
           whiteName={whiteName}
           blackName={blackName}
           isTournament={state.tournamentPairingId != null}
-          onClose={() => navigate(state.tournamentPairingId != null ? '/tournaments' : '/play')}
+          onClose={() => {
+            setFinishTransition(state.tournamentPairingId != null ? 'Volviendo al torneo' : 'Volviendo al portal de juego');
+            window.setTimeout(() => navigate(state.tournamentPairingId != null ? '/tournaments' : '/play'), 650);
+          }}
           onRematch={async () => {
             if (!id) return;
             // Si el rival ya creó la revancha, navegamos directo. Si no, la creamos.
             if (rematchSessionId != null) {
-              navigate(`/play/${rematchSessionId}`);
+              setFinishTransition('Abriendo revancha');
+              window.setTimeout(() => navigate(`/play/${rematchSessionId}`), 650);
               return;
             }
             setRematchCreating(true);
             try {
               const next = await dataApi.rematch(id);
-              navigate(`/play/${next.id}`);
+              setFinishTransition('Preparando revancha');
+              window.setTimeout(() => navigate(`/play/${next.id}`), 650);
             } catch (e) {
               setError(message(e));
+              setFinishTransition(null);
             } finally {
               setRematchCreating(false);
             }
           }}
           rematchPending={rematchSessionId != null}
           rematchCreating={rematchCreating}
+        />
+      )}
+      {finishTransition && (
+        <TransitionOverlay
+          message={finishTransition}
+          detail="Guardando el resultado y preparando la siguiente pantalla."
         />
       )}
     </div>

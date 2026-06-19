@@ -60,7 +60,6 @@ export const ForgotPasswordPage = () => {
               autoFocus
               value={email}
               onChange={(e) => { setEmail(e.target.value); setError(null); }}
-              placeholder="tu@email.com"
               aria-invalid={!!error}
               aria-describedby={error ? 'email-error' : undefined}
               style={{ width: '100%', background: '#0e100d', border: `1px solid ${error ? '#e05a5a' : '#2a2d27'}`, borderRadius: 8, padding: '12px 14px', color: '#e8ead4', fontSize: 14, fontFamily: 'inherit', outline: 'none' }}

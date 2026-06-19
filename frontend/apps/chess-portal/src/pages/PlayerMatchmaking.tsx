@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card, ErrorAlert } from '@chessquery/ui-lib';
 import { liveGameApi } from '../api';
+import { TransitionOverlay } from '../components/TransitionOverlay';
 
 /**
  * Vista 2: Jugar (Emparejamiento) — alcance demo.
@@ -15,10 +17,15 @@ import { liveGameApi } from '../api';
  */
 export const PlayerMatchmakingPage = () => {
   const navigate = useNavigate();
+  const [redirecting, setRedirecting] = useState(false);
 
   const startLive = useMutation({
     mutationFn: () => liveGameApi.create(),
-    onSuccess: (game) => navigate(`/play/${game.id}`),
+    onSuccess: (game) => {
+      setRedirecting(true);
+      navigate(`/play/${game.id}`);
+    },
+    onError: () => setRedirecting(false),
   });
 
   const errorMessage =
@@ -62,9 +69,9 @@ export const PlayerMatchmakingPage = () => {
             size="lg"
             variant="primary"
             onClick={() => startLive.mutate()}
-            loading={startLive.isPending}
+            loading={startLive.isPending || redirecting}
           >
-            ♞ Empezar partida en vivo
+            {redirecting ? '♞ Abriendo tablero…' : '♞ Empezar partida en vivo'}
           </Button>
 
           {startLive.isError && (
@@ -72,6 +79,12 @@ export const PlayerMatchmakingPage = () => {
           )}
         </div>
       </Card>
+      {redirecting && (
+        <TransitionOverlay
+          message="Preparando tablero"
+          detail="Creando la sala en vivo y conectando Realtime."
+        />
+      )}
     </div>
   );
 };
