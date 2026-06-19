@@ -1,10 +1,20 @@
 name: CI — build & test
 
+# CI automática: corre en cada push/PR a main. No necesita credenciales de AWS,
+# así que SIEMPRE funciona (a diferencia del CD, que es manual por las creds de
+# Academy). Tu compañero hace push y esto valida tests + cobertura + seguridad.
+#
+# Runner: por defecto self-hosted (la cuenta tiene los hosted deshabilitados por
+# billing). Para usar runners GitHub-hosted, definí la variable de repositorio
+# RUNNER_LABEL=ubuntu-latest (Settings → Secrets and variables → Actions → Variables).
+
 on:
   push:
     branches: [main]
+    paths-ignore: ['**.md', 'docs/**', '*.drawio', 'tools/**']
   pull_request:
     branches: [main]
+    paths-ignore: ['**.md', 'docs/**', '*.drawio', 'tools/**']
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -13,7 +23,7 @@ concurrency:
 jobs:
   java-tests:
     name: Tests Java (${{ matrix.module }})
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ${{ vars.RUNNER_LABEL || 'self-hosted' }}
     strategy:
       fail-fast: false
       matrix:
@@ -39,9 +49,12 @@ jobs:
         with:
           maven-version: '3.9.9'
 
+      # -ntp silencia el ruido de descargas; el cache:maven de arriba reusa ~/.m2
+      # entre corridas. El gate JaCoCo (jacoco:check ≥90%) está atado a la fase
+      # test: si la cobertura baja del 90%, el build falla.
       - name: Run mvn test (${{ matrix.module }})
         working-directory: ${{ matrix.module }}
-        run: mvn -B -DskipITs test
+        run: mvn -B -ntp -DskipITs test
 
       - name: Upload coverage report
         if: always()
@@ -54,7 +67,7 @@ jobs:
 
   frontend-tests:
     name: Tests frontend (${{ matrix.app }})
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ${{ vars.RUNNER_LABEL || 'self-hosted' }}
     strategy:
       fail-fast: false
       matrix:
@@ -79,7 +92,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        continue-on-error: true   # no bloquear el job si se agotó la cuota de artifacts
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: vitest-${{ matrix.app }}
@@ -88,11 +101,11 @@ jobs:
 
   bff-tests:
     name: Tests BFF (${{ matrix.bff }})
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ${{ vars.RUNNER_LABEL || 'self-hosted' }}
     strategy:
       fail-fast: false
       matrix:
-        bff: [bff-player, bff-organizer]
+        bff: [bff-player, bff-organizer, bff-admin]
     steps:
       - uses: actions/checkout@v4
 
@@ -110,3 +123,30 @@ jobs:
       - name: Run unit tests
         working-directory: ${{ matrix.bff }}
         run: npm test -- --watchAll=false
+
+  # ── H-07: escaneo de vulnerabilidades en cada push/PR ──────────────────────
+  # Trivy en modo filesystem analiza los manifiestos de dependencias (pom.xml,
+  # package-lock.json, requirements) y falla el build si hay CVEs HIGH/CRITICAL
+  # CON FIX disponible (ignore-unfixed evita ruido por vulnerabilidades sin
+  # parche). Complementa el scan-on-push de ECR (ya activo) que escanea la imagen
+  # del lado de AWS pero NO frena el pipeline.
+  security-scan:
+    name: Escaneo de seguridad (Trivy)
+    runs-on: ${{ vars.RUNNER_LABEL || 'self-hosted' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trivy filesystem scan (HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+          format: table
+          skip-dirs: '**/node_modules,**/target,**/dist,**/.venv,**/__pycache__'
+        env:
+          # cachea la DB de vulnerabilidades entre corridas (más liviano)
+          TRIVY_CACHE_DIR: .trivycache
+          TRIVY_DISABLE_VEX_NOTICE: 'true'
