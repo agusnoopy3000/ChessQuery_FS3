@@ -8,6 +8,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +24,10 @@ public class NotificationService {
     private final NotificationLogRepository  notificationLogRepo;
     private final ObjectMapper               objectMapper;
     private final PlayerNameResolver         playerNameResolver;
+
+    /** URL del portal para el CTA del correo de bienvenida (vacío => sin botón). */
+    @Value("${notifications.portal.url:}")
+    private String portalUrl;
 
     /**
      * Email de bienvenida cuando un usuario se registra.
@@ -40,12 +45,10 @@ public class NotificationService {
 
         String greeting = (firstName != null && !firstName.isBlank()) ? firstName : "jugador";
         String subject = "¡Bienvenido a ChessQuery!";
-        String body    = String.format(
-                "Hola %s, tu cuenta fue creada exitosamente. ¡Bienvenido a ChessQuery!",
-                greeting);
+        EmailTemplates.Content mail = EmailTemplates.welcome(greeting, portalUrl);
 
         if (email != null && !email.isBlank()) {
-            mockEmailService.sendEmail(recipientId, email, subject, body);
+            mockEmailService.sendHtmlEmail(recipientId, email, subject, mail.text(), mail.html());
         }
         saveLog(recipientId, Channel.EMAIL, "user.registered", subject, payload, NotifStatus.SENT);
         if (recipientId != null) {
@@ -155,11 +158,8 @@ public class NotificationService {
         // de verdad si hay SMTP configurado; si no, queda en log (no rompe nada).
         if (email != null) {
             String emailSubject = "Te invitan a una partida en ChessQuery";
-            String emailBody = String.format(
-                    "%s te invitó a jugar una partida en ChessQuery.%s",
-                    inviterName,
-                    gameUrl != null ? "\n\nUnite a la partida:\n" + gameUrl : "");
-            mockEmailService.sendEmail(recipientId, email, emailSubject, emailBody);
+            EmailTemplates.Content mail = EmailTemplates.gameInvitation(String.valueOf(inviterName), gameUrl);
+            mockEmailService.sendHtmlEmail(recipientId, email, emailSubject, mail.text(), mail.html());
         }
 
         // Notificación in-app sólo si el invitado tiene cuenta (playerId).
