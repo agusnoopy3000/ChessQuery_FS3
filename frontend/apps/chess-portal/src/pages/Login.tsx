@@ -204,6 +204,7 @@ const Field = ({ label, type = 'text', placeholder = '', hint = '', error = '', 
             outline: 'none',
             transition: 'border-color 0.2s, box-shadow 0.2s',
             boxShadow: focused ? '0 0 0 3px rgba(74,124,89,0.15)' : 'none',
+            animation: error ? 'cq-shake 0.34s cubic-bezier(.36,.07,.19,.97)' : undefined,
           }}
         />
         {isPass && (
@@ -367,6 +368,7 @@ export const LoginPage = () => {
     >
       <style>{`
         @keyframes cq-spin { to { transform: rotate(360deg); } }
+        @keyframes cq-shake { 10%,90%{transform:translateX(-1px)} 20%,80%{transform:translateX(2px)} 30%,50%,70%{transform:translateX(-4px)} 40%,60%{transform:translateX(4px)} }
         @keyframes cq-slide-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes cq-board-pulse { 0%, 100% { opacity: .72; transform: scale(.98); } 50% { opacity: 1; transform: scale(1.02); } }
         @keyframes cq-form-glow { 0%, 100% { box-shadow: 0 0 0 rgba(106,191,116,0); } 50% { box-shadow: 0 0 34px rgba(106,191,116,.08); } }
@@ -443,9 +445,9 @@ export const LoginPage = () => {
           }}
         >
           {[
-            { label: 'JUGADORES', val: '12.4k' },
-            { label: 'TORNEOS', val: '380' },
-            { label: 'PARTIDAS', val: '2.1M' },
+            { label: 'PARTIDAS EN VIVO', val: '♟' },
+            { label: 'TORNEOS POR RONDAS', val: '♜' },
+            { label: 'RATINGS REALES', val: '♞' },
           ].map((s) => (
             <div key={s.label} style={{ background: '#181a17', padding: '12px 10px', textAlign: 'center' }}>
               <div style={{ fontSize: 18, fontWeight: 700, color: '#6abf74', fontFamily: 'Space Mono, monospace' }}>
@@ -480,7 +482,7 @@ export const LoginPage = () => {
           </Link>
         </div>
 
-        <div style={{ maxWidth: 420, width: '100%', margin: '0 auto', animation: 'cq-slide-up 0.4s ease, cq-form-glow 3.8s ease-in-out infinite' }}>
+        <div style={{ maxWidth: 420, width: '100%', margin: '0 auto', animation: 'cq-slide-up 0.4s ease' }}>
           <p
             style={{
               fontSize: 11,

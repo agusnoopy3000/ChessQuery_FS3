@@ -227,6 +227,7 @@ const Field = ({ label, type = 'text', placeholder = '', hint = '', error = '', 
             outline: 'none',
             transition: 'border-color 0.2s, box-shadow 0.2s',
             boxShadow: focused ? '0 0 0 3px rgba(74,124,89,0.15)' : 'none',
+            animation: error ? 'cq-shake 0.34s cubic-bezier(.36,.07,.19,.97)' : undefined,
           }}
         />
         {isPass && (
@@ -455,6 +456,7 @@ export const RegisterPage = () => {
           from { opacity: 0; transform: translateY(8px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        @keyframes cq-shake { 10%,90%{transform:translateX(-1px)} 20%,80%{transform:translateX(2px)} 30%,50%,70%{transform:translateX(-4px)} 40%,60%{transform:translateX(4px)} }
         .cq-register-page { overflow: hidden; }
         .cq-register-left { flex: 0 0 480px; }
         .cq-register-right { flex: 1; animation: cq-register-panel 320ms ease-out both; }
