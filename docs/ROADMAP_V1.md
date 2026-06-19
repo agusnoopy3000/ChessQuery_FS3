@@ -83,6 +83,20 @@
 > **659 tests, 0 fallos**. Pendiente menor de T1: `coverageThreshold` en Node (best-effort) y que el
 > gate "muerda" en CI cuando el runner self-hosted vuelva online (T6).
 
+> **✅ Cierre de jornada 2026-06-19 — H-07, correos y portal mergeados a `main` (Agustín):**
+> - **H-07 CERRADO (PR #35):** **Trivy como gate duro** en `ci.yml` (job `security-scan`, `scan-type:fs`,
+>   automático en push/PR) y en `build-and-push.yml` (build → scan de imagen → push), ambos
+>   `exit-code:'1'` + `ignore-unfixed:true` + `HIGH,CRITICAL` (`trivy-action@v0.36.0`). El `scanOnPush`
+>   de ECR ya estaba activo en `setup-aws.sh`. Trajo además `deploy.yml`, `ms-etl` al build y doc
+>   `CICD_PIPELINE.md`. ⚠️ **A vigilar:** el gate fs corre solo en cada PR; como los CVEs de Spring 3.2.4
+>   tienen fix (H-06 diferido), `ignore-unfixed` NO los ignora → **podría poner rojos los PRs apenas el
+>   runner vuelva online**. Verificar en el primer run real; si bloquea, aflojar el gate o acelerar H-06.
+> - **Correos CERRADO (PR #36):** remitente oficial `chessquery.invitaciones@gmail.com` + plantillas
+>   **HTML de marca** (bienvenida e invitación), `EmailTemplates`. Cierra el `MAIL_FROM=""` que frenaba el envío.
+> - **Portal UX (PR #37):** animaciones de navegación, pulido visual de auth, accesibilidad, plan de nav móvil (T8).
+> - **T2 queda cerrado** salvo lo **diferido conscientemente**: H-06 (bump Spring/NestJS) y H-02 (ADMIN
+>   desde `app_metadata`). **Resto de v1:** T6 (runner online + backups RDS), T4 (QA manual) y T8 (informe/presentación).
+
 ---
 
 ## 1. ¿Qué convierte una demo en "producto v1"?
@@ -129,12 +143,12 @@ Estados: ⬜ pendiente · 🟨 en curso · ✅ hecho · ⏸️ diferido — *ir 
 | # | Tarea | Incluye | Prioridad | Días-dev | Estado |
 |---|---|---|---|---|---|
 | 🧪 **T1** | Pruebas unitarias → **gate en CI** | Suite completa vía `scripts/test-all.sh` | **P0** | 6–8 | ✅ **HECHO (16-jun):** 6 módulos Java **≥90% con gate JaCoCo a 0.90** en fase `test`; 659 tests, 0 fallos. Falta menor: `coverageThreshold` Node (best-effort) y que el gate corra en CI (depende del runner, T6) |
-| 🔒 **T2** | **Seguridad** + hardening | Cerrar SG 8080, deps, secrets, H-01/H-02 | **P0** | 3 | 🟨 casi cerrado (H-04 ✅, SG ✅, deps PR#29 ✅, OBS-02 PR#30 ✅); falta H-06/H-07 + decisión ADMIN |
+| 🔒 **T2** | **Seguridad** + hardening | Cerrar SG 8080, deps, secrets, H-01/H-02 | **P0** | 3 | ✅ **cerrado (19-jun):** H-04 ✅, SG ✅, deps PR#29 ✅, OBS-02 PR#30 ✅, **H-07 ✅ PR#35 (Trivy gate)**. Solo quedan **diferidos**: H-06 (bump frameworks) y H-02 (ADMIN) |
 | 🎤 **T8** | 🆕 **Ensayo final + informe + presentación** | Recorrido completo del front pre-entrega; presentación pensada para quien no conoce la app | **P0** | 1.5–2 | ⬜ |
 | 🧩 **T3** | **Integrar `ms-etl`** en AWS | Deploy (límite 10 contenedores) + migraciones + tests + e2e | **P1** | 3 | ✅ **HECHO (11-jun):** desplegado y verificado e2e en la réplica de Martin (Lichess SUCCESS) + fix de chesscom (PR #32) |
 | 🧩 **T4** | **QA funcional** paneles organizador | 🆕 Caso explícito: un organizador **no** modifica torneos de otro (UI + API) | **P1** | 2 | 🟨 caso de aislamiento blindado por H-04; falta el QA manual (UI + API) |
 | 👁️ **T5** | **CloudWatch** | Logs + métricas + alarmas + dashboard | **P2** | 2 | 🟢 **montado (11-jun):** logs+retención, Container Insights, 5 alarmas, dashboard `ChessQuery-Replica`, doc `CLOUDWATCH_REPLICA.md`; falta opcional SNS+mail |
-| ⚙️ **T6** | **CI/CD real** + operación | Runner self-hosted · 🆕 probar correos en la réplica AWS de Martin · backups RDS | **P2** | 2 | 🟨 runner **offline** (checks en cola); **correos diagnosticados:** `MAIL_FROM=""` → no envía, fix pendiente; backups RDS pendiente |
+| ⚙️ **T6** | **CI/CD real** + operación | Runner self-hosted · 🆕 probar correos en la réplica AWS de Martin · backups RDS | **P2** | 2 | 🟨 **correos ✅ (PR#36:** remitente oficial + HTML de marca); CI/CD adaptado (PR#35, `CICD_PIPELINE.md`); **falta:** runner self-hosted **online** (gates en cola) + backups RDS + envío e2e en la réplica |
 | 🔐 **T7** | HTTPS | Plan en `PENDIENTE_HTTPS.md`; bloqueado por dominio | **P3** | 1–4 | ⏸️ |
 
 > P0–P2 suman ~20–22 días-dev sobre ~16 disponibles ⇒ **hay que paralelizar y recortar alcance**
