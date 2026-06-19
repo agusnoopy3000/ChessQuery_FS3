@@ -269,33 +269,43 @@ const Field = ({ label, type = 'text', placeholder = '', hint = '', error = '', 
   );
 };
 
-/* ── Checkbox ── */
+/* ── Checkbox ──
+   Checkbox nativo real superpuesto (opacity 0) sobre la caja visual: operable
+   por teclado (Tab + Espacio) y con nombre accesible vía la <label> que lo
+   envuelve. El foco por teclado se ve en la caja vía `:focus-visible + span`. */
 const Checkbox = ({ checked, onChange, children }: { checked: boolean; onChange: () => void; children: ReactNode }) => (
   <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', userSelect: 'none' }}>
-    <div
-      onClick={onChange}
-      style={{
-        width: 18,
-        height: 18,
-        borderRadius: 5,
-        border: `1.5px solid ${checked ? '#6abf74' : '#2a2d27'}`,
-        background: checked ? '#6abf74' : 'transparent',
-        flexShrink: 0,
-        marginTop: 1,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        transition: 'all 0.2s',
-        cursor: 'pointer',
-      }}
-    >
-      {checked && (
-        <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-          <path d="M1 4L4 7L9 1" stroke="#0e100d" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      )}
-    </div>
-    <span style={{ fontSize: 13, color: '#7a7d6e', lineHeight: 1.5 }}>{children}</span>
+    <span style={{ position: 'relative', width: 18, height: 18, flexShrink: 0, marginTop: 1 }}>
+      <input
+        type="checkbox"
+        className="cq-cbx-input"
+        checked={checked}
+        onChange={onChange}
+        style={{ position: 'absolute', inset: 0, width: 18, height: 18, margin: 0, opacity: 0, cursor: 'pointer' }}
+      />
+      <span
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          borderRadius: 5,
+          border: `1.5px solid ${checked ? '#6abf74' : '#2a2d27'}`,
+          background: checked ? '#6abf74' : 'transparent',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: 'all 0.2s',
+        }}
+      >
+        {checked && (
+          <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+            <path d="M1 4L4 7L9 1" stroke="#0e100d" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+      </span>
+    </span>
+    <span style={{ fontSize: 13, color: '#9a9c8c', lineHeight: 1.5 }}>{children}</span>
+    <style>{`.cq-cbx-input:focus-visible + span { outline: 2px solid var(--accent, #6abf74); outline-offset: 2px; border-radius: 6px; }`}</style>
   </label>
 );
 
@@ -537,7 +547,12 @@ export const RegisterPage = () => {
           </p>
         </div>
 
-        <div className="cq-register-role-grid" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div
+          className="cq-register-role-grid"
+          role="group"
+          aria-label="Elegí tu rol"
+          style={{ display: 'flex', flexDirection: 'column', gap: 10 }}
+        >
           <RoleCard
             selected={role === 'PLAYER'}
             title="Jugador"
@@ -714,9 +729,16 @@ interface RoleCardProps {
   onClick: () => void;
 }
 const RoleCard = ({ selected, title, description, badge, iconSvg, visual, onClick }: RoleCardProps) => (
-  <div
+  <button
+    type="button"
     onClick={onClick}
+    aria-pressed={selected}
     style={{
+      display: 'block',
+      width: '100%',
+      textAlign: 'left',
+      font: 'inherit',
+      color: 'inherit',
       borderRadius: 14,
       border: `1.5px solid ${selected ? '#4a7c59' : '#252820'}`,
       background: selected ? '#1e2b1f' : '#191c18',
@@ -762,5 +784,5 @@ const RoleCard = ({ selected, title, description, badge, iconSvg, visual, onClic
       </div>
     </div>
     {visual}
-  </div>
+  </button>
 );

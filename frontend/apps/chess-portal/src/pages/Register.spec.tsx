@@ -16,9 +16,9 @@ vi.mock('@chessquery/shared', () => ({
 }));
 
 const toggleTerms = () => {
-  const label = screen.getByText(/Acepto los/i).closest('label')!;
-  const box = label.querySelector('div')!;
-  fireEvent.click(box);
+  // El checkbox de términos es un <input type="checkbox"> real con nombre
+  // accesible heredado de su <label> ("Acepto los términos…").
+  fireEvent.click(screen.getByRole('checkbox', { name: /Acepto los/i }));
 };
 
 const fillBaseFields = () => {

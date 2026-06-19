@@ -59,7 +59,11 @@ export const RegistrationsPanel = ({ registrations, loading, error, onApprove, o
         </div>
       }
     >
-      <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+      <div
+        role="group"
+        aria-label="Filtrar inscripciones"
+        style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}
+      >
         {tabs.map(([key, label]) => (
           <button
             key={key}
@@ -67,6 +71,7 @@ export const RegistrationsPanel = ({ registrations, loading, error, onApprove, o
             onClick={() => setFilter(key)}
             className="tab-btn"
             data-active={filter === key}
+            aria-pressed={filter === key}
           >
             {label}
           </button>
@@ -129,6 +134,7 @@ export const RegistrationsPanel = ({ registrations, loading, error, onApprove, o
                     <div className="registration-reject" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       <input
                         autoFocus
+                        aria-label={`Razón del rechazo de ${r.playerName ?? `jugador #${r.playerId}`} (opcional)`}
                         value={rejectReason}
                         onChange={(e) => setRejectReason(e.target.value)}
                         placeholder="Razón (opcional)"
