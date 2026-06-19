@@ -49,10 +49,10 @@ class NotificationServiceTest {
         // Act
         notificationService.notifyWelcome(payload);
 
-        // Assert — se envía el email mock
-        verify(mockEmailService, times(1)).sendEmail(
+        // Assert — se envía el email mock (HTML con fallback de texto)
+        verify(mockEmailService, times(1)).sendHtmlEmail(
                 eq(12L), eq("cristobal@email.com"),
-                eq("¡Bienvenido a ChessQuery!"), anyString());
+                eq("¡Bienvenido a ChessQuery!"), anyString(), anyString());
 
         // Assert — se guardan los logs con status SENT (EMAIL y IN_APP)
         ArgumentCaptor<NotificationLog> captor = ArgumentCaptor.forClass(NotificationLog.class);
@@ -81,9 +81,9 @@ class NotificationServiceTest {
 
         notificationService.notifyWelcome(payload);
 
-        verify(mockEmailService).sendEmail(
+        verify(mockEmailService).sendHtmlEmail(
                 isNull(), eq("nuevo@email.com"),
-                eq("¡Bienvenido a ChessQuery!"), anyString());
+                eq("¡Bienvenido a ChessQuery!"), anyString(), anyString());
 
         ArgumentCaptor<NotificationLog> captor = ArgumentCaptor.forClass(NotificationLog.class);
         verify(notificationLogRepo, times(1)).save(captor.capture());
@@ -188,7 +188,7 @@ class NotificationServiceTest {
         payload.put("gameUrl", "http://portal/play/9");
         payload.put("inviterName", "Ana");
         notificationService.notifyGameInvitation(payload);
-        verify(mockEmailService).sendEmail(isNull(), eq("invitado@example.com"), anyString(), anyString());
+        verify(mockEmailService).sendHtmlEmail(isNull(), eq("invitado@example.com"), anyString(), anyString(), anyString());
         verify(notificationLogRepo, never()).save(any());
     }
 
