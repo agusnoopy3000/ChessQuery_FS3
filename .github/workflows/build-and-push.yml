@@ -91,6 +91,28 @@ jobs:
             ${{ steps.tags.outputs.ecr_uri }}:latest
             ${{ steps.tags.outputs.extra_tag != '' && format('{0}:{1}', steps.tags.outputs.ecr_uri, steps.tags.outputs.extra_tag) || '' }}
 
+      # H-07 — Escaneo de vulnerabilidades de la imagen (Trivy).
+      #
+      # ⚠️ MODO REPORTE A PROPÓSITO (exit-code: '0'): escanea la imagen y deja el
+      # resultado visible en el log del CI, pero NO falla el build. Se eligió
+      # reporte-y-no-gate porque H-06 (subir Spring Boot 3.2.4 / Spring Cloud 2023,
+      # fuera de soporte, + major de NestJS en los BFFs) está DIFERIDO. Un gate
+      # duro marcaría esos CVEs —que tienen fix en 3.3+/2024.x— y bloquearía el
+      # deploy del CI/CD (T6) hasta cerrar H-06; no queremos atarnos las manos.
+      #
+      # 🔒 PARA ENDURECER (hacer cuando H-06 esté cerrado y se monte el CI/CD real):
+      #     exit-code: '1'        # falla el build ante HIGH/CRITICAL
+      #     ignore-unfixed: true  # ignora CVEs sin parche disponible (ruido del SO base)
+      # Así el push/deploy se frena si entra una imagen con vuln crítica con fix.
+      - name: Scan image for vulnerabilities (Trivy — report only)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ steps.tags.outputs.ecr_uri }}:${{ steps.tags.outputs.sha_tag }}
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: '0'         # report-only: nunca falla el build (ver comentario arriba)
+          ignore-unfixed: false  # en modo reporte mostramos todo; al endurecer → true
+
       - name: Output image URI
         run: |
           echo "::notice title=Image pushed::${{ steps.tags.outputs.ecr_uri }}:${{ steps.tags.outputs.sha_tag }}"
