@@ -41,6 +41,8 @@ const TOURNAMENT_MOVES: Move[] = [
   { from: [3, 5], to: [5, 2] },
 ];
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 const ChessBackdrop = () => {
   const [highlight, setHighlight] = useState<Move | null>(null);
 
@@ -299,7 +301,7 @@ export const LoginPage = () => {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const errs: Record<string, string> = {};
-    if (!form.email.includes('@')) errs.email = 'Email inválido';
+    if (!EMAIL_RE.test(form.email.trim())) errs.email = 'Email inválido';
     if (form.password.length < 1) errs.password = 'Ingresa tu contraseña';
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
@@ -495,7 +497,6 @@ export const LoginPage = () => {
               value={form.email}
               onChange={handleChange}
               error={errors.email}
-              placeholder="organizador@club.cl"
             />
 
             <Field
@@ -506,7 +507,6 @@ export const LoginPage = () => {
               value={form.password}
               onChange={handleChange}
               error={errors.password}
-              placeholder="••••••••"
               rightSlot={
                 <Link
                   to="/login"

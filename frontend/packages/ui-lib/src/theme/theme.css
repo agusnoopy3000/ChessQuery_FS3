@@ -790,3 +790,16 @@ tbody tr:last-child td { border-bottom: none; }
     justify-content: stretch;
   }
 }
+
+/* ── Accesibilidad: respeta "menos movimiento" del SO/navegador ──────────────
+   Si el usuario activó reduce-motion, atenuamos animaciones y transiciones
+   (overlays de carga, slide-ups, spinners, shakes) para evitar mareo/distracción.
+   Los overlays siguen apareciendo; solo se quita el movimiento. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

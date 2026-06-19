@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth, translateAuthError } from '@chessquery/shared';
 import { playerApi } from '../api';
 import { organizerPanelUrl } from '../lib/urls';
+import { TransitionOverlay } from '../components/TransitionOverlay';
 
 /* ── Logo ── */
 const ChessQueryLogo = () => (
@@ -39,6 +40,8 @@ const CHESS_MOVES: Move[] = [
   { from: [7, 5], to: [4, 2] },
   { from: [5, 5], to: [3, 4] },
 ];
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 /* ── Tablero animado del panel izquierdo ── */
 const ChessBackdrop = () => {
@@ -201,6 +204,7 @@ const Field = ({ label, type = 'text', placeholder = '', hint = '', error = '', 
             outline: 'none',
             transition: 'border-color 0.2s, box-shadow 0.2s',
             boxShadow: focused ? '0 0 0 3px rgba(74,124,89,0.15)' : 'none',
+            animation: error ? 'cq-shake 0.34s cubic-bezier(.36,.07,.19,.97)' : undefined,
           }}
         />
         {isPass && (
@@ -288,6 +292,7 @@ export const LoginPage = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [remember, setRemember] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [redirecting, setRedirecting] = useState<string | null>(null);
 
   const nextParam = params.get('next');
   const registerHref = useMemo(() => (nextParam ? `/register?next=${nextParam}` : '/register'), [nextParam]);
@@ -300,7 +305,8 @@ export const LoginPage = () => {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const errs: Record<string, string> = {};
-    if (!form.email.includes('@')) errs.email = 'Email inválido';
+    const email = form.email.trim();
+    if (!EMAIL_RE.test(email)) errs.email = 'Email inválido';
     if (form.password.length < 1) errs.password = 'Ingresa tu contraseña';
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
@@ -309,12 +315,13 @@ export const LoginPage = () => {
 
     setSubmitting(true);
     try {
-      const u = await login(form.email.trim(), form.password);
+      const u = await login(email, form.password);
 
       // ORGANIZER: enviar directo al panel del organizador en :5174 sin
       // pasar por el portal del jugador (cross-origin, no react-router).
       if (u.role === 'ORGANIZER') {
-        window.location.assign(organizerPanelUrl());
+        setRedirecting('Abriendo panel del organizador');
+        window.setTimeout(() => window.location.assign(organizerPanelUrl()), 650);
         return;
       }
 
@@ -328,7 +335,9 @@ export const LoginPage = () => {
         queryFn: () => playerApi.dashboard(),
       });
       const decoded = nextParam ? decodeURIComponent(nextParam) : '';
-      navigate(decoded && decoded.startsWith('/') ? decoded : '/');
+      const target = decoded && decoded.startsWith('/') ? decoded : '/';
+      setRedirecting(target.startsWith('/play') ? 'Abriendo partida' : 'Cargando tu portal');
+      window.setTimeout(() => navigate(target), 650);
     } catch (err) {
       const raw =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
@@ -338,6 +347,7 @@ export const LoginPage = () => {
       // Refrescamos el campo de contraseña para que el usuario vuelva a tipear;
       // dejamos el email intacto para no obligar a reescribirlo.
       setForm((f) => ({ ...f, password: '' }));
+      setRedirecting(null);
     } finally {
       setSubmitting(false);
     }
@@ -358,7 +368,10 @@ export const LoginPage = () => {
     >
       <style>{`
         @keyframes cq-spin { to { transform: rotate(360deg); } }
+        @keyframes cq-shake { 10%,90%{transform:translateX(-1px)} 20%,80%{transform:translateX(2px)} 30%,50%,70%{transform:translateX(-4px)} 40%,60%{transform:translateX(4px)} }
         @keyframes cq-slide-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes cq-board-pulse { 0%, 100% { opacity: .72; transform: scale(.98); } 50% { opacity: 1; transform: scale(1.02); } }
+        @keyframes cq-form-glow { 0%, 100% { box-shadow: 0 0 0 rgba(106,191,116,0); } 50% { box-shadow: 0 0 34px rgba(106,191,116,.08); } }
         @media (max-width: 880px) {
           .cq-login-left { display: none !important; }
           .cq-login-right { padding: 32px 22px !important; }
@@ -432,9 +445,9 @@ export const LoginPage = () => {
           }}
         >
           {[
-            { label: 'JUGADORES', val: '12.4k' },
-            { label: 'TORNEOS', val: '380' },
-            { label: 'PARTIDAS', val: '2.1M' },
+            { label: 'PARTIDAS EN VIVO', val: '♟' },
+            { label: 'TORNEOS POR RONDAS', val: '♜' },
+            { label: 'RATINGS REALES', val: '♞' },
           ].map((s) => (
             <div key={s.label} style={{ background: '#181a17', padding: '12px 10px', textAlign: 'center' }}>
               <div style={{ fontSize: 18, fontWeight: 700, color: '#6abf74', fontFamily: 'Space Mono, monospace' }}>
@@ -499,7 +512,6 @@ export const LoginPage = () => {
               value={form.email}
               onChange={handleChange}
               error={errors.email}
-              placeholder="tu@email.com"
             />
 
             <Field
@@ -510,7 +522,6 @@ export const LoginPage = () => {
               value={form.password}
               onChange={handleChange}
               error={errors.password}
-              placeholder="••••••••"
               rightSlot={
                 <Link
                   to="/forgot-password"
@@ -555,19 +566,19 @@ export const LoginPage = () => {
 
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || !!redirecting}
               style={{
                 width: '100%',
                 padding: '13px',
                 marginTop: 4,
-                background: submitting ? '#3d8a4a' : '#6abf74',
+                background: submitting || redirecting ? '#3d8a4a' : '#6abf74',
                 color: '#0a100a',
                 borderRadius: 10,
                 border: 'none',
                 fontFamily: 'inherit',
                 fontWeight: 700,
                 fontSize: 15,
-                cursor: submitting ? 'wait' : 'pointer',
+                cursor: submitting || redirecting ? 'wait' : 'pointer',
                 letterSpacing: '-0.01em',
                 transition: 'background 0.2s, transform 0.1s',
                 boxShadow: '0 4px 20px rgba(106,191,116,0.25)',
@@ -577,19 +588,19 @@ export const LoginPage = () => {
                 gap: 10,
               }}
               onMouseEnter={(e) => {
-                if (!submitting) e.currentTarget.style.background = '#7ece86';
+                if (!submitting && !redirecting) e.currentTarget.style.background = '#7ece86';
               }}
               onMouseLeave={(e) => {
-                if (!submitting) e.currentTarget.style.background = '#6abf74';
+                if (!submitting && !redirecting) e.currentTarget.style.background = '#6abf74';
               }}
               onMouseDown={(e) => {
-                if (!submitting) e.currentTarget.style.transform = 'scale(0.99)';
+                if (!submitting && !redirecting) e.currentTarget.style.transform = 'scale(0.99)';
               }}
               onMouseUp={(e) => {
-                if (!submitting) e.currentTarget.style.transform = 'scale(1)';
+                if (!submitting && !redirecting) e.currentTarget.style.transform = 'scale(1)';
               }}
             >
-              {submitting ? (
+              {submitting || redirecting ? (
                 <>
                   <svg
                     width="14"
@@ -602,7 +613,7 @@ export const LoginPage = () => {
                   >
                     <path d="M21 12a9 9 0 1 1-6.2-8.55" />
                   </svg>
-                  Verificando…
+                  {redirecting ? 'Redireccionando…' : 'Verificando…'}
                 </>
               ) : (
                 'Iniciar sesión'
@@ -648,6 +659,7 @@ export const LoginPage = () => {
           </form>
         </div>
       </div>
+      {redirecting && <TransitionOverlay message={redirecting} detail="Validación correcta. Preparando la siguiente pantalla." />}
     </div>
   );
 };

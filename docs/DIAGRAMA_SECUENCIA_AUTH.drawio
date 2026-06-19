@@ -1,0 +1,85 @@
+<mxfile host="app.diagrams.net" modified="2026-06-11T00:00:00.000Z" agent="ChessQuery" version="24.0.0">
+  <diagram id="seq-auth" name="Secuencia — Registro y Login">
+    <mxGraphModel dx="1422" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1050" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="ChessQuery — Registro de usuario y request autenticada (Supabase + JWT + RabbitMQ)" style="text;html=1;fontSize=16;fontStyle=1;align=left;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="900" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- ===== CABECERAS DE LIFELINES ===== -->
+        <mxCell id="h1" value="Usuario&lt;br&gt;(SPA en S3)" style="rounded=0;html=1;whiteSpace=wrap;fillColor=#232F3E;fontColor=#FFFFFF;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2" value="Supabase Auth&lt;br&gt;(externo)" style="rounded=0;html=1;whiteSpace=wrap;fillColor=#3ECF8E;fontColor=#FFFFFF;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="260" y="70" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h3" value="Supabase Postgres&lt;br&gt;(trigger pg_net)" style="rounded=0;html=1;whiteSpace=wrap;fillColor=#3ECF8E;fontColor=#FFFFFF;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="480" y="70" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h4" value="api-gateway :8080&lt;br&gt;(vía ALB)" style="rounded=0;html=1;whiteSpace=wrap;fillColor=#147EBA;fontColor=#FFFFFF;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="700" y="70" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h5" value="bff-player :3001" style="rounded=0;html=1;whiteSpace=wrap;fillColor=#ED7100;fontColor=#FFFFFF;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="930" y="70" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h6" value="ms-users :8081" style="rounded=0;html=1;whiteSpace=wrap;fillColor=#ED7100;fontColor=#FFFFFF;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1150" y="70" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h7" value="RabbitMQ :5672&lt;br&gt;(exchange ChessEvents)" style="rounded=0;html=1;whiteSpace=wrap;fillColor=#C2185B;fontColor=#FFFFFF;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1370" y="70" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h8" value="RDS users_db&lt;br&gt;:5432" style="rounded=0;html=1;whiteSpace=wrap;fillColor=#C925D1;fontColor=#FFFFFF;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1590" y="70" width="150" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ===== LIFELINES ===== -->
+        <mxCell id="l1" style="endArrow=none;dashed=1;html=1;strokeColor=#9E9E9E;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="115" y="120" as="sourcePoint" /><mxPoint x="115" y="1000" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="l2" style="endArrow=none;dashed=1;html=1;strokeColor=#9E9E9E;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="335" y="120" as="sourcePoint" /><mxPoint x="335" y="1000" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="l3" style="endArrow=none;dashed=1;html=1;strokeColor=#9E9E9E;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="555" y="120" as="sourcePoint" /><mxPoint x="555" y="1000" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="l4" style="endArrow=none;dashed=1;html=1;strokeColor=#9E9E9E;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="775" y="120" as="sourcePoint" /><mxPoint x="775" y="1000" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="l5" style="endArrow=none;dashed=1;html=1;strokeColor=#9E9E9E;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1005" y="120" as="sourcePoint" /><mxPoint x="1005" y="1000" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="l6" style="endArrow=none;dashed=1;html=1;strokeColor=#9E9E9E;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1225" y="120" as="sourcePoint" /><mxPoint x="1225" y="1000" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="l7" style="endArrow=none;dashed=1;html=1;strokeColor=#9E9E9E;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1450" y="120" as="sourcePoint" /><mxPoint x="1450" y="1000" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="l8" style="endArrow=none;dashed=1;html=1;strokeColor=#9E9E9E;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1665" y="120" as="sourcePoint" /><mxPoint x="1665" y="1000" as="targetPoint" /></mxGeometry></mxCell>
+
+        <!-- ===== SECCIÓN A: REGISTRO ===== -->
+        <mxCell id="secA" value="A — REGISTRO (provisioning del Player vía webhook + evento)" style="rounded=0;html=1;whiteSpace=wrap;fillColor=#FFF8DC;strokeColor=#D6B656;fontSize=11;fontStyle=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="145" width="1700" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="m1" value="1. signUp(email, password, rol)" style="html=1;fontSize=10;strokeColor=#232F3E;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="115" y="200" as="sourcePoint" /><mxPoint x="335" y="200" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="m2" value="2. JWT (access + refresh)" style="html=1;fontSize=10;dashed=1;strokeColor=#3ECF8E;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="335" y="240" as="sourcePoint" /><mxPoint x="115" y="240" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="m3" value="3. POST /webhooks/supabase/user-registered · header X-Supabase-Webhook-Secret (pg_net, vía ALB)" style="html=1;fontSize=10;strokeColor=#3ECF8E;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="555" y="285" as="sourcePoint" /><mxPoint x="775" y="285" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="n4" value="4. valida el secret contra Secrets Manager (si no coincide → 401)" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#D4E6F9;strokeColor=#147EBA;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="800" y="310" width="330" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="m5" value="5. publish user.registered → exchange ChessEvents" style="html=1;fontSize=10;strokeColor=#C2185B;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="775" y="370" as="sourcePoint" /><mxPoint x="1450" y="370" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="m6" value="6. 200 OK" style="html=1;fontSize=10;dashed=1;strokeColor=#147EBA;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="775" y="405" as="sourcePoint" /><mxPoint x="555" y="405" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="m7" value="7. consume (cola users.registration, rk user.registered)" style="html=1;fontSize=10;strokeColor=#C2185B;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1450" y="445" as="sourcePoint" /><mxPoint x="1225" y="445" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="m8" value="8. INSERT Player (vincula supabase_id ↔ player)" style="html=1;fontSize=10;strokeColor=#C925D1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1225" y="485" as="sourcePoint" /><mxPoint x="1665" y="485" as="targetPoint" /></mxGeometry></mxCell>
+
+        <!-- ===== SECCIÓN B: LOGIN + REQUEST ===== -->
+        <mxCell id="secB" value="B — LOGIN Y REQUEST AUTENTICADA (validación JWT + resolución de identidad)" style="rounded=0;html=1;whiteSpace=wrap;fillColor=#FFF8DC;strokeColor=#D6B656;fontSize=11;fontStyle=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="530" width="1700" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="m9" value="9. signInWithPassword → JWT" style="html=1;fontSize=10;strokeColor=#232F3E;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="115" y="585" as="sourcePoint" /><mxPoint x="335" y="585" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="m10" value="10. GET /api/player/profile · Authorization: Bearer JWT (vía ALB)" style="html=1;fontSize=10;strokeColor=#232F3E;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="115" y="630" as="sourcePoint" /><mxPoint x="775" y="630" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="n11" value="11. SupabaseJwtAuthFilter: valida firma HS256 (SUPABASE_JWT_SECRET) y expiración · rutas públicas solo por segmento (/auth, /actuator, /webhooks)" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#D4E6F9;strokeColor=#147EBA;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="800" y="655" width="400" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="m12" value="12. GET /users/by-supabase-id/{uuid} — PlayerIdResolver (caché Caffeine TTL 5 min)" style="html=1;fontSize=10;strokeColor=#147EBA;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="775" y="725" as="sourcePoint" /><mxPoint x="1225" y="725" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="m13" value="13. playerId" style="html=1;fontSize=10;dashed=1;strokeColor=#147EBA;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1225" y="760" as="sourcePoint" /><mxPoint x="775" y="760" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="m14" value="14. proxy /api/player/** + header X-User-Id" style="html=1;fontSize=10;strokeColor=#ED7100;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="775" y="800" as="sourcePoint" /><mxPoint x="1005" y="800" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="m15" value="15. REST localhost:8081" style="html=1;fontSize=10;strokeColor=#ED7100;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1005" y="840" as="sourcePoint" /><mxPoint x="1225" y="840" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="m16" value="16. SELECT perfil + ratings (lichess/chess.com)" style="html=1;fontSize=10;strokeColor=#C925D1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1225" y="880" as="sourcePoint" /><mxPoint x="1665" y="880" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="m17" value="17. 200 JSON (perfil)" style="html=1;fontSize=10;dashed=1;strokeColor=#545B64;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1225" y="930" as="sourcePoint" /><mxPoint x="115" y="930" as="targetPoint" /></mxGeometry></mxCell>
+
+        <mxCell id="note" value="Notas: el webhook es la única unión Supabase↔AWS (debe apuntar al ALB de la cuenta y firmar con el secret de Secrets Manager; requiere extensión pg_net). Si el webhook no llegó, PlayerIdResolver reintenta la resolución y existe provisioning perezoso." style="text;html=1;fontSize=10;fontStyle=2;fontColor=#545B64;align=left;" vertex="1" parent="1">
+          <mxGeometry x="40" y="965" width="1300" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

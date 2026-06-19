@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Role, useAuth } from '@chessquery/shared';
 import { Button, Card, Shell, ShellNavItem } from '@chessquery/ui-lib';
 import { NotificationBell } from './components/NotificationBell';
+import { TransitionOverlay } from './components/TransitionOverlay';
 import { getDefaultRoute } from './portal-utils';
 import { organizerPanelUrl } from './lib/urls';
 import { HomePage } from './pages/Home';
@@ -93,20 +94,53 @@ const buildNavItems = (
   ];
 };
 
+const transitionLabel = (pathname: string) => {
+  if (pathname === '/login') return 'Abriendo inicio de sesión';
+  if (pathname === '/register') return 'Abriendo registro';
+  if (pathname === '/play') return 'Abriendo sala de juego';
+  if (pathname.startsWith('/play/')) return 'Cargando partida';
+  if (pathname.startsWith('/tournaments')) return 'Cargando torneos';
+  if (pathname === '/portal') return 'Cargando portal';
+  if (pathname === '/player/me') return 'Cargando perfil';
+  return 'Cargando vista';
+};
+
 export const App = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, loading } = useAuth();
+  const previousPath = useRef(location.pathname);
+  const [routeTransition, setRouteTransition] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (previousPath.current === location.pathname) return;
+    previousPath.current = location.pathname;
+    setRouteTransition(transitionLabel(location.pathname));
+    const timeout = window.setTimeout(() => setRouteTransition(null), 520);
+    return () => window.clearTimeout(timeout);
+  }, [location.pathname]);
 
   const authRoutes = ['/login', '/register', '/forgot-password', '/reset-password'];
   if (authRoutes.includes(location.pathname)) {
     return (
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
-      </Routes>
+      <>
+        <div key={location.key} className="cq-route-frame">
+          <style>{`
+            @keyframes cq-route-in {
+              from { opacity: 0; transform: translateY(8px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            .cq-route-frame { animation: cq-route-in 260ms ease-out both; }
+          `}</style>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+          </Routes>
+        </div>
+        {routeTransition && <TransitionOverlay message={routeTransition} detail="Preparando la siguiente pantalla." />}
+      </>
     );
   }
 
@@ -131,69 +165,79 @@ export const App = () => {
     >
       {user?.role === 'PLAYER' && <NotificationBell />}
 
-      <Routes>
-        <Route
-          path="/"
-          element={
-            !user
-              ? <HomePage />
-              : user.role === 'ORGANIZER'
-                ? <OrganizerRedirect />
-                : <Navigate to={getDefaultRoute(user.role)} replace />
+      <div key={location.key} className="cq-route-frame">
+        <style>{`
+          @keyframes cq-route-in {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
           }
-        />
+          .cq-route-frame { animation: cq-route-in 260ms ease-out both; }
+        `}</style>
+        <Routes>
+          <Route
+            path="/"
+            element={
+              !user
+                ? <HomePage />
+                : user.role === 'ORGANIZER'
+                  ? <OrganizerRedirect />
+                  : <Navigate to={getDefaultRoute(user.role)} replace />
+            }
+          />
 
-        <Route
-          path="/portal"
-          element={
-            <RequireRole userRole={user?.role} roles={['PLAYER']}>
-              <PlayerPortalPage />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="/play"
-          element={
-            <RequireRole userRole={user?.role} roles={['PLAYER']}>
-              <PlayerMatchmakingPage />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="/play/:id"
-          element={
-            <RequireRole userRole={user?.role} roles={['PLAYER']}>
-              <LiveGamePage />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="/tournaments"
-          element={
-            <RequireRole userRole={user?.role} roles={['PLAYER']}>
-              <TournamentsPage />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="/tournaments/:id"
-          element={
-            <RequireRole userRole={user?.role} roles={['PLAYER']}>
-              <TournamentDetailPage />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="/player/me"
-          element={
-            <RequireRole userRole={user?.role} roles={['PLAYER']}>
-              <MyDashboardPage />
-            </RequireRole>
-          }
-        />
+          <Route
+            path="/portal"
+            element={
+              <RequireRole userRole={user?.role} roles={['PLAYER']}>
+                <PlayerPortalPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/play"
+            element={
+              <RequireRole userRole={user?.role} roles={['PLAYER']}>
+                <PlayerMatchmakingPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/play/:id"
+            element={
+              <RequireRole userRole={user?.role} roles={['PLAYER']}>
+                <LiveGamePage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/tournaments"
+            element={
+              <RequireRole userRole={user?.role} roles={['PLAYER']}>
+                <TournamentsPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/tournaments/:id"
+            element={
+              <RequireRole userRole={user?.role} roles={['PLAYER']}>
+                <TournamentDetailPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/player/me"
+            element={
+              <RequireRole userRole={user?.role} roles={['PLAYER']}>
+                <MyDashboardPage />
+              </RequireRole>
+            }
+          />
 
-        <Route path="*" element={<Navigate to={user ? getDefaultRoute(user.role) : '/'} replace />} />
-      </Routes>
+          <Route path="*" element={<Navigate to={user ? getDefaultRoute(user.role) : '/'} replace />} />
+        </Routes>
+      </div>
+      {routeTransition && <TransitionOverlay message={routeTransition} detail="Preparando la siguiente pantalla." />}
     </Shell>
   );
 };

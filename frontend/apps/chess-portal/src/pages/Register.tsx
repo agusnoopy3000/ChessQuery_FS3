@@ -35,6 +35,8 @@ const KingSVG = () => (
   </svg>
 );
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 /* ── Role visual: Player (mini board + pawn + stats) ── */
 const PlayerVisual = ({ selected }: { selected: boolean }) => (
   <div
@@ -225,12 +227,14 @@ const Field = ({ label, type = 'text', placeholder = '', hint = '', error = '', 
             outline: 'none',
             transition: 'border-color 0.2s, box-shadow 0.2s',
             boxShadow: focused ? '0 0 0 3px rgba(74,124,89,0.15)' : 'none',
+            animation: error ? 'cq-shake 0.34s cubic-bezier(.36,.07,.19,.97)' : undefined,
           }}
         />
         {isPass && (
           <button
             type="button"
             onClick={() => setShow((s) => !s)}
+            aria-label={show ? 'Ocultar contraseña' : 'Mostrar contraseña'}
             style={{
               position: 'absolute',
               right: 12,
@@ -323,14 +327,21 @@ export const RegisterPage = () => {
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
     setErrors((er) => ({ ...er, [e.target.name]: '' }));
+    setServerError(null);
   };
 
   const validate = () => {
     const errs: Record<string, string> = {};
-    if (!form.nombre.trim()) errs.nombre = 'Campo requerido';
-    if (!form.apellido.trim()) errs.apellido = 'Campo requerido';
-    if (!form.email.includes('@')) errs.email = 'Email inválido';
+    const firstName = form.nombre.trim();
+    const lastName = form.apellido.trim();
+    const email = form.email.trim();
+    if (firstName.length < 2) errs.nombre = 'Ingresa al menos 2 caracteres';
+    if (lastName.length < 2) errs.apellido = 'Ingresa al menos 2 caracteres';
+    if (!EMAIL_RE.test(email)) errs.email = 'Ingresa un email válido';
     if (form.password.length < 8) errs.password = 'Mínimo 8 caracteres';
+    else if (!/[A-Za-z]/.test(form.password) || !/\d/.test(form.password)) {
+      errs.password = 'Debe incluir letras y números';
+    }
     if (form.password !== form.confirmPassword) errs.confirmPassword = 'Las contraseñas no coinciden';
     if (!terms) errs.terms = 'Debes aceptar los términos para continuar';
     return errs;
@@ -401,12 +412,13 @@ export const RegisterPage = () => {
           @keyframes cq-check { from { stroke-dashoffset: 48 } to { stroke-dashoffset: 0 } }
           @keyframes cq-fade { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: translateY(0) } }
           @keyframes cq-spin { to { transform: rotate(360deg) } }
+          @keyframes cq-success-pulse { 0%, 100% { box-shadow: 0 0 26px rgba(106,191,116,0.22); } 50% { box-shadow: 0 0 52px rgba(106,191,116,0.4); } }
         `}</style>
         <div style={{
           width: 92, height: 92, borderRadius: '50%',
           background: 'rgba(106,191,116,0.12)', border: '2px solid #6abf74',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          animation: 'cq-pop 0.45s cubic-bezier(0.2,0.8,0.2,1) both',
+          animation: 'cq-pop 0.45s cubic-bezier(0.2,0.8,0.2,1) both, cq-success-pulse 1.2s ease-in-out infinite',
           boxShadow: '0 0 40px rgba(106,191,116,0.25)',
         }}>
           <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#6abf74" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -436,9 +448,20 @@ export const RegisterPage = () => {
       }}
     >
       <style>{`
+        @keyframes cq-register-panel {
+          from { opacity: 0; transform: translateX(14px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes cq-register-role {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes cq-shake { 10%,90%{transform:translateX(-1px)} 20%,80%{transform:translateX(2px)} 30%,50%,70%{transform:translateX(-4px)} 40%,60%{transform:translateX(4px)} }
         .cq-register-page { overflow: hidden; }
         .cq-register-left { flex: 0 0 480px; }
-        .cq-register-right { flex: 1; }
+        .cq-register-right { flex: 1; animation: cq-register-panel 320ms ease-out both; }
+        .cq-register-role-grid > * { animation: cq-register-role 280ms ease-out both; }
+        .cq-register-role-grid > *:nth-child(2) { animation-delay: 80ms; }
         @media (max-width: 980px) {
           .cq-register-page {
             display: grid !important;
@@ -587,8 +610,8 @@ export const RegisterPage = () => {
               <Field label="Apellido" name="apellido" autoComplete="family-name" value={form.apellido} onChange={handleChange} error={errors.apellido} half />
             </div>
 
-            <Field label="Email" type="email" name="email" autoComplete="email" value={form.email} onChange={handleChange} error={errors.email} placeholder="tu@email.com" />
-            <Field label="Contraseña" type="password" name="password" autoComplete="new-password" value={form.password} onChange={handleChange} error={errors.password} hint="Mínimo 8 caracteres" />
+            <Field label="Email" type="email" name="email" autoComplete="email" value={form.email} onChange={handleChange} error={errors.email} />
+            <Field label="Contraseña" type="password" name="password" autoComplete="new-password" value={form.password} onChange={handleChange} error={errors.password} hint="Mínimo 8 caracteres, con letras y números" />
             <Field label="Confirmar contraseña" type="password" name="confirmPassword" autoComplete="new-password" value={form.confirmPassword} onChange={handleChange} error={errors.confirmPassword} />
 
             {role === 'PLAYER' ? (
@@ -597,7 +620,6 @@ export const RegisterPage = () => {
                 name="lichess"
                 value={form.lichess}
                 onChange={handleChange}
-                placeholder="ej: DrNykterstein"
                 hint="Permite mostrar tu ELO de plataforma por modalidad en tu perfil"
               />
             ) : (
@@ -606,7 +628,6 @@ export const RegisterPage = () => {
                 name="club"
                 value={form.club}
                 onChange={handleChange}
-                placeholder="ej: Club Ajedrez Santiago"
                 hint="Podés agregar más clubes luego desde tu dashboard"
               />
             )}
@@ -626,7 +647,7 @@ export const RegisterPage = () => {
                   </a>{' '}
                   de ChessQuery.
                 </Checkbox>
-                {errors.terms && <p style={{ fontSize: 11, color: '#e05a5a', marginTop: 5, marginLeft: 28 }}>{errors.terms}</p>}
+                {errors.terms && <p role="alert" style={{ fontSize: 11, color: '#e05a5a', marginTop: 5, marginLeft: 28 }}>{errors.terms}</p>}
               </div>
               <Checkbox checked={newsletter} onChange={() => setNewsletter((n) => !n)}>
                 Quiero recibir novedades, torneos y actualizaciones de ChessQuery (opcional).
