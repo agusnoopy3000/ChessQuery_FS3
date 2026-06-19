@@ -50,3 +50,7 @@ docs/coverage-reports/   # reportes JaCoCo generados; viven en <módulo>/target/
 # Vite / Vitest cache
 **/.vite/
 **/.vitest-cache/
+
+# Skills instaladas (tooling, no parte del proyecto)
+.agents/
+skills-lock.json

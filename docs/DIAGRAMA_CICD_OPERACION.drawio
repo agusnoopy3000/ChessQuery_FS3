@@ -1,0 +1,110 @@
+<mxfile host="app.diagrams.net" modified="2026-06-11T00:00:00.000Z" agent="ChessQuery" version="24.0.0">
+  <diagram id="cicd-op" name="CI/CD y Operación">
+    <mxGraphModel dx="1422" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1150" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="ChessQuery — CI/CD y operación diaria (adaptado a AWS Academy: creds rotan ~4h, solo LabRole)" style="text;html=1;fontSize=16;fontStyle=1;align=left;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="1100" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- ===== CARRIL 1: CI ===== -->
+        <mxCell id="lane1" value="CI — automático en cada push / PR a main" style="rounded=0;html=1;whiteSpace=wrap;fillColor=#E8F5E9;strokeColor=#2E7D32;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=13;fontStyle=1;fontColor=#2E7D32;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="1620" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="dev" value="Developer&lt;br&gt;&lt;font size=&quot;1&quot;&gt;git push / PR&lt;/font&gt;" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#FFFFFF;strokeColor=#232F3E;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="80" y="130" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="gh" value="GitHub&lt;br&gt;agusnoopy3000/ChessQuery_FS3&lt;br&gt;&lt;font size=&quot;1&quot;&gt;workflow ci.yml · concurrency cancela runs viejos del mismo ref&lt;/font&gt;" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#FFFFFF;strokeColor=#232F3E;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="330" y="120" width="280" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="runner" value="Runner self-hosted &quot;fedora-runner&quot;&lt;br&gt;(Linux x64, local — $0 vs runners hosted)&lt;br&gt;&lt;font size=&quot;1&quot;&gt;procesa jobs en serie (único runner)&lt;/font&gt;" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#FFFFFF;strokeColor=#2E7D32;strokeWidth=2;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="700" y="120" width="300" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="tests" value="Tests por matriz&lt;br&gt;&lt;font size=&quot;1&quot;&gt;mvn test ×6 (gateway, users, tournament, game, notifications, analytics)&lt;br&gt;+ frontends y BFFs (npm test) · cobertura JaCoCo como artifact&lt;/font&gt;" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#FFFFFF;strokeColor=#2E7D32;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1090" y="120" width="340" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="green" value="✅ CI verde&lt;br&gt;= se puede mergear" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#C8E6C9;strokeColor=#2E7D32;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1500" y="130" width="130" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="c1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=10;" edge="1" parent="1" source="dev" target="gh"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="c2" value="encola jobs" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=10;" edge="1" parent="1" source="gh" target="runner"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="c3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=10;" edge="1" parent="1" source="runner" target="tests"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="c4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=10;" edge="1" parent="1" source="tests" target="green"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="lane1note" value="⚠ Si el runner está caído, los jobs quedan &quot;queued&quot; hasta 24h y el run se cancela: revisar systemd del runner antes de culpar al código." style="text;html=1;fontSize=10;fontStyle=2;fontColor=#2E7D32;align=left;" vertex="1" parent="1">
+          <mxGeometry x="80" y="240" width="900" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- ===== CARRIL 2: CD ===== -->
+        <mxCell id="lane2" value="CD — manual desde local (Academy: las creds no sobreviven en GitHub Secrets)" style="rounded=0;html=1;whiteSpace=wrap;fillColor=#FFF3E0;strokeColor=#E65100;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=13;fontStyle=1;fontColor=#E65100;" vertex="1" parent="1">
+          <mxGeometry x="40" y="320" width="1620" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="creds" value="1. Refrescar creds Academy&lt;br&gt;&lt;font size=&quot;1&quot;&gt;aws configure set ×3 + region&lt;br&gt;sts get-caller-identity = 672782205900&lt;/font&gt;" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#FFFFFF;strokeColor=#E65100;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="80" y="380" width="260" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="build" value="2. Build &amp;amp; push&lt;br&gt;scripts/build-push-ecr.sh&lt;br&gt;&lt;font size=&quot;1&quot;&gt;9 imágenes · IMAGE_TAG=vX.Y.Z&lt;br&gt;⚠ x86_64 (en Mac M1: DOCKER_DEFAULT_PLATFORM=linux/amd64)&lt;/font&gt;" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#FFFFFF;strokeColor=#E65100;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="420" y="380" width="300" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ecr2" value="ECR&lt;br&gt;chessquery/*" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#ED7100;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.ecr;" vertex="1" parent="1">
+          <mxGeometry x="800" y="382" width="70" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="taskdef" value="3. Task definition&lt;br&gt;&lt;font size=&quot;1&quot;&gt;chessquery-stack:revN (10 contenedores)&lt;br&gt;deploy-etl-service.sh → chessquery-etl&lt;br&gt;(hornea IP del stack: re-correr si se redespliega)&lt;/font&gt;" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#FFFFFF;strokeColor=#E65100;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="950" y="380" width="300" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="deploy" value="4. update-service + rollout&lt;br&gt;&lt;font size=&quot;1&quot;&gt;force-new-deployment → target healthy&lt;br&gt;→ /actuator/health/readiness = UP&lt;/font&gt;" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#FFFFFF;strokeColor=#E65100;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1330" y="380" width="280" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="d1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="creds" target="build"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="d2" value="push vX.Y.Z" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=10;" edge="1" parent="1" source="build" target="ecr2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="d3" value="pull" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=10;" edge="1" parent="1" source="ecr2" target="taskdef"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="d4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="taskdef" target="deploy"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="lane2note" value="Los workflows build-and-push.yml y deploy.yml existen como workflow_dispatch (manuales); el disparo automático en push está deshabilitado a propósito para no tener runs rojos por creds vencidas. setup-aws.sh es idempotente: si las creds expiran a mitad, se refrescan y se re-corre." style="text;html=1;fontSize=10;fontStyle=2;fontColor=#E65100;align=left;" vertex="1" parent="1">
+          <mxGeometry x="80" y="490" width="1500" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ===== CARRIL 3: OPERACIÓN ===== -->
+        <mxCell id="lane3" value="Operación diaria — ciclo de prendido/apagado (la mayor palanca de ahorro)" style="rounded=0;html=1;whiteSpace=wrap;fillColor=#E3F2FD;strokeColor=#1565C0;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=13;fontStyle=1;fontColor=#1565C0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="610" width="1620" height="430" as="geometry" />
+        </mxCell>
+
+        <mxCell id="onbox" value="🔌 PRENDER (~6-8 min)" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#FFFFFF;strokeColor=#1565C0;strokeWidth=2;verticalAlign=top;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="660" width="720" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="on1" value="1. rds start-db-instance chessquery-pg&lt;br&gt;&lt;font size=&quot;1&quot;&gt;esperar status = available (~3-5 min) — si ECS arranca sin BD, crashea&lt;/font&gt;" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#E3F2FD;strokeColor=#1565C0;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="100" y="690" width="680" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="on2" value="2. ecs update-service chessquery-stack --task-definition revN --desired-count 1&lt;br&gt;&lt;font size=&quot;1&quot;&gt;esperar target healthy (~2-3 min) y readiness UP&lt;/font&gt;" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#E3F2FD;strokeColor=#1565C0;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="100" y="740" width="680" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="on3" value="3. bash scripts/deploy-etl-service.sh (re-hornea la IP del stack) → autoscaling 1–2 tasks queda activo" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#E3F2FD;strokeColor=#1565C0;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="100" y="790" width="680" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="onnote" value="Links estables (siempre arriba, $≈0): S3 chess-portal · S3 organizer-panel · ALB chessquery-alb (DNS no cambia)" style="text;html=1;fontSize=10;fontStyle=2;fontColor=#1565C0;align=left;" vertex="1" parent="1">
+          <mxGeometry x="100" y="840" width="680" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="offbox" value="🔻 APAGAR al terminar" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#FFFFFF;strokeColor=#B71C1C;strokeWidth=2;verticalAlign=top;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="880" y="660" width="730" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="off1" value="1. ecs update-service chessquery-stack --desired-count 0" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#FFEBEE;strokeColor=#B71C1C;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="900" y="690" width="690" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="off2" value="2. ecs update-service chessquery-etl --desired-count 0" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#FFEBEE;strokeColor=#B71C1C;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="900" y="740" width="690" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="off3" value="3. rds stop-db-instance chessquery-pg" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#FFEBEE;strokeColor=#B71C1C;fontSize=10;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="900" y="790" width="690" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="offnote" value="Costo encendido ≈ US$0.25–0.30/h (stack 4vCPU/8GB + ETL + RDS) · apagado ≈ $0 variable" style="text;html=1;fontSize=10;fontStyle=2;fontColor=#B71C1C;align=left;" vertex="1" parent="1">
+          <mxGeometry x="900" y="840" width="690" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="mon" value="Monitoreo permanente (CloudWatch): logs /ecs/chessquery/stack y /ecs/chessquery/ms-etl (aws logs tail --follow) · 4 alarmas en métricas estándar: stack-cpu-alta · etl-cpu-alta · alb-target-unhealthy · alb-5xx · sin Container Insights (ahorro)" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#FCE4EC;strokeColor=#E7157B;fontSize=11;align=left;spacingLeft=10;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="80" y="910" width="1530" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="cycle" value="ciclo diario" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=10;strokeColor=#545B64;dashed=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="onbox" target="offbox"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
