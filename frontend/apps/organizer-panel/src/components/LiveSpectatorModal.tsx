@@ -59,11 +59,21 @@ export const LiveSpectatorModal = ({ sessionId, whiteLabel, blackLabel, onClose 
   return (
     <Modal open onClose={onClose} title={`Partida en vivo · mesa #${sessionId}`} size="md">
       {error ? (
-        <p style={{ color: 'var(--cq-error, #e05a5a)' }}>{error}</p>
+        <p role="alert" style={{ color: 'var(--cq-error, #e05a5a)' }}>{error}</p>
       ) : !state ? (
-        <Skeleton height={320} />
+        <div role="status" aria-label="Cargando partida en vivo">
+          <Skeleton height={320} />
+        </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
+          {/* Anuncio accesible del estado/turno (se actualiza con Realtime). */}
+          <div
+            role="status"
+            aria-live="polite"
+            style={{ position: 'absolute', width: 1, height: 1, margin: -1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}
+          >
+            {`${statusLabel(state.status, state.result ?? null)}${state.status === 'ACTIVE' ? `. Turno: ${turnLabel}` : ''}`}
+          </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
             <Badge variant={state.status === 'ACTIVE' ? 'success' : state.status === 'FINISHED' ? 'neutral' : 'warning'}>
               {statusLabel(state.status, state.result ?? null)}

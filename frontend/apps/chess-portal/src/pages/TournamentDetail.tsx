@@ -54,7 +54,7 @@ const RegistrationCTA = ({ tournament, myRegistration, loading, onRegister, regi
     };
     const m = meta[status];
     return (
-      <div style={{
+      <div role="status" aria-live="polite" style={{
         marginTop: 16, padding: '12px 14px',
         background: m.bg, border: `1px solid ${m.color}`, borderRadius: 8,
         display: 'flex', flexDirection: 'column', gap: 4,
@@ -82,7 +82,7 @@ const RegistrationCTA = ({ tournament, myRegistration, loading, onRegister, regi
         <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{reasonDisabled}</span>
       )}
       {error && (
-        <div style={{
+        <div role="alert" style={{
           background: 'rgba(224,90,90,0.1)', border: '1px solid #e05a5a',
           borderRadius: 8, padding: '8px 12px', color: '#e05a5a', fontSize: 13,
         }}>
