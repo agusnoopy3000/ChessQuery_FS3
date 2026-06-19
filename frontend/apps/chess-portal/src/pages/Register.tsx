@@ -413,7 +413,7 @@ export const RegisterPage = () => {
       <div
         style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          minHeight: '100vh', background: '#111210', color: '#e8ead4', fontFamily: fontStack,
+          minHeight: '100dvh', background: '#111210', color: '#e8ead4', fontFamily: fontStack,
           textAlign: 'center', padding: 24, gap: 18,
         }}
       >
@@ -451,7 +451,7 @@ export const RegisterPage = () => {
       className="cq-register-page"
       style={{
         display: 'flex',
-        minHeight: '100vh',
+        minHeight: '100dvh',
         background: '#111210',
         color: '#e8ead4',
         fontFamily: fontStack,
@@ -467,7 +467,8 @@ export const RegisterPage = () => {
           to { opacity: 1; transform: translateY(0); }
         }
         @keyframes cq-shake { 10%,90%{transform:translateX(-1px)} 20%,80%{transform:translateX(2px)} 30%,50%,70%{transform:translateX(-4px)} 40%,60%{transform:translateX(4px)} }
-        .cq-register-page { overflow: hidden; }
+        /* Sin clip vertical: el formulario siempre se puede scrollear para rellenar. */
+        .cq-register-page { overflow-x: hidden; }
         .cq-register-left { flex: 0 0 480px; }
         .cq-register-right { flex: 1; animation: cq-register-panel 320ms ease-out both; }
         .cq-register-role-grid > * { animation: cq-register-role 280ms ease-out both; }

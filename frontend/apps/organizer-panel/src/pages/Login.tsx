@@ -342,9 +342,10 @@ export const LoginPage = () => {
     <div
       style={{
         display: 'flex',
-        height: '100vh',
-        overflow: 'hidden',
-        background: 'var(--cq-bg, #111210)',
+        minHeight: '100dvh',
+        overflowY: 'auto',
+        padding: '24px',
+        background: 'var(--cq-surface-r, #141614)',
         color: 'var(--cq-text, #e8ead4)',
         fontFamily: fontStack,
       }}
@@ -352,9 +353,10 @@ export const LoginPage = () => {
       <style>{`
         @keyframes cq-spin { to { transform: rotate(360deg); } }
         @keyframes cq-slide-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        /* Auth enfocado: solo el formulario, centrado y a pantalla completa. */
+        .cq-org-login-left { display: none; }
         @media (max-width: 880px) {
-          .cq-org-login-left { display: none !important; }
-          .cq-org-login-right { padding: 32px 22px !important; }
+          .cq-org-login-right { padding: 28px 20px !important; }
           .cq-org-login-help { position: static !important; margin-bottom: 20px; text-align: right; }
         }
       `}</style>
@@ -454,17 +456,18 @@ export const LoginPage = () => {
         </div>
       </div>
 
-      {/* ── RIGHT ── */}
+      {/* ── FORMULARIO (única columna, centrada) ── */}
       <div
         className="cq-org-login-right"
         style={{
-          flex: 1,
+          width: '100%',
+          maxWidth: 460,
+          margin: 'auto',
           background: 'var(--cq-surface-r, #141614)',
-          padding: '32px 52px',
+          padding: '40px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
-          overflowY: 'auto',
           position: 'relative',
         }}
       >
