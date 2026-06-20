@@ -87,7 +87,7 @@ describe('MyDashboardPage', () => {
   it('renderiza los ratings de Lichess cuando vienen del API', () => {
     dashboardQuery.data = {
       profile: { id: 3, firstName: 'C', lastName: 'D', lichessUsername: 'cd_lichess',
-                 eloNational: null, eloFideStandard: null, clubName: null },
+                 eloNational: null, eloFideStandard: null, eloPlatform: 1540, clubName: null },
     };
     lichessQuery.data = {
       found: true,
@@ -97,7 +97,9 @@ describe('MyDashboardPage', () => {
       ],
     };
     render(<MyDashboardPage />);
-    expect(screen.getByText('LICHESS:1820')).toBeInTheDocument();
+    // La card "ELO ChessQuery" muestra el eloPlatform (no Lichess).
+    expect(screen.getByText('CQ:1540')).toBeInTheDocument();
+    // El resumen Lichess sigue listando las variantes.
     expect(screen.getByText('Bullet')).toBeInTheDocument();
     expect(screen.getByText('Blitz')).toBeInTheDocument();
   });

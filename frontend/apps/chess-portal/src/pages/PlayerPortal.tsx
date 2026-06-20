@@ -118,8 +118,12 @@ export const PlayerPortalPage = () => {
     .slice(0, 2)
     .map((s) => s[0]?.toUpperCase() ?? '')
     .join('');
-  const primaryRating = profile.eloFideStandard ?? profile.eloNational ?? null;
-  const ratingLabel = profile.eloFideStandard != null ? 'FIDE' : profile.eloNational != null ? 'NACIONAL' : 'SIN RATING';
+  // El ELO de ChessQuery (eloPlatform, que actualizan las partidas) es el
+  // principal del portal; cae a FIDE/Nacional si el jugador aún no jugó.
+  const primaryRating = profile.eloPlatform ?? profile.eloFideStandard ?? profile.eloNational ?? null;
+  const ratingLabel = profile.eloPlatform != null ? 'CHESSQUERY'
+    : profile.eloFideStandard != null ? 'FIDE'
+    : profile.eloNational != null ? 'NACIONAL' : 'SIN RATING';
 
   return (
     <div

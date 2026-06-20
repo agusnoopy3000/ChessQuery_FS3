@@ -80,7 +80,7 @@ export const PlayerCard = ({ player, onClick }: PlayerCardProps) => {
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {player.eloNational != null && <RatingBadge rating={player.eloNational} label="NAC" />}
           {player.eloFideStandard != null && <RatingBadge rating={player.eloFideStandard} label="FIDE" />}
-          {player.eloPlatform != null && <RatingBadge rating={player.eloPlatform} label="LICHESS" />}
+          {player.eloPlatform != null && <RatingBadge rating={player.eloPlatform} label="CQ" />}
         </div>
       </div>
     </Card>

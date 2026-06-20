@@ -29,6 +29,8 @@ vi.mock('@tanstack/react-query', () => ({
     mutateMock.mockImplementation(() => opts.onSuccess?.({ id: 42 }));
     return mutationState;
   },
+  // Query del perfil (para enviar el eloPlatform al crear la partida).
+  useQuery: () => ({ data: undefined }),
 }));
 
 vi.mock('@chessquery/ui-lib', () => ({

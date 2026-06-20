@@ -338,7 +338,13 @@ export const LiveGamePage = () => {
     if (state.blackPlayerId != null) return; // ya hay rival
     if (joinAttempted.current === id) return; // ya intentamos este id
     joinAttempted.current = id;
-    dataApi.join(id).then(setState).catch((e) => setError(message(e)));
+    // Enviamos el eloPlatform actual como eloBefore para que el cálculo parta
+    // del rating real del jugador y no del default 1500.
+    playerApi
+      .dashboard()
+      .then((d) => dataApi.join(id, d.profile?.eloPlatform ?? undefined))
+      .then(setState)
+      .catch((e) => setError(message(e)));
   }, [id, state, user]);
 
   // FEN a renderizar: posición actual o histórica (R12).

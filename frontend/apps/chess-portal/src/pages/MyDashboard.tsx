@@ -63,9 +63,6 @@ export const MyDashboardPage = () => {
 
   const ratings = (lichess.data?.ratings ?? []) as LichessRating[];
   const platformRatings = ratings.filter((r) => PRIMARY_VARIANTS.includes(r.variant));
-  const platformBest = platformRatings.length > 0
-    ? Math.max(...platformRatings.map((r) => r.rating ?? 0))
-    : null;
 
   return (
     <div style={{ padding: 28, display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 980, margin: '0 auto' }}>
@@ -98,19 +95,17 @@ export const MyDashboardPage = () => {
             <div style={{ fontSize: 18, color: 'var(--text-muted)' }}>—</div>
           )}
         </Card>
-        <Card header="ELO Plataforma">
-          {platformBest != null ? (
+        <Card header="ELO ChessQuery">
+          {p.eloPlatform != null ? (
             <div>
-              <RatingBadge rating={platformBest} label="LICHESS" />
+              <RatingBadge rating={p.eloPlatform} label="CQ" />
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
-                Mejor variante
+                Actualizado por tus partidas
               </div>
             </div>
-          ) : lichess.isLoading ? (
-            <Skeleton height={26} width={90} />
           ) : (
             <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-              {p.lichessUsername ? 'Sin datos en Lichess' : 'Sin cuenta vinculada'}
+              Aún sin partidas jugadas
             </div>
           )}
         </Card>
