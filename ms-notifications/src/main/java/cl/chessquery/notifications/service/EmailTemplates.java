@@ -94,7 +94,70 @@ public final class EmailTemplates {
         return new Content(text, shell(inviter + " te invitó a una partida en ChessQuery", body));
     }
 
+    /**
+     * Correo de inscripción a un torneo. {@code pending} indica si el torneo
+     * requiere aprobación del organizador (queda en revisión) o si quedó
+     * confirmada de inmediato.
+     */
+    public static Content tournamentRegistration(String firstName, String tournamentName,
+                                                 boolean pending, String portalUrl) {
+        String t = esc(notBlank(tournamentName) ? tournamentName : "el torneo");
+        String head = pending ? "Inscripción recibida" : "¡Estás inscrito!";
+        String htmlMsg = pending
+                ? "recibimos tu inscripción a <strong style=\"color:" + TEXT + ";\">" + t + "</strong>. "
+                  + "El organizador la revisará y te avisaremos por correo cuando quede confirmada."
+                : "quedaste inscrito en <strong style=\"color:" + TEXT + ";\">" + t + "</strong>. "
+                  + "Te llegará la convocatoria cuando se genere la primera ronda.";
+        String plainMsg = pending
+                ? "recibimos tu inscripción a " + t + ". El organizador la revisará y te avisaremos cuando quede confirmada."
+                : "quedaste inscrito en " + t + ". Te llegará la convocatoria cuando se genere la primera ronda.";
+        return notice(firstName, "🏆", head, htmlMsg, plainMsg, portalUrl, "Ver el torneo");
+    }
+
+    /** Correo cuando el organizador aprueba la inscripción. */
+    public static Content tournamentApproved(String firstName, String tournamentName, String portalUrl) {
+        String t = esc(notBlank(tournamentName) ? tournamentName : "el torneo");
+        String html = "tu inscripción a <strong style=\"color:" + TEXT + ";\">" + t
+                + "</strong> fue aprobada. ¡Nos vemos en el tablero!";
+        String plain = "tu inscripción a " + t + " fue aprobada. ¡Nos vemos en el tablero!";
+        return notice(firstName, "✅", "Inscripción aprobada", html, plain, portalUrl, "Ver el torneo");
+    }
+
+    /** Correo cuando el organizador rechaza la inscripción. */
+    public static Content tournamentRejected(String firstName, String tournamentName,
+                                             String reason, String portalUrl) {
+        String t = esc(notBlank(tournamentName) ? tournamentName : "el torneo");
+        String r = notBlank(reason) ? " Motivo: " + esc(reason) + "." : "";
+        String html = "tu inscripción a <strong style=\"color:" + TEXT + ";\">" + t
+                + "</strong> no fue aceptada por el organizador." + r;
+        String plain = "tu inscripción a " + t + " no fue aceptada por el organizador."
+                + (notBlank(reason) ? " Motivo: " + reason + "." : "");
+        return notice(firstName, "✖️", "Inscripción no aceptada", html, plain, portalUrl, "Ver torneos");
+    }
+
     // ── Componentes reutilizables ─────────────────────────────────────────────
+
+    /** Cuerpo genérico de "aviso" con emoji, título, saludo y CTA opcional. */
+    private static Content notice(String firstName, String emoji, String headline,
+                                  String htmlMessage, String plainMessage,
+                                  String ctaUrl, String ctaLabel) {
+        String name = (firstName != null && !firstName.isBlank()) ? esc(firstName) : "jugador";
+        String plain = headline + " — Hola " + name + ", " + plainMessage
+                + (notBlank(ctaUrl) ? "\n\n" + ctaLabel + ": " + ctaUrl : "");
+        String cta = notBlank(ctaUrl) ? button(ctaLabel, ctaUrl) : "";
+        String body = """
+                <div style="font-size:38px;line-height:1;margin:0 0 12px;">%7$s</div>
+                <h1 style="margin:0 0 14px;font-family:%1$s;font-size:23px;line-height:1.25;font-weight:700;color:%2$s;">
+                  %3$s
+                </h1>
+                <p style="margin:0 0 22px;font-family:%1$s;font-size:15px;line-height:1.6;color:%4$s;">
+                  Hola <strong style="color:%2$s;">%8$s</strong>, %5$s
+                </p>
+                %6$s
+                """.formatted(FONT, TEXT, esc(headline), MUTED, htmlMessage, cta, emoji, name);
+        return new Content(plain, shell(headline, body));
+    }
+
 
     /** Documento completo: fondo + tarjeta centrada con header de marca y footer. */
     private static String shell(String preheader, String bodyHtml) {
