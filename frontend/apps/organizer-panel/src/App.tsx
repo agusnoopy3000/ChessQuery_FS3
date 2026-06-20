@@ -49,7 +49,11 @@ export const App = () => {
       subtitle="Tu panel del organizador"
       items={buildNav(location.pathname, navigate)}
       user={{ name: (user.name && user.name.trim()) || user.email.split('@')[0], role: user.role, email: user.email }}
-      onLogout={() => logout().then(() => navigate('/login'))}
+      onLogout={() => {
+        // Refrescar la bandeja: al cerrar sesión, la próxima arranca vacía.
+        try { sessionStorage.removeItem('cq-notif-baseline'); } catch { /* ignore */ }
+        logout().then(() => navigate('/login'));
+      }}
     >
       <NotificationBell />
       <Routes>

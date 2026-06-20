@@ -4,6 +4,18 @@ import { organizerApi, NotificationItem } from '../api';
 const POLL_MS = 8_000;
 const TOAST_DURATION_MS = 5_000;
 
+// Baseline de sesión: solo se muestran notificaciones posteriores al inicio de
+// la sesión. sessionStorage → sesión nueva = bandeja vacía; se limpia en logout.
+const SESSION_BASELINE_KEY = 'cq-notif-baseline';
+const readSessionBaseline = (): number | null => {
+  try {
+    const v = sessionStorage.getItem(SESSION_BASELINE_KEY);
+    return v != null ? Number(v) : null;
+  } catch {
+    return null;
+  }
+};
+
 const eventIcon = (eventType: string): string => {
   if (eventType.startsWith('registration.')) return '📋';
   if (eventType.startsWith('tournament.')) return '🏆';
@@ -43,6 +55,7 @@ export const NotificationBell = () => {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const lastSeenIdRef = useRef<number | null>(null);
   const initializedRef = useRef(false);
+  const baselineRef = useRef<number | null>(null);
 
   const pushToast = useCallback((n: NotificationItem) => {
     const key = Date.now() + Math.random();
@@ -54,21 +67,30 @@ export const NotificationBell = () => {
 
   const poll = useCallback(async () => {
     try {
-      const [list, count] = await Promise.all([
-        organizerApi.listNotifications().catch(() => [] as NotificationItem[]),
-        organizerApi.unreadNotificationCount().catch(() => 0),
-      ]);
-      setUnread(count);
-      setItems(list);
+      const list = await organizerApi.listNotifications().catch(() => [] as NotificationItem[]);
+
+      if (baselineRef.current == null) {
+        const stored = readSessionBaseline();
+        if (stored != null) {
+          baselineRef.current = stored;
+        } else {
+          const maxId = list.reduce((m, n) => (n.id > m ? n.id : m), 0);
+          baselineRef.current = maxId;
+          try { sessionStorage.setItem(SESSION_BASELINE_KEY, String(maxId)); } catch { /* ignore */ }
+        }
+      }
+      const baseline = baselineRef.current ?? 0;
+      const sessionList = list.filter((n) => n.id > baseline);
+      setItems(sessionList);
+      setUnread(sessionList.filter((n) => !n.readAt).length);
 
       if (!initializedRef.current) {
-        const maxId = list.reduce((m, n) => (n.id > m ? n.id : m), 0);
-        lastSeenIdRef.current = maxId;
+        lastSeenIdRef.current = baseline;
         initializedRef.current = true;
         return;
       }
-      const seen = lastSeenIdRef.current ?? 0;
-      const fresh = list.filter((n) => n.id > seen);
+      const seen = lastSeenIdRef.current ?? baseline;
+      const fresh = sessionList.filter((n) => n.id > seen);
       if (fresh.length > 0) {
         for (const n of [...fresh].reverse()) pushToast(n);
         lastSeenIdRef.current = fresh.reduce((m, n) => (n.id > m ? n.id : m), seen);
@@ -100,8 +122,10 @@ export const NotificationBell = () => {
     setLoading(true);
     try {
       const list = await organizerApi.listNotifications();
-      setItems(list);
-      if (list.some((n) => !n.readAt)) {
+      const baseline = baselineRef.current ?? readSessionBaseline() ?? 0;
+      const sessionList = list.filter((n) => n.id > baseline);
+      setItems(sessionList);
+      if (sessionList.some((n) => !n.readAt)) {
         await organizerApi.markAllNotificationsRead();
         setUnread(0);
         setItems((prev) => prev.map((n) => ({ ...n, readAt: n.readAt ?? new Date().toISOString() })));
