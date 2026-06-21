@@ -1,0 +1,78 @@
+# ════════════════════════════════════════════════════════════════════════════
+#  tigrc de lazychess — vista del árbol de ChessQuery: compacta, legible y cozy.
+#  Se carga vía TIGRC_USER cuando 'arbol' abre tig; NO toca tu ~/.tigrc.
+#
+#  Paleta COZY-EARTH (256 colores, cálidos y con cuerpo — NADA de gris apagado):
+#    tan/café   180 / 137 / 223     navarro: estructura cálida y refs
+#    olivo/sage 108 / 144            ramas locales, agregados
+#    azul polvo 109 / 67             ramas remotas, fechas
+#    ladrillo   167                  quitados (-)
+#    terracota  173 · malva 139 · naranjo 215   acentos del grafo / HEAD
+# ════════════════════════════════════════════════════════════════════════════
+
+# ── Vista principal: compacta (que respire, que no sea pared de texto) ───────
+set main-view-date          = relative       # "hace 5 horas", no el timestamp largo
+set main-view-author        = abbreviated    # iniciales, no el nombre completo
+set main-view-id            = no             # sin la columna de hash
+set line-graphics           = utf-8          # líneas del grafo más limpias
+set horizontal-scroll       = 25%
+
+# ── Al seleccionar un commit (Enter): detalle a fondo ───────────────────────
+set vertical-split          = no             # el commit se abre a pantalla completa
+set diff-view-line-number   = no
+set show-changes            = yes            # resumen de archivos cambiados
+
+# ── Resalte y barras: cálidas (sin barras grises) ───────────────────────────
+color cursor                color223  color238          # crema sobre gris-cálido
+color title-focus           color235  color180          # barra activa: tan con texto oscuro
+color title-blur            color180  default           # barra inactiva: tan
+color status                color108  default           # estado: sage
+color delimiter             color144  default
+color line-number           color144  default
+
+# ── Vista principal: con color, no gris ─────────────────────────────────────
+color date                  color109  default           # azul polvoriento
+color author                color144  default           # khaki cálido
+color graph-commit          color215  default           # nodo del grafo: naranjo vivo
+
+# ── Refs (ramas/decoraciones): cálidas y distintas ──────────────────────────
+color main-head             color215  default bold      # rama actual (HEAD): naranjo
+color main-tag              color180  default bold       # tags: tan
+color main-ref              color108  default           # ramas locales: sage
+color main-remote           color109  default           # ramas remotas: azul polvo
+color main-tracked          color108  default bold
+
+# ── Líneas del grafo: vivas y distinguibles (cozy pero CON vida, nada gris) ──
+#   hues más saturados para que cada carril resalte bien.
+color palette-0             color215  default           # naranjo / peach vivo
+color palette-1             color114  default           # verde vivo
+color palette-2             color75   default           # azul vivo
+color palette-3             color211  default           # rosa vivo
+color palette-4             color180  default           # tan (toque earthy)
+color palette-5             color173  default           # terracota
+color palette-6             color177  default           # orquídea / malva
+color palette-7             color80   default           # teal
+color palette-8             color215  default
+color palette-9             color114  default
+color palette-10            color75   default
+color palette-11            color211  default
+color palette-12            color180  default
+color palette-13            color173  default
+
+# ── Cabecera del commit (vista de detalle): cálida, en café ─────────────────
+#   tig matchea por el prefijo (ojo: con el espacio final).
+color "commit "             color180  default bold      # "commit <sha>": tan, marca el inicio
+color "Refs: "              color137  default           # café
+color "Author: "            color137  default           # café
+color "AuthorDate: "        color137  default           # café
+color "Commit: "            color137  default           # café
+color "CommitDate: "        color137  default           # café
+color "Date: "              color137  default
+color "Merge: "             color137  default
+
+# ── Diff (al abrir un commit): cálido y sobrio ──────────────────────────────
+color diff-header           color144  default
+color diff-index            color144  default
+color diff-chunk            color109  default
+color diff-add              color108  default           # + en sage
+color diff-del              color167  default           # - en ladrillo

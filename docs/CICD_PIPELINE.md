@@ -106,4 +106,4 @@ Todos los jobs usan `runs-on: ${{ vars.RUNNER_LABEL || 'self-hosted' }}`.
 4. Actions → **Deploy to AWS** → Run workflow con ese `image_tag` y los toggles deseados.
 5. Verificar: el smoke test del workflow, o `tools/lazychess smoke`.
 
-> Para operar desde local (prender/apagar/deploy sin GitHub) está `tools/lazychess`.
+> Para operar desde local (prender/apagar/deploy sin GitHub) está `tools/lazychess` — ver su manual en [`tools/LAZYCHESS.md`](../tools/LAZYCHESS.md).
