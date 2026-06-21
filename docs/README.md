@@ -20,6 +20,7 @@ desde el [README raíz](../README.md).
 | [SELF_HOSTED_RUNNER.md](./SELF_HOSTED_RUNNER.md) | Configurar el runner self-hosted de GitHub Actions para el CI. |
 | [CICD_PIPELINE.md](./CICD_PIPELINE.md) | Pipeline CI/CD completo: CI automática (tests + Trivy), CD manual (ECR + ECS + S3 + ETL), secrets/variables y runners. |
 | [OPERACION_DEMO.md](./OPERACION_DEMO.md) | Cheat-sheet de operación de la demo: encender/apagar el stack, usuarios y verificación. |
+| [tools/LAZYCHESS.md](../tools/LAZYCHESS.md) | Manual de `lazychess`: panel de control en terminal para infra, despliegue, tests y git (árbol/flujo de commits) del proyecto. |
 | [ENDPOINTS.md](./ENDPOINTS.md) | Referencia en español de todas las rutas: qué hace cada una, quién la llama, headers y renombres propuestos. |
 | [ENDPOINTS_QA.md](./ENDPOINTS_QA.md) | Listado de endpoints de la plataforma para QA / pruebas manuales. |
 
