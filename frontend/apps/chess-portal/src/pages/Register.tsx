@@ -1,6 +1,7 @@
 import { useState, ChangeEvent, FormEvent, ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Role, useAuth, translateAuthError } from '@chessquery/shared';
+import { Checkbox } from '@chessquery/ui-lib';
 import { organizerPanelUrl } from '../lib/urls';
 
 /* ── Logo SVG ── */
@@ -268,46 +269,6 @@ const Field = ({ label, type = 'text', placeholder = '', hint = '', error = '', 
     </div>
   );
 };
-
-/* ── Checkbox ──
-   Checkbox nativo real superpuesto (opacity 0) sobre la caja visual: operable
-   por teclado (Tab + Espacio) y con nombre accesible vía la <label> que lo
-   envuelve. El foco por teclado se ve en la caja vía `:focus-visible + span`. */
-const Checkbox = ({ checked, onChange, children }: { checked: boolean; onChange: () => void; children: ReactNode }) => (
-  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', userSelect: 'none' }}>
-    <span style={{ position: 'relative', width: 18, height: 18, flexShrink: 0, marginTop: 1 }}>
-      <input
-        type="checkbox"
-        className="cq-cbx-input"
-        checked={checked}
-        onChange={onChange}
-        style={{ position: 'absolute', inset: 0, width: 18, height: 18, margin: 0, opacity: 0, cursor: 'pointer' }}
-      />
-      <span
-        aria-hidden="true"
-        style={{
-          position: 'absolute',
-          inset: 0,
-          borderRadius: 5,
-          border: `1.5px solid ${checked ? '#6abf74' : '#2a2d27'}`,
-          background: checked ? '#6abf74' : 'transparent',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transition: 'all 0.2s',
-        }}
-      >
-        {checked && (
-          <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-            <path d="M1 4L4 7L9 1" stroke="#0e100d" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        )}
-      </span>
-    </span>
-    <span style={{ fontSize: 13, color: '#9a9c8c', lineHeight: 1.5 }}>{children}</span>
-    <style>{`.cq-cbx-input:focus-visible + span { outline: 2px solid var(--accent, #6abf74); outline-offset: 2px; border-radius: 6px; }`}</style>
-  </label>
-);
 
 /* ── Page ── */
 export const RegisterPage = () => {
@@ -652,7 +613,7 @@ export const RegisterPage = () => {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
-                <Checkbox checked={terms} onChange={() => setTerms((t) => !t)}>
+                <Checkbox checked={terms} onChange={() => setTerms((t) => !t)} alignStart>
                   Acepto los{' '}
                   <a href="#" style={{ color: '#6abf74', textDecoration: 'underline', textUnderlineOffset: 3 }} onClick={(e) => e.preventDefault()}>
                     Términos y Condiciones
@@ -665,7 +626,7 @@ export const RegisterPage = () => {
                 </Checkbox>
                 {errors.terms && <p role="alert" style={{ fontSize: 11, color: '#e05a5a', marginTop: 5, marginLeft: 28 }}>{errors.terms}</p>}
               </div>
-              <Checkbox checked={newsletter} onChange={() => setNewsletter((n) => !n)}>
+              <Checkbox checked={newsletter} onChange={() => setNewsletter((n) => !n)} alignStart>
                 Quiero recibir novedades, torneos y actualizaciones de ChessQuery (opcional).
               </Checkbox>
             </div>
