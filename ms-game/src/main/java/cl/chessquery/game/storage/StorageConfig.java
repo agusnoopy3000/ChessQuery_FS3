@@ -9,15 +9,9 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Duration;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 /**
- * Selector de proveedor de almacenamiento PGN según
- * {@code storage.provider} (default: supabase).
- *
- * - supabase → {@link SupabaseStorageService}
- * - minio    → {@link MinioStorageService}  (legacy, requiere S3Client/S3Presigner activos)
+ * Configuración de almacenamiento PGN. Único proveedor: Supabase Storage.
  */
 @Configuration
 public class StorageConfig {
@@ -31,15 +25,6 @@ public class StorageConfig {
             @Value("${supabase.service-key}") String serviceKey,
             @Value("${s3.bucket:chessquery-pgn}") String bucket) {
         return new SupabaseStorageService(restTemplate, supabaseUrl, publicSupabaseUrl, serviceKey, bucket);
-    }
-
-    @Bean
-    @ConditionalOnProperty(name = "storage.provider", havingValue = "minio")
-    public StorageService minioStorageService(
-            S3Client s3Client,
-            S3Presigner s3Presigner,
-            @Value("${s3.bucket:chessquery-pgn}") String bucket) {
-        return new MinioStorageService(s3Client, s3Presigner, bucket);
     }
 
     /**

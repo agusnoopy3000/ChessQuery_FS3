@@ -56,24 +56,11 @@ logging:
   level:
     cl.chessquery.game: DEBUG
     org.springframework.amqp: WARN
-    software.amazon.awssdk: WARN
 
-# ── AWS / MinIO ──────────────────────────────────────────────────────────────
-cloud:
-  aws:
-    s3:
-      endpoint: ${S3_ENDPOINT_URL:http://localhost:9000}
-      public-endpoint: ${S3_PUBLIC_ENDPOINT_URL:http://localhost:9000}
-    credentials:
-      access-key: ${S3_ACCESS_KEY:minioadmin}
-      secret-key: ${S3_SECRET_KEY:minioadmin}
-    region:
-      static: ${AWS_REGION:us-east-1}
-
+# ── Almacenamiento PGN (Supabase Storage) ───────────────────────────────────
 s3:
   bucket: ${S3_BUCKET:chessquery-pgn}
 
-# ── Storage provider (supabase | minio) ─────────────────────────────────────
 storage:
   provider: ${STORAGE_PROVIDER:supabase}
 
@@ -115,11 +102,6 @@ spring:
     url: jdbc:postgresql://game_db:5432/game_db
   rabbitmq:
     host: rabbitmq
-
-cloud:
-  aws:
-    s3:
-      endpoint: http://minio:9000
 
 ---
 # ── Perfil test (H2, Flyway deshabilitado, RabbitMQ y S3 mockeados) ────────
