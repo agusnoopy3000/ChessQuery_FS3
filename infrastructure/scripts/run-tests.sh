@@ -7,7 +7,7 @@ ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "${ROOT_DIR}"
 
 JAVA_SERVICES=(ms-users ms-tournament ms-game ms-notifications)
-BFFS=(bff-player bff-organizer bff-admin)
+BFFS=(bff-player bff-organizer)
 
 FAILED=()
 

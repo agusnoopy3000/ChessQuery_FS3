@@ -64,20 +64,6 @@ spring:
                 key-resolver: "#{@ipKeyResolver}"
                 rate-limiter: "#{@defaultRateLimiter}"
 
-        - id: bff-admin
-          uri: ${BFF_ADMIN_URL}
-          predicates:
-            - Path=/api/admin/**
-          filters:
-            - StripPrefix=1
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 100
-                redis-rate-limiter.burstCapacity: 120
-                redis-rate-limiter.requestedTokens: 1
-                key-resolver: "#{@ipKeyResolver}"
-                rate-limiter: "#{@defaultRateLimiter}"
-
 # ── Servidor ──────────────────────────────────────────────────────────────
 server:
   port: ${SERVER_PORT:8080}
@@ -88,8 +74,6 @@ gateway:
     url: ${BFF_PLAYER_URL}
   bff-organizer:
     url: ${BFF_ORGANIZER_URL}
-  bff-admin:
-    url: ${BFF_ADMIN_URL}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost}
   ms-users:

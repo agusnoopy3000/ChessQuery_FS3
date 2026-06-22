@@ -2,7 +2,6 @@ import { Player, Role, Tournament } from '@chessquery/shared';
 
 export const getDefaultRoute = (role?: Role | null) => {
   if (role === 'ORGANIZER') return '/organizer';
-  if (role === 'ADMIN') return '/admin';
   return '/portal';
 };
 
@@ -27,13 +26,11 @@ export const resolveRequestedRoute = (role: Role | undefined, requested?: string
 
 export const getRoleLabel = (role?: Role | null) => {
   if (role === 'ORGANIZER') return 'Organizador';
-  if (role === 'ADMIN') return 'Administrador';
   return 'Jugador';
 };
 
 export const getRoleSummary = (role?: Role | null) => {
   if (role === 'ORGANIZER') return 'Clubes, academias y entidades con foco en gestión competitiva.';
-  if (role === 'ADMIN') return 'Operación, sincronización de fuentes y observabilidad de la plataforma.';
   return 'Competencia, perfiles, ranking y actividad conectada al ecosistema Lichess.';
 };
 

@@ -9,7 +9,7 @@ set -euo pipefail
 SERVICES=(
   ms-users ms-tournament ms-game ms-analytics ms-notifications
   api-gateway ms-etl
-  bff-player bff-organizer bff-admin
+  bff-player bff-organizer
   frontend
 )
 

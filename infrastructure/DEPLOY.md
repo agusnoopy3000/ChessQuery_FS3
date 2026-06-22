@@ -39,7 +39,7 @@ export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 #    (alternativa al ECR; útil cuando no hay conectividad AWS)
 docker compose -f infrastructure/docker-compose.yml build
 for svc in ms-users ms-tournament ms-game ms-analytics ms-notifications \
-           api-gateway ms-etl bff-player bff-organizer bff-admin frontend; do
+           api-gateway ms-etl bff-player bff-organizer frontend; do
   docker tag chessquery_${svc}:latest local/chessquery/${svc}:latest
   docker save local/chessquery/${svc}:latest | sudo k3s ctr images import -
 done

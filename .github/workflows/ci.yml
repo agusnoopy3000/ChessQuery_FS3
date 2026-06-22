@@ -105,7 +105,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        bff: [bff-player, bff-organizer, bff-admin]
+        bff: [bff-player, bff-organizer]
     steps:
       - uses: actions/checkout@v4
 

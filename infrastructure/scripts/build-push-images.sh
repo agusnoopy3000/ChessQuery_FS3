@@ -21,7 +21,6 @@ SERVICES=(
   "ms-etl:infrastructure/docker/ms-etl/Dockerfile"
   "bff-player:infrastructure/docker/bff-player/Dockerfile"
   "bff-organizer:infrastructure/docker/bff-organizer/Dockerfile"
-  "bff-admin:infrastructure/docker/bff-admin/Dockerfile"
   "frontend:infrastructure/docker/frontend/Dockerfile"
 )
 

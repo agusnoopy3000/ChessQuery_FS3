@@ -1,5 +1,5 @@
 // ── Auth ─────────────────────────────────────────────────────────
-export type Role = 'PLAYER' | 'ORGANIZER' | 'ADMIN';
+export type Role = 'PLAYER' | 'ORGANIZER';
 
 export interface AuthUser {
   /** BIGINT de PLAYER en MS-Users. 0 si aún no se ha resuelto desde Supabase. */

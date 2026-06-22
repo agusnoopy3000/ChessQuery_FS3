@@ -31,7 +31,7 @@ type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
  * Cliente HTTP hacia los microservicios con timeout y un único reintento
  * ante errores de red transitorios.
  *
- * ⚠️ Este archivo está replicado en bff-player, bff-organizer y bff-admin
+ * ⚠️ Este archivo está replicado en bff-player y bff-organizer
  * (solo difiere la interfaz {@link Upstreams}). Cualquier cambio acá debe
  * aplicarse en las 3 copias hasta que se extraiga a un paquete común.
  */
