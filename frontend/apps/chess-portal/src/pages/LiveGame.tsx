@@ -608,8 +608,42 @@ export const LiveGamePage = () => {
     }
   };
 
-  if (error && !state) return <div className="page-shell"><Card><p>Error: {error}</p></Card></div>;
-  if (!state) return <div className="page-shell"><p>Cargando partida…</p></div>;
+  if (error && !state) {
+    return (
+      <div className="page-shell" style={{ minHeight: '70vh', display: 'grid', placeItems: 'center' }}>
+        <Card style={{ maxWidth: 420, padding: 28, textAlign: 'center' }}>
+          <div style={{ fontSize: 40, marginBottom: 8 }} aria-hidden="true">♟</div>
+          <h2 style={{ marginTop: 0, marginBottom: 6 }}>No se pudo cargar la partida</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: 0 }}>{error}</p>
+        </Card>
+      </div>
+    );
+  }
+  if (!state) {
+    return (
+      <div className="page-shell" role="status" aria-label="Cargando partida"
+           style={{ minHeight: '70vh', display: 'grid', placeItems: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div
+            style={{
+              width: 'min(360px, 80vw)', aspectRatio: '1 / 1', borderRadius: 12,
+              border: '1px solid var(--border, #2a2d27)',
+              backgroundImage:
+                'linear-gradient(45deg, rgba(255,255,255,0.04) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.04) 75%),'
+                + 'linear-gradient(45deg, rgba(255,255,255,0.04) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.04) 75%)',
+              backgroundSize: '90px 90px', backgroundPosition: '0 0, 45px 45px',
+              margin: '0 auto', opacity: 0.7,
+            }}
+            className="pulse"
+          />
+          <div style={{ marginTop: 14, color: 'var(--text-muted)', fontSize: 13 }}>
+            <span className="spin" style={{ color: 'var(--accent)', marginRight: 6 }}>⟳</span>
+            Cargando partida…
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/play/${state.id}` : '';
 

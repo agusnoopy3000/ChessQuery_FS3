@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { sileo } from 'sileo';
 import { organizerApi, NotificationItem } from '../api';
 
 const POLL_MS = 8_000;
-const TOAST_DURATION_MS = 5_000;
 
 // Baseline de sesión: solo se muestran notificaciones posteriores al inicio de
 // la sesión. sessionStorage → sesión nueva = bandeja vacía; se limpia en logout.
@@ -36,33 +36,27 @@ const formatRelative = (iso: string | null): string => {
   return `hace ${Math.floor(hrs / 24)} d`;
 };
 
-interface ToastEntry {
-  key: number;
-  notification: NotificationItem;
-}
-
 /**
- * Campana de notificaciones + toasts emergentes para el panel del organizador.
- * Polling cada 8s. Detecta notificaciones nuevas (id > lastSeenId) y las
- * empuja como toasts auto-dismiss.
+ * Campana de notificaciones + toasts emergentes (Sileo) para el organizador.
+ * Polling cada 8s; cada notificación nueva emite un toast físico.
  */
 export const NotificationBell = () => {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [toasts, setToasts] = useState<ToastEntry[]>([]);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const lastSeenIdRef = useRef<number | null>(null);
   const initializedRef = useRef(false);
   const baselineRef = useRef<number | null>(null);
 
-  const pushToast = useCallback((n: NotificationItem) => {
-    const key = Date.now() + Math.random();
-    setToasts((prev) => [...prev, { key, notification: n }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.key !== key));
-    }, TOAST_DURATION_MS);
+  const emitToast = useCallback((n: NotificationItem) => {
+    const title = n.subject || 'Notificación';
+    if (n.eventType === 'registration.pending') {
+      sileo.info({ title });
+    } else {
+      sileo.success({ title });
+    }
   }, []);
 
   const poll = useCallback(async () => {
@@ -92,13 +86,13 @@ export const NotificationBell = () => {
       const seen = lastSeenIdRef.current ?? baseline;
       const fresh = sessionList.filter((n) => n.id > seen);
       if (fresh.length > 0) {
-        for (const n of [...fresh].reverse()) pushToast(n);
+        for (const n of [...fresh].reverse()) emitToast(n);
         lastSeenIdRef.current = fresh.reduce((m, n) => (n.id > m ? n.id : m), seen);
       }
     } catch {
       /* ignore */
     }
-  }, [pushToast]);
+  }, [emitToast]);
 
   useEffect(() => {
     poll();
@@ -136,9 +130,6 @@ export const NotificationBell = () => {
       setLoading(false);
     }
   };
-
-  const dismissToast = (key: number) =>
-    setToasts((prev) => prev.filter((t) => t.key !== key));
 
   return (
     <>
@@ -221,59 +212,6 @@ export const NotificationBell = () => {
             ))}
           </div>
         )}
-      </div>
-
-      <div
-        style={{
-          position: 'fixed', top: 64, right: 18, zIndex: 1100,
-          display: 'flex', flexDirection: 'column', gap: 10,
-          pointerEvents: 'none',
-        }}
-      >
-        {toasts.map(({ key, notification: n }) => (
-          <div
-            key={key}
-            onClick={() => dismissToast(key)}
-            style={{
-              pointerEvents: 'auto', cursor: 'pointer',
-              minWidth: 280, maxWidth: 360,
-              background: 'rgba(28,31,26,0.98)',
-              border: '1px solid var(--border, #2a2d27)',
-              borderLeft: '3px solid #6abf74',
-              borderRadius: 10,
-              boxShadow: '0 12px 32px rgba(0,0,0,0.5)',
-              padding: '12px 14px',
-              display: 'flex', gap: 12, alignItems: 'flex-start',
-              animation: 'cq-org-toast-slide-in 220ms ease-out',
-            }}
-          >
-            <span style={{ fontSize: 20, flexShrink: 0 }}>{eventIcon(n.eventType)}</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text, #e8ead4)' }}>
-                {n.subject || n.eventType}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
-                {n.eventType}
-              </div>
-            </div>
-            <button
-              onClick={(e) => { e.stopPropagation(); dismissToast(key); }}
-              style={{
-                background: 'transparent', border: 'none', color: 'var(--text-muted)',
-                cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 2, flexShrink: 0,
-              }}
-              aria-label="Cerrar"
-            >
-              ×
-            </button>
-          </div>
-        ))}
-        <style>{`
-          @keyframes cq-org-toast-slide-in {
-            from { opacity: 0; transform: translateX(20px); }
-            to { opacity: 1; transform: translateX(0); }
-          }
-        `}</style>
       </div>
     </>
   );

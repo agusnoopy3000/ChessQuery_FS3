@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { sileo } from 'sileo';
 import { playerApi, NotificationItem } from '../api';
 
 const POLL_MS = 8_000;
-const TOAST_DURATION_MS = 5_000;
-const MAX_TOASTS = 3;
 
 // Baseline de sesión: id máximo de notificaciones al iniciar la sesión. Solo se
 // muestran/cuentan las posteriores. Vive en sessionStorage → al cerrar la
@@ -61,20 +60,13 @@ const formatRelative = (iso: string | null): string => {
   return `hace ${Math.floor(hrs / 24)} d`;
 };
 
-interface ToastEntry {
-  key: number;
-  notification: NotificationItem;
-}
-
 /**
- * N1 + push: campana de notificaciones in-app + toasts emergentes.
+ * N1 + push: campana de notificaciones in-app + toasts emergentes (Sileo).
  *
- * Polling cada 8s del listado. Para cada notificación con id > lastSeenId,
- * empuja un toast que se auto-dismissea en 5s. Esto da experiencia "push"
- * sin depender de Realtime ni Service Workers.
- *
- * En la primera carga se inicializa lastSeenId al max id existente para
- * no spamear toasts del histórico.
+ * Polling cada 8s del listado. Cada notificación nueva (id > lastSeenId) emite
+ * un toast físico de Sileo. La invitación a partida trae acción "Unirse"; las
+ * accionables, "Ver". En la primera carga se memoriza el max id para no
+ * toastear el histórico de la sesión.
  */
 export const NotificationBell = () => {
   const navigate = useNavigate();
@@ -82,23 +74,26 @@ export const NotificationBell = () => {
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [toasts, setToasts] = useState<ToastEntry[]>([]);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const lastSeenIdRef = useRef<number | null>(null);
   const initializedRef = useRef(false);
   const baselineRef = useRef<number | null>(null);
 
-  const pushToast = useCallback((n: NotificationItem) => {
-    const key = Date.now() + Math.random();
-    setToasts((prev) => {
-      const next = [...prev, { key, notification: n }];
-      // FIFO: si superamos el máximo, descartamos los más viejos.
-      return next.length > MAX_TOASTS ? next.slice(next.length - MAX_TOASTS) : next;
-    });
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.key !== key));
-    }, TOAST_DURATION_MS);
-  }, []);
+  // Emite un toast Sileo por notificación nueva.
+  const emitToast = useCallback((n: NotificationItem) => {
+    const link = notificationLink(n);
+    const title = n.subject || (n.eventType === 'game.invitation' ? 'Invitación a partida' : 'Notificación');
+    const button = link
+      ? { title: n.eventType === 'game.invitation' ? 'Unirse' : 'Ver', onClick: () => navigate(link) }
+      : undefined;
+    if (n.eventType === 'game.invitation') {
+      sileo.info({ title, button });
+    } else if (n.eventType.startsWith('registration.rejected')) {
+      sileo.warning({ title });
+    } else {
+      sileo.success({ title, button });
+    }
+  }, [navigate]);
 
   const poll = useCallback(async () => {
     try {
@@ -133,7 +128,7 @@ export const NotificationBell = () => {
       if (fresh.length > 0) {
         // Mostrar de la más vieja a la más nueva (orden cronológico).
         for (const n of [...fresh].reverse()) {
-          pushToast(n);
+          emitToast(n);
         }
         const newMax = fresh.reduce((m, n) => (n.id > m ? n.id : m), seen);
         lastSeenIdRef.current = newMax;
@@ -141,7 +136,7 @@ export const NotificationBell = () => {
     } catch {
       // backend caído: ignorar silenciosamente
     }
-  }, [pushToast]);
+  }, [emitToast]);
 
   useEffect(() => {
     poll();
@@ -178,22 +173,6 @@ export const NotificationBell = () => {
       /* ignore */
     } finally {
       setLoading(false);
-    }
-  };
-
-  const dismissToast = (key: number) => {
-    setToasts((prev) => prev.filter((t) => t.key !== key));
-  };
-
-  /** Declinar invitación: marca la notificación como leída y cierra el toast.
-   *  No notifica al invitador (no hay endpoint dedicado todavía). */
-  const declineInvitation = async (key: number, notificationId: number) => {
-    dismissToast(key);
-    try {
-      await playerApi.markNotificationRead(notificationId);
-      setUnread((u) => Math.max(0, u - 1));
-    } catch {
-      /* ignore: el polling siguiente lo reconciliará */
     }
   };
 
@@ -311,104 +290,6 @@ export const NotificationBell = () => {
             })}
           </div>
         )}
-      </div>
-
-      {/* Stack de toasts emergentes (push notifications). */}
-      <div
-        style={{
-          position: 'fixed', top: 64, right: 18, zIndex: 1100,
-          display: 'flex', flexDirection: 'column', gap: 10,
-          pointerEvents: 'none',
-        }}
-      >
-        {toasts.map(({ key, notification: n }) => {
-          const link = notificationLink(n);
-          const isInvitation = n.eventType === 'game.invitation';
-          return (
-            <div
-              key={key}
-              onClick={() => {
-                if (!isInvitation && link) {
-                  navigate(link);
-                  dismissToast(key);
-                }
-              }}
-              style={{
-                pointerEvents: 'auto',
-                cursor: isInvitation ? 'default' : (link ? 'pointer' : 'default'),
-                minWidth: 300, maxWidth: 380,
-                background: isInvitation ? 'rgba(35,28,22,0.98)' : 'rgba(28,31,26,0.98)',
-                border: '1px solid var(--border, #2a2d27)',
-                borderLeft: `3px solid ${isInvitation ? '#f0b94e' : '#6abf74'}`,
-                borderRadius: 10,
-                boxShadow: '0 12px 32px rgba(0,0,0,0.5)',
-                padding: '12px 14px',
-                display: 'flex', gap: 12, alignItems: 'flex-start',
-                animation: 'cq-toast-slide-in 220ms ease-out',
-              }}
-            >
-              <span style={{ fontSize: 22, flexShrink: 0 }}>{eventIcon(n.eventType)}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text, #e8ead4)', lineHeight: 1.3 }}>
-                  {n.subject || (isInvitation ? 'Invitación a partida' : 'Notificación')}
-                </div>
-                {isInvitation && link && (
-                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); dismissToast(key); navigate(link); }}
-                      style={{
-                        flex: 1, padding: '7px 10px', borderRadius: 6, border: 'none',
-                        background: '#6abf74', color: '#0e100d',
-                        fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                        letterSpacing: '0.02em',
-                      }}
-                    >
-                      Aceptar
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); declineInvitation(key, n.id); }}
-                      style={{
-                        flex: 1, padding: '7px 10px', borderRadius: 6,
-                        border: '1px solid #4a4d40', background: 'transparent',
-                        color: 'var(--text-muted, #7a7d6e)',
-                        fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                      }}
-                    >
-                      Declinar
-                    </button>
-                  </div>
-                )}
-                {!isInvitation && link && (
-                  <div
-                    style={{
-                      marginTop: 6, fontSize: 12, color: '#6abf74', fontWeight: 600,
-                      display: 'flex', alignItems: 'center', gap: 4,
-                    }}
-                  >
-                    Ver detalle <span>→</span>
-                  </div>
-                )}
-              </div>
-              <button
-                onClick={(e) => { e.stopPropagation(); dismissToast(key); }}
-                style={{
-                  background: 'transparent', border: 'none', color: 'var(--text-muted)',
-                  cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 2,
-                  flexShrink: 0,
-                }}
-                aria-label="Cerrar"
-              >
-                ×
-              </button>
-            </div>
-          );
-        })}
-        <style>{`
-          @keyframes cq-toast-slide-in {
-            from { opacity: 0; transform: translateX(20px); }
-            to { opacity: 1; transform: translateX(0); }
-          }
-        `}</style>
       </div>
     </>
   );
