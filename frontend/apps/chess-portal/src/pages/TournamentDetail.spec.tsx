@@ -64,6 +64,8 @@ vi.mock('../api', () => ({
   },
 }));
 
+vi.mock('../hooks/useMyPlayerId', () => ({ useMyPlayerId: () => null }));
+
 const baseTournament = {
   id: 7, name: 'Open Verano',
   status: 'OPEN', format: 'SWISS', rounds: 7,

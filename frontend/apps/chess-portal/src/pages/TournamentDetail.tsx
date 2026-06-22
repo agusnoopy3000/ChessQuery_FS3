@@ -14,6 +14,7 @@ import {
 } from '@chessquery/ui-lib';
 import { Tournament, Standing } from '@chessquery/shared';
 import { tournamentApi, type MyRegistration } from '../api';
+import { useMyPlayerId } from '../hooks/useMyPlayerId';
 
 interface RegistrationCTAProps {
   tournament: Tournament;
@@ -106,6 +107,7 @@ interface StandingsResp {
 export const TournamentDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const myId = useMyPlayerId();
   const [tab, setTab] = useState<Tab>('info');
 
   const queryClient = useQueryClient();
@@ -291,6 +293,46 @@ export const TournamentDetailPage = () => {
               );
             })}
           </div>
+
+          {(() => {
+            const mine = round.data?.pairings.find(
+              (p) => myId != null && (p.whitePlayerId === myId || p.blackPlayerId === myId),
+            );
+            if (!mine) return null;
+            const oppName = mine.whitePlayerId === myId
+              ? (mine.blackPlayerName ?? 'tu rival')
+              : (mine.whitePlayerName ?? 'tu rival');
+            const myColor = mine.whitePlayerId === myId ? 'Blancas' : 'Negras';
+            const canPlay = mine.liveSessionId != null && !mine.result;
+            return (
+              <div
+                style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  gap: 14, flexWrap: 'wrap', marginBottom: 16, padding: '14px 16px',
+                  borderRadius: 12, border: '1px solid var(--accent-outline, rgba(106,191,116,0.34))',
+                  background: 'rgba(106,191,116,0.08)',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--accent)', fontWeight: 700 }}>
+                    Tu mesa · Ronda {selectedRound}
+                  </div>
+                  <div style={{ fontWeight: 700, marginTop: 3 }}>
+                    Mesa {mine.boardNumber} · {myColor} vs {oppName}
+                  </div>
+                </div>
+                {canPlay ? (
+                  <Button variant="primary" onClick={() => navigate(`/play/${mine.liveSessionId}`)}>
+                    ♞ Jugar mi partida →
+                  </Button>
+                ) : mine.result ? (
+                  <Badge variant="neutral">Terminada · {mine.result}</Badge>
+                ) : (
+                  <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Preparando tu partida…</span>
+                )}
+              </div>
+            );
+          })()}
 
           {round.isLoading ? (
             <Skeleton height={180} />

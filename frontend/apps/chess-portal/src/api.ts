@@ -245,6 +245,7 @@ const normalizePairing = (value: unknown): Pairing => {
     blackPlayerName: asString(raw.blackPlayerName),
     blackPlayerRating: asNumber(raw.blackPlayerRating),
     result: ((asString(raw.result) ?? null) as Pairing['result']),
+    liveSessionId: asNumber(raw.liveSessionId) ?? null,
   };
 };
 

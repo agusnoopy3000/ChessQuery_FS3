@@ -19,11 +19,8 @@
 
 ## 🔜 Próximos pasos (priorizados)
 
-### P0 — Infra de entrega
-- **CloudFront + HTTPS** delante de los buckets S3. Hoy es S3 website por HTTP:
-  sin CDN, sin compresión brotli en el edge, y los móviles muestran "sitio no
-  seguro". CloudFront da: HTTPS, brotli/gzip, cache en edge, menor latencia.
-  (Ya documentado como pendiente en `docs/PENDIENTE_HTTPS.md`.)
+> Nota: HTTPS/CDN (CloudFront) queda **fuera de alcance** para la entrega
+> académica — no se prioriza acá.
 
 ### P1 — Red y datos
 - **Polling → Supabase Realtime** donde se pueda: standings y pairings del
