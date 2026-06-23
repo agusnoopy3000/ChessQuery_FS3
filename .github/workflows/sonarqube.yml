@@ -1,7 +1,8 @@
 name: SonarQube
 
 # Análisis estático + cobertura sobre SonarQube self-hosted.
-# Requiere secrets del repo: SONAR_HOST_URL (URL del server) y SONAR_TOKEN.
+# Se activa solo si están los secrets SONAR_HOST_URL y SONAR_TOKEN; sin ellos
+# el job no falla (omite el análisis) para no romper el CI.
 on:
   push:
     branches: [main]
@@ -19,11 +20,26 @@ jobs:
     name: Análisis SonarQube
     runs-on: ${{ vars.RUNNER_LABEL || 'self-hosted' }}
     steps:
+      - name: ¿SonarQube configurado?
+        id: cfg
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          if [ -n "$SONAR_TOKEN" ] && [ -n "$SONAR_HOST_URL" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::SonarQube sin configurar (faltan SONAR_TOKEN/SONAR_HOST_URL) — análisis omitido."
+          fi
+
       - uses: actions/checkout@v4
+        if: steps.cfg.outputs.enabled == 'true'
         with:
           fetch-depth: 0   # historial completo → blame para "new code"
 
       - name: Setup JDK 17 (Temurin)
+        if: steps.cfg.outputs.enabled == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -31,27 +47,29 @@ jobs:
           cache: maven
 
       - name: Setup Maven 3.9
+        if: steps.cfg.outputs.enabled == 'true'
         uses: stCarolas/setup-maven@v5
         with:
           maven-version: '3.9.9'
 
       - name: Setup Node 20
+        if: steps.cfg.outputs.enabled == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      # Genera target/classes + jacoco.xml por módulo (gate JaCoCo en fase test).
       - name: Tests Java + cobertura (JaCoCo)
+        if: steps.cfg.outputs.enabled == 'true'
         run: |
           for m in api-gateway ms-users ms-tournament ms-game ms-notifications ms-analytics; do
             echo "── $m ──"
             (cd "$m" && mvn -B -ntp -DskipITs test)
           done
 
-      # Genera coverage/lcov.info por app (vitest --coverage, reporter lcov).
       - name: Tests frontend + cobertura (lcov)
+        if: steps.cfg.outputs.enabled == 'true'
         working-directory: frontend
         run: |
           npm ci
@@ -59,13 +77,14 @@ jobs:
           npm --prefix apps/organizer-panel test
 
       - name: SonarQube Scan
+        if: steps.cfg.outputs.enabled == 'true'
         uses: SonarSource/sonarqube-scan-action@v4
         env:
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-      # Falla el job si el Quality Gate no pasa (necesita el server configurado).
       - name: Quality Gate
+        if: steps.cfg.outputs.enabled == 'true'
         uses: SonarSource/sonarqube-quality-gate-action@v1
         timeout-minutes: 5
         env:

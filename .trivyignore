@@ -1,0 +1,8 @@
+# Vulnerabilidades de DEV-TOOLING del frontend (dev-server de vite/esbuild).
+# NO están en el bundle de producción ni afectan el CI o la app desplegada en S3;
+# solo se explotan exponiendo el dev-server local con --host. El fix es subir
+# vite a una major (breaking) → diferido. Revisar al actualizar vite.
+CVE-2026-53571   # vite: bypass de server.fs.deny en Windows (dev-server) — HIGH
+CVE-2026-39365   # vite: path traversal en .map del dev-server — moderate
+CVE-2026-53632   # launch-editor (via vite): NTLM por UNC en Windows — moderate
+GHSA-67mh-4wv8-2f99   # esbuild: el dev-server acepta requests de cualquier sitio — moderate
