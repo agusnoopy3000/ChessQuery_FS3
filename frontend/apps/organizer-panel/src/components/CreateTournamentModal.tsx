@@ -1,5 +1,5 @@
-import { FormEvent, useEffect, useState } from 'react';
-import { Button } from '@chessquery/ui-lib';
+import { FormEvent, useEffect, useId, useRef, useState } from 'react';
+import { Button, useFocusTrap } from '@chessquery/ui-lib';
 import type { CreateTournamentInput } from '../api';
 
 interface Props {
@@ -31,6 +31,10 @@ export const CreateTournamentModal = ({ open, onClose, onSubmit, loading, error 
   const [timeControl, setTimeControl] = useState('');
   const [requiresApproval, setRequiresApproval] = useState(true);
   const [validation, setValidation] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+
+  useFocusTrap(dialogRef, open);
 
   // Cuando se abre el modal: scroll a top + lock del body para que el usuario
   // no necesite mover la página detrás. Al cerrar: restauramos.
@@ -122,6 +126,11 @@ export const CreateTournamentModal = ({ open, onClose, onSubmit, loading, error 
         @keyframes cq-modal-slide { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         style={{
           background: 'var(--cq-surface-r, #141614)',
@@ -176,7 +185,7 @@ export const CreateTournamentModal = ({ open, onClose, onSubmit, loading, error 
         >
           Nuevo torneo
         </div>
-        <h2 style={{ margin: 0, marginBottom: 6, fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em' }}>
+        <h2 id={titleId} style={{ margin: 0, marginBottom: 6, fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em' }}>
           Configurar torneo
         </h2>
         <p style={{ color: 'var(--cq-text-dim, #7a7d6e)', fontSize: 13, marginTop: 0, marginBottom: 26 }}>
@@ -260,7 +269,7 @@ export const CreateTournamentModal = ({ open, onClose, onSubmit, loading, error 
           </label>
 
           {(validation || error) && (
-            <div style={{
+            <div role="alert" style={{
               background: 'rgba(224,90,90,0.1)', border: '1px solid #e05a5a',
               borderRadius: 8, padding: '10px 14px', color: '#e05a5a', fontSize: 13,
             }}>
@@ -297,12 +306,14 @@ export const CreateTournamentModal = ({ open, onClose, onSubmit, loading, error 
   );
 };
 
+// El control va DENTRO del <label>: asociación implícita, sin necesidad de
+// htmlFor/id por campo, y cada input queda con nombre accesible.
 const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-    <label style={{
+  <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+    <span style={{
       fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase',
-      color: '#7a7d6e', fontFamily: 'Space Mono, monospace',
-    }}>{label}</label>
+      color: 'var(--cq-text-dim, #9a9c8c)', fontFamily: 'Space Mono, monospace',
+    }}>{label}</span>
     {children}
-  </div>
+  </label>
 );

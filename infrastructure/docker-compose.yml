@@ -436,29 +436,6 @@ services:
     networks:
       - chessquery-net
 
-  bff-admin:
-    build:
-      context: ../bff-admin
-      dockerfile: Dockerfile
-    container_name: chessquery_bff_admin
-    restart: unless-stopped
-    profiles: ["admin"]
-    environment:
-      PORT: "3003"
-      MS_USERS_URL: http://ms-users:8081
-      MS_TOURNAMENT_URL: http://ms-tournament:8082
-      MS_GAME_URL: http://ms-game:8083
-      MS_ANALYTICS_URL: http://ms-analytics:8084
-      MS_ETL_URL: http://ms-etl:8086
-    ports:
-      - "127.0.0.1:3003:3003"
-    depends_on:
-      - ms-users
-      - ms-tournament
-      - ms-game
-    networks:
-      - chessquery-net
-
   # -------------------------------------------------------------------------
   # API GATEWAY (Spring Cloud Gateway, puerto 8080)
   # -------------------------------------------------------------------------
@@ -475,7 +452,6 @@ services:
       MS_USERS_URL: http://ms-users:8081
       BFF_PLAYER_URL: http://bff-player:3001
       BFF_ORGANIZER_URL: http://bff-organizer:3002
-      BFF_ADMIN_URL: http://bff-admin:3003
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       REDIS_PASSWORD: ${REDIS_PASSWORD:-chessquery_dev}

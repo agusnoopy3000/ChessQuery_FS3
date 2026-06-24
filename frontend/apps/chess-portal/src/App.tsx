@@ -1,22 +1,37 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Role, useAuth } from '@chessquery/shared';
 import { Button, Card, Shell, ShellNavItem } from '@chessquery/ui-lib';
-import { NotificationBell } from './components/NotificationBell';
 import { TransitionOverlay } from './components/TransitionOverlay';
 import { getDefaultRoute } from './portal-utils';
 import { organizerPanelUrl } from './lib/urls';
+// Auth + landing: eager (primer pintado crítico — la QR aterriza acá).
 import { HomePage } from './pages/Home';
 import { LoginPage } from './pages/Login';
-import { MyDashboardPage } from './pages/MyDashboard';
-import { PlayerMatchmakingPage } from './pages/PlayerMatchmaking';
-import { LiveGamePage } from './pages/LiveGame';
-import { PlayerPortalPage } from './pages/PlayerPortal';
 import { RegisterPage } from './pages/Register';
 import { ForgotPasswordPage } from './pages/ForgotPassword';
 import { ResetPasswordPage } from './pages/ResetPassword';
-import { TournamentDetailPage } from './pages/TournamentDetail';
-import { TournamentsPage } from './pages/Tournaments';
+
+// Vistas internas: lazy → sacan del bundle inicial el peso de Chessground/chessops
+// (LiveGame) y las pantallas de datos. Cargan bajo demanda con fallback.
+const MyDashboardPage = lazy(() => import('./pages/MyDashboard').then((m) => ({ default: m.MyDashboardPage })));
+const PlayerMatchmakingPage = lazy(() => import('./pages/PlayerMatchmaking').then((m) => ({ default: m.PlayerMatchmakingPage })));
+const LiveGamePage = lazy(() => import('./pages/LiveGame').then((m) => ({ default: m.LiveGamePage })));
+const PlayerPortalPage = lazy(() => import('./pages/PlayerPortal').then((m) => ({ default: m.PlayerPortalPage })));
+// Campana + toasts (Sileo) lazy: no entran al bundle de login.
+const NotificationBell = lazy(() => import('./components/NotificationBell').then((m) => ({ default: m.NotificationBell })));
+const TournamentDetailPage = lazy(() => import('./pages/TournamentDetail').then((m) => ({ default: m.TournamentDetailPage })));
+const TournamentsPage = lazy(() => import('./pages/Tournaments').then((m) => ({ default: m.TournamentsPage })));
+
+/** Fallback de Suspense para las rutas lazy: loader centrado, sin pantalla en blanco. */
+const RouteFallback = () => (
+  <div style={{ minHeight: '60vh', display: 'grid', placeItems: 'center' }}>
+    <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+      <div className="spin" style={{ fontSize: 30, color: 'var(--accent)' }}>⟳</div>
+      <div style={{ marginTop: 12, fontSize: 13, letterSpacing: '0.04em' }}>Cargando…</div>
+    </div>
+  </div>
+);
 
 interface RequireRoleProps {
   userRole?: Role;
@@ -161,9 +176,15 @@ export const App = () => {
       subtitle={user?.role === 'PLAYER' ? 'Tu portal de jugador' : user?.role === 'ORGANIZER' ? 'Tu panel del organizador' : 'Bienvenido a ChessQuery'}
       items={items}
       user={user ? { name: (user.name && user.name.trim()) || user.email.split('@')[0], role: user.role, email: user.email } : undefined}
-      onLogout={user ? () => logout().then(() => navigate('/')) : undefined}
+      onLogout={user ? () => {
+        // Refrescar la bandeja: al cerrar sesión, la próxima arranca vacía.
+        try { sessionStorage.removeItem('cq-notif-baseline'); } catch { /* ignore */ }
+        logout().then(() => navigate('/'));
+      } : undefined}
     >
-      {user?.role === 'PLAYER' && <NotificationBell />}
+      {user?.role === 'PLAYER' && (
+        <Suspense fallback={null}><NotificationBell /></Suspense>
+      )}
 
       <div key={location.key} className="cq-route-frame">
         <style>{`
@@ -173,6 +194,7 @@ export const App = () => {
           }
           .cq-route-frame { animation: cq-route-in 260ms ease-out both; }
         `}</style>
+        <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route
             path="/"
@@ -236,6 +258,7 @@ export const App = () => {
 
           <Route path="*" element={<Navigate to={user ? getDefaultRoute(user.role) : '/'} replace />} />
         </Routes>
+        </Suspense>
       </div>
       {routeTransition && <TransitionOverlay message={routeTransition} detail="Preparando la siguiente pantalla." />}
     </Shell>

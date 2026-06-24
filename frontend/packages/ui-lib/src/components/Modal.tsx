@@ -1,4 +1,5 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useId, useRef } from 'react';
+import { useFocusTrap } from '../utils/useFocusTrap';
 
 type Size = 'sm' | 'md' | 'lg';
 
@@ -10,11 +11,25 @@ export interface ModalProps {
   footer?: ReactNode;
   size?: Size;
   closeOnOverlay?: boolean;
+  /** Etiqueta accesible cuando no se pasa `title` (ej. modales sin cabecera). */
+  ariaLabel?: string;
 }
 
 const SIZE_MAX: Record<Size, number> = { sm: 380, md: 520, lg: 800 };
 
-export const Modal = ({ open, onClose, title, children, footer, size = 'md', closeOnOverlay = true }: ModalProps) => {
+export const Modal = ({
+  open,
+  onClose,
+  title,
+  children,
+  footer,
+  size = 'md',
+  closeOnOverlay = true,
+  ariaLabel,
+}: ModalProps) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
@@ -28,11 +43,23 @@ export const Modal = ({ open, onClose, title, children, footer, size = 'md', clo
     };
   }, [open, onClose]);
 
+  useFocusTrap(dialogRef, open);
+
   if (!open) return null;
 
   return (
     <div className="overlay" onClick={closeOnOverlay ? onClose : undefined}>
-      <div className="modal fade-up" style={{ maxWidth: SIZE_MAX[size] }} onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
+        aria-label={!title ? ariaLabel : undefined}
+        tabIndex={-1}
+        className="modal fade-up"
+        style={{ maxWidth: SIZE_MAX[size] }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {title && (
           <div
             style={{
@@ -43,7 +70,10 @@ export const Modal = ({ open, onClose, title, children, footer, size = 'md', clo
               borderBottom: '1px solid var(--border)',
             }}
           >
-            <div style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif", fontWeight: 600, fontSize: 15 }}>
+            <div
+              id={titleId}
+              style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif", fontWeight: 600, fontSize: 15 }}
+            >
               {title}
             </div>
             <button
@@ -51,7 +81,7 @@ export const Modal = ({ open, onClose, title, children, footer, size = 'md', clo
               onClick={onClose}
               className="btn btn-ghost"
               style={{ padding: '4px 8px' }}
-              aria-label="Close"
+              aria-label="Cerrar"
             >
               ✕
             </button>

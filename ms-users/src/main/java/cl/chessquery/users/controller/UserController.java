@@ -86,6 +86,12 @@ public class UserController {
         return playerService.syncLichess(id);
     }
 
+    @Operation(summary = "Sincroniza los ratings de Chess.com del jugador (API pública de Chess.com)")
+    @PostMapping("/{id}/chesscom-sync")
+    public PlayerProfileResponse syncChesscom(@PathVariable Long id) {
+        return playerService.syncChesscom(id);
+    }
+
     @Operation(summary = "Resolver Player por email (usado por ms-game para invitaciones in-app)")
     @GetMapping("/by-email")
     public PlayerProfileResponse getByEmail(@RequestParam String email) {

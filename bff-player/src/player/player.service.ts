@@ -402,6 +402,61 @@ export class PlayerService {
     return { username, user: { username, ratings }, games: [] };
   }
 
+  async getChesscomProfile(playerId: string): Promise<{
+    username: string | null;
+    user: unknown | null;
+    games: unknown[];
+    error?: string;
+  }> {
+    const { msUsers } = this.http.urls;
+    // Sincroniza con la API pública de Chess.com y persiste en ms-users
+    // (eloChesscom*), devolviendo el perfil actualizado. Espejo de getLichessProfile.
+    let profile: {
+      chesscomUsername?: string | null;
+      eloChesscomBullet?: number | null;
+      eloChesscomBlitz?: number | null;
+      eloChesscomRapid?: number | null;
+      eloChesscomDaily?: number | null;
+    };
+    try {
+      profile = await this.http.post(`${msUsers}/users/${playerId}/chesscom-sync`, {});
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'No se pudo sincronizar con Chess.com';
+      return { username: null, user: null, games: [], error: msg };
+    }
+
+    const username = profile?.chesscomUsername?.trim() || null;
+    if (!username) {
+      return { username: null, user: null, games: [], error: 'Jugador sin chesscomUsername registrado.' };
+    }
+
+    const ratings = [
+      { variant: 'bullet', rating: profile.eloChesscomBullet },
+      { variant: 'blitz', rating: profile.eloChesscomBlitz },
+      { variant: 'rapid', rating: profile.eloChesscomRapid },
+      { variant: 'daily', rating: profile.eloChesscomDaily },
+    ].filter((r) => r.rating != null);
+
+    if (ratings.length === 0) {
+      return {
+        username,
+        user: null,
+        games: [],
+        error: `No encontramos ratings para @${username} en Chess.com.`,
+      };
+    }
+    return { username, user: { username, ratings }, games: [] };
+  }
+
+  async updateMyProfile(
+    userId: string,
+    body: { firstName?: string; lastName?: string; clubId?: number; region?: string; lichessUsername?: string; chesscomUsername?: string },
+  ): Promise<unknown> {
+    const { msUsers } = this.http.urls;
+    const playerId = await this.resolvePlayerId(userId);
+    return this.http.put<unknown>(`${msUsers}/users/${playerId}/profile`, body);
+  }
+
   // ── Torneos (vista de jugador) ─────────────────────────────────────────
 
   async listTournaments(query: Record<string, string | undefined>): Promise<unknown> {

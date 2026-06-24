@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Badge, Button, Card, EmptyState, ErrorAlert, Select, Skeleton, StandingsTable, Table, TableColumn } from '@chessquery/ui-lib';
+import { Badge, Button, Card, ConfirmDialog, EmptyState, ErrorAlert, Select, Skeleton, StandingsTable, Table, TableColumn } from '@chessquery/ui-lib';
 import { Pairing, Tournament } from '@chessquery/shared';
 import { organizerApi, type CreateTournamentInput, type RegistrationRow } from '../api';
 import { dedupeBy, formatDate, tournamentStatusVariant, unwrapContent } from '../portal-utils';
@@ -22,6 +22,7 @@ export const OrganizerTournamentsPage = () => {
   const [statusFilter, setStatusFilter] = useState<'ALL' | Tournament['status']>('ALL');
   const [search, setSearch] = useState('');
   const [spectating, setSpectating] = useState<{ sessionId: number; white: string; black: string } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Tournament | null>(null);
 
   const tournaments = useQuery({
     queryKey: ['organizer', 'tournaments', 'list'],
@@ -147,16 +148,11 @@ export const OrganizerTournamentsPage = () => {
         queryClient.invalidateQueries({ queryKey: ['organizer', 'tournaments', 'list'] }),
         queryClient.invalidateQueries({ queryKey: ['organizer', 'portal', 'tournaments'] }),
       ]);
+      setConfirmDelete(null);
     },
   });
 
-  const handleDelete = (t: Tournament) => {
-    const ok = window.confirm(
-      `¿Eliminar el torneo "${t.name}"?\n\nEsta acción es irreversible. Solo se permite eliminar torneos en DRAFT u OPEN sin rondas generadas.`,
-    );
-    if (!ok) return;
-    deleteTournament.mutate(t.id);
-  };
+  const handleDelete = (t: Tournament) => setConfirmDelete(t);
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['organizer', 'tournaments', 'list'] });
@@ -645,7 +641,35 @@ export const OrganizerTournamentsPage = () => {
             />
           )}
 
-          <Card header="Standings">
+          <Card
+            header={
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span>Standings</span>
+                {liveRefetch && selectedTournamentId && (
+                  <span style={{ fontSize: 11, color: 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    {standings.isFetching ? (
+                      <>
+                        <span className="spin" aria-hidden="true">↻</span> Sincronizando…
+                      </>
+                    ) : (
+                      '● Actualizado'
+                    )}
+                  </span>
+                )}
+              </div>
+            }
+          >
+            {/* Resumen accesible: anuncia al líder solo cuando el texto cambia
+                (evita repetir en cada refetch de 8s con datos idénticos). */}
+            <div
+              role="status"
+              aria-live="polite"
+              style={{ position: 'absolute', width: 1, height: 1, margin: -1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}
+            >
+              {standings.data && standings.data.length > 0
+                ? `Clasificación actualizada. Lidera ${standings.data[0].playerName} con ${standings.data[0].points.toFixed(1)} puntos.`
+                : ''}
+            </div>
             {!selectedTournamentId ? (
               <EmptyState title="Sin clasificación" description="Elige un torneo para ver su tabla de posiciones." icon="♟" />
             ) : standings.isLoading ? (
@@ -760,6 +784,22 @@ export const OrganizerTournamentsPage = () => {
           onClose={() => setSpectating(null)}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmDelete != null}
+        tone="danger"
+        title="Eliminar torneo"
+        message={
+          <>
+            ¿Eliminar el torneo <strong>«{confirmDelete?.name}»</strong>? Esta acción es
+            irreversible. Solo se permite eliminar torneos en DRAFT u OPEN sin rondas generadas.
+          </>
+        }
+        confirmLabel="Eliminar"
+        loading={deleteTournament.isPending}
+        onConfirm={() => confirmDelete && deleteTournament.mutate(confirmDelete.id)}
+        onClose={() => setConfirmDelete(null)}
+      />
     </div>
   );
 };

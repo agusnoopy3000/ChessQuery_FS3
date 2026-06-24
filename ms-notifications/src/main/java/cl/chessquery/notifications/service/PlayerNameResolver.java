@@ -24,7 +24,7 @@ public class PlayerNameResolver {
 
     private final RestTemplate http;
     private final String msUsersUrl;
-    private final Map<Long, CachedName> cache = new ConcurrentHashMap<>();
+    private final Map<Long, CachedProfile> cache = new ConcurrentHashMap<>();
 
     public PlayerNameResolver(RestTemplateBuilder builder,
                               @Value("${ms-users.url:http://ms-users:8081}") String msUsersUrl) {
@@ -37,28 +37,55 @@ public class PlayerNameResolver {
 
     public String resolve(Long playerId) {
         if (playerId == null) return "un jugador";
-        CachedName cached = cache.get(playerId);
-        if (cached != null && cached.expiresAt.isAfter(Instant.now())) {
-            return cached.name;
-        }
-        String name = fetch(playerId);
-        cache.put(playerId, new CachedName(name, Instant.now().plus(TTL)));
-        return name;
+        CachedProfile p = get(playerId);
+        return p.name != null ? p.name : fallback(playerId);
     }
 
-    private String fetch(Long playerId) {
+    /**
+     * Resuelve playerId → email registrado (para correos transaccionales cuyo
+     * evento solo trae el id). Devuelve null si no se pudo resolver; el caller
+     * decide si omite el email sin romper la notificación in-app.
+     */
+    public String resolveEmail(Long playerId) {
+        if (playerId == null) return null;
+        return get(playerId).email;
+    }
+
+    /**
+     * Resuelve playerId → firstName (para el saludo del correo). Cae al nombre
+     * completo o a "jugador" si no hay datos.
+     */
+    public String resolveFirstName(Long playerId) {
+        if (playerId == null) return "jugador";
+        String fn = get(playerId).firstName;
+        return (fn != null && !fn.isBlank()) ? fn : "jugador";
+    }
+
+    private CachedProfile get(Long playerId) {
+        CachedProfile cached = cache.get(playerId);
+        if (cached != null && cached.expiresAt.isAfter(Instant.now())) {
+            return cached;
+        }
+        CachedProfile fresh = fetch(playerId);
+        cache.put(playerId, fresh);
+        return fresh;
+    }
+
+    private CachedProfile fetch(Long playerId) {
+        Instant exp = Instant.now().plus(TTL);
         try {
             @SuppressWarnings("unchecked")
             Map<String, Object> body = http.getForObject(
                     msUsersUrl + "/users/" + playerId + "/profile", Map.class);
-            if (body == null) return fallback(playerId);
+            if (body == null) return new CachedProfile(null, null, null, exp);
             String first = (String) body.get("firstName");
             String last  = (String) body.get("lastName");
+            String email = (String) body.get("email");
             String full  = ((first != null ? first : "") + " " + (last != null ? last : "")).trim();
-            return full.isEmpty() ? fallback(playerId) : full;
+            return new CachedProfile(full.isEmpty() ? null : full, first, email, exp);
         } catch (Exception e) {
-            log.debug("No se pudo resolver nombre del player {}: {}", playerId, e.getMessage());
-            return fallback(playerId);
+            log.debug("No se pudo resolver perfil del player {}: {}", playerId, e.getMessage());
+            return new CachedProfile(null, null, null, exp);
         }
     }
 
@@ -66,5 +93,5 @@ public class PlayerNameResolver {
         return "jugador #" + playerId;
     }
 
-    private record CachedName(String name, Instant expiresAt) {}
+    private record CachedProfile(String name, String firstName, String email, Instant expiresAt) {}
 }

@@ -9,6 +9,7 @@ describe('PlayerService', () => {
     get: jest.Mock;
     post: jest.Mock;
     patch: jest.Mock;
+    put: jest.Mock;
     urls: Record<string, string>;
   };
 
@@ -17,6 +18,7 @@ describe('PlayerService', () => {
       get: jest.fn(),
       post: jest.fn(),
       patch: jest.fn(),
+      put: jest.fn(),
       urls: {
         msUsers: 'http://ms-users:8081',
         msTournament: 'http://ms-tournament:8082',
@@ -350,6 +352,59 @@ describe('PlayerService', () => {
       });
       const r = await service.getLichessProfile('5');
       expect(r.error).toBeDefined();
+    });
+  });
+
+  describe('getChesscomProfile', () => {
+    it('sin chesscomUsername devuelve error informativo', async () => {
+      http.post.mockResolvedValue({ chesscomUsername: null });
+      const r = await service.getChesscomProfile('5');
+      expect(r.username).toBeNull();
+      expect(r.error).toBeDefined();
+    });
+
+    it('sincroniza con ms-users y devuelve ratings por modalidad', async () => {
+      http.post.mockResolvedValue({
+        chesscomUsername: 'hikaru',
+        eloChesscomBullet: 3300,
+        eloChesscomBlitz: 3100,
+        eloChesscomRapid: 2900,
+        eloChesscomDaily: null,
+      });
+      const r = await service.getChesscomProfile('5');
+      expect(r.username).toBe('hikaru');
+      expect(http.post).toHaveBeenCalledWith(
+        expect.stringContaining('/users/5/chesscom-sync'),
+        {},
+      );
+      const ratings = (r.user as { ratings: { variant: string; rating: number }[] }).ratings;
+      expect(ratings).toHaveLength(3); // daily null se omite
+      expect(ratings.find((x) => x.variant === 'bullet')?.rating).toBe(3300);
+    });
+
+    it('si el sync falla devuelve error sin romper', async () => {
+      http.post.mockImplementation(async () => {
+        throw new Error('ms-users down');
+      });
+      const r = await service.getChesscomProfile('5');
+      expect(r.error).toBeDefined();
+    });
+  });
+
+  describe('updateMyProfile', () => {
+    it('resuelve playerId y hace PUT al perfil en ms-users', async () => {
+      const uuid = '550e8400-e29b-41d4-a716-446655440099';
+      http.get.mockImplementation(async (url: string) =>
+        url.includes('by-supabase-id') ? { id: 7 } : {},
+      );
+      http.put.mockResolvedValue({ id: 7, lichessUsername: 'magnus' });
+
+      await service.updateMyProfile(uuid, { lichessUsername: 'magnus', chesscomUsername: 'hikaru' });
+
+      expect(http.put).toHaveBeenCalledWith(
+        'http://ms-users:8081/users/7/profile',
+        { lichessUsername: 'magnus', chesscomUsername: 'hikaru' },
+      );
     });
   });
 

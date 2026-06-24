@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card, ErrorAlert } from '@chessquery/ui-lib';
-import { liveGameApi } from '../api';
+import { liveGameApi, playerApi } from '../api';
 import { TransitionOverlay } from '../components/TransitionOverlay';
 
 /**
@@ -19,8 +19,15 @@ export const PlayerMatchmakingPage = () => {
   const navigate = useNavigate();
   const [redirecting, setRedirecting] = useState(false);
 
+  // ELO ChessQuery actual del jugador: se envía como eloBefore para que el
+  // cálculo parta de su rating real y NO del default 1500 en cada partida.
+  const me = useQuery({
+    queryKey: ['player', 'me', 'dashboard'],
+    queryFn: () => playerApi.dashboard(),
+  });
+
   const startLive = useMutation({
-    mutationFn: () => liveGameApi.create(),
+    mutationFn: () => liveGameApi.create(me.data?.profile?.eloPlatform ?? undefined),
     onSuccess: (game) => {
       setRedirecting(true);
       navigate(`/play/${game.id}`);

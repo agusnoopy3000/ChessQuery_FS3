@@ -2,6 +2,7 @@ import { ChangeEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from 
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth, translateAuthError } from '@chessquery/shared';
+import { Checkbox } from '@chessquery/ui-lib';
 import { playerApi } from '../api';
 import { organizerPanelUrl } from '../lib/urls';
 import { TransitionOverlay } from '../components/TransitionOverlay';
@@ -252,35 +253,6 @@ const Field = ({ label, type = 'text', placeholder = '', hint = '', error = '', 
   );
 };
 
-/* ── Checkbox ── */
-const Checkbox = ({ checked, onChange, children }: { checked: boolean; onChange: () => void; children: ReactNode }) => (
-  <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', userSelect: 'none' }}>
-    <div
-      onClick={onChange}
-      style={{
-        width: 18,
-        height: 18,
-        borderRadius: 5,
-        border: `1.5px solid ${checked ? '#6abf74' : '#2a2d27'}`,
-        background: checked ? '#6abf74' : 'transparent',
-        flexShrink: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        transition: 'all 0.2s',
-        cursor: 'pointer',
-      }}
-    >
-      {checked && (
-        <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-          <path d="M1 4L4 7L9 1" stroke="#0e100d" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      )}
-    </div>
-    <span style={{ fontSize: 13, color: '#7a7d6e', lineHeight: 1.5 }}>{children}</span>
-  </label>
-);
-
 /* ── Page ── */
 export const LoginPage = () => {
   const navigate = useNavigate();
@@ -357,11 +329,13 @@ export const LoginPage = () => {
 
   return (
     <div
+      className="cq-login-root"
       style={{
         display: 'flex',
-        height: '100vh',
-        overflow: 'hidden',
-        background: '#111210',
+        minHeight: '100dvh',
+        overflowY: 'auto',
+        padding: '24px',
+        background: '#141614',
         color: '#e8ead4',
         fontFamily: fontStack,
       }}
@@ -372,10 +346,15 @@ export const LoginPage = () => {
         @keyframes cq-slide-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes cq-board-pulse { 0%, 100% { opacity: .72; transform: scale(.98); } 50% { opacity: 1; transform: scale(1.02); } }
         @keyframes cq-form-glow { 0%, 100% { box-shadow: 0 0 0 rgba(106,191,116,0); } 50% { box-shadow: 0 0 34px rgba(106,191,116,.08); } }
+        /* Auth enfocado: solo el formulario, centrado y a pantalla completa. */
+        .cq-login-left { display: none; }
         @media (max-width: 880px) {
-          .cq-login-left { display: none !important; }
-          .cq-login-right { padding: 32px 22px !important; }
+          .cq-login-right { padding: 28px 20px !important; }
           .cq-login-help { position: static !important; margin-bottom: 20px; text-align: right; }
+        }
+        @media (max-width: 560px) {
+          .cq-login-root { padding: 14px !important; }
+          .cq-login-right { padding: 22px 16px !important; }
         }
       `}</style>
 
@@ -461,17 +440,18 @@ export const LoginPage = () => {
         </div>
       </div>
 
-      {/* ── RIGHT PANEL ── */}
+      {/* ── FORMULARIO (única columna, centrada) ── */}
       <div
         className="cq-login-right"
         style={{
-          flex: 1,
+          width: '100%',
+          maxWidth: 'clamp(280px, 92vw, 460px)',
+          margin: 'auto',
           background: '#141614',
-          padding: '32px 52px',
+          padding: '40px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
-          overflowY: 'auto',
           position: 'relative',
         }}
       >

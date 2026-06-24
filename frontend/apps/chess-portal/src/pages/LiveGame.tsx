@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Chessground } from 'chessground';
 import type { Api as CgApi } from 'chessground/api';
@@ -11,7 +11,7 @@ import { makeSan } from 'chessops/san';
 import { chessgroundDests } from 'chessops/compat';
 import { useAuth } from '@chessquery/shared';
 import type { Player } from '@chessquery/shared';
-import { Button, Card } from '@chessquery/ui-lib';
+import { Button, Card, useFocusTrap } from '@chessquery/ui-lib';
 import { api, liveGameApi, playerApi } from '../api';
 import { supabase } from '../lib/supabase';
 import { useMyPlayerId } from '../hooks/useMyPlayerId';
@@ -338,7 +338,13 @@ export const LiveGamePage = () => {
     if (state.blackPlayerId != null) return; // ya hay rival
     if (joinAttempted.current === id) return; // ya intentamos este id
     joinAttempted.current = id;
-    dataApi.join(id).then(setState).catch((e) => setError(message(e)));
+    // Enviamos el eloPlatform actual como eloBefore para que el cálculo parta
+    // del rating real del jugador y no del default 1500.
+    playerApi
+      .dashboard()
+      .then((d) => dataApi.join(id, d.profile?.eloPlatform ?? undefined))
+      .then(setState)
+      .catch((e) => setError(message(e)));
   }, [id, state, user]);
 
   // FEN a renderizar: posición actual o histórica (R12).
@@ -602,8 +608,42 @@ export const LiveGamePage = () => {
     }
   };
 
-  if (error && !state) return <div className="page-shell"><Card><p>Error: {error}</p></Card></div>;
-  if (!state) return <div className="page-shell"><p>Cargando partida…</p></div>;
+  if (error && !state) {
+    return (
+      <div className="page-shell" style={{ minHeight: '70vh', display: 'grid', placeItems: 'center' }}>
+        <Card style={{ maxWidth: 420, padding: 28, textAlign: 'center' }}>
+          <div style={{ fontSize: 40, marginBottom: 8 }} aria-hidden="true">♟</div>
+          <h2 style={{ marginTop: 0, marginBottom: 6 }}>No se pudo cargar la partida</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: 0 }}>{error}</p>
+        </Card>
+      </div>
+    );
+  }
+  if (!state) {
+    return (
+      <div className="page-shell" role="status" aria-label="Cargando partida"
+           style={{ minHeight: '70vh', display: 'grid', placeItems: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div
+            style={{
+              width: 'min(360px, 80vw)', aspectRatio: '1 / 1', borderRadius: 12,
+              border: '1px solid var(--border, #2a2d27)',
+              backgroundImage:
+                'linear-gradient(45deg, rgba(255,255,255,0.04) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.04) 75%),'
+                + 'linear-gradient(45deg, rgba(255,255,255,0.04) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.04) 75%)',
+              backgroundSize: '90px 90px', backgroundPosition: '0 0, 45px 45px',
+              margin: '0 auto', opacity: 0.7,
+            }}
+            className="pulse"
+          />
+          <div style={{ marginTop: 14, color: 'var(--text-muted)', fontSize: 13 }}>
+            <span className="spin" style={{ color: 'var(--accent)', marginRight: 6 }}>⟳</span>
+            Cargando partida…
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/play/${state.id}` : '';
 
@@ -630,8 +670,41 @@ export const LiveGamePage = () => {
     && ((myColor === 'black' && state.turn === 'w') || (myColor !== 'black' && state.turn === 'b'));
   const bottomActive = state.status === 'ACTIVE' && !topActive;
 
+  // Anuncio para lectores de pantalla. Se actualiza al cambiar el estado
+  // (jugada del rival, turno, jaque, resultado) y la región aria-live lo lee
+  // sin alterar la UI visual.
+  const lastMove = state.moves[state.moves.length - 1];
+  const inCheck = chessFromFen(state.currentFen)?.isCheck() ?? false;
+  const liveAnnounce = (() => {
+    if (state.status === 'WAITING') return 'Esperando a que se una el rival.';
+    if (state.status !== 'ACTIVE') {
+      const outcome = state.result === '1/2-1/2'
+        ? 'Tablas'
+        : myColor && state.result
+          ? ((state.result === '1-0' && myColor === 'white') || (state.result === '0-1' && myColor === 'black') ? 'Ganaste' : 'Perdiste')
+          : 'Partida finalizada';
+      return `Partida finalizada. ${outcome}. Resultado ${state.result ?? ''}.`;
+    }
+    const parts: string[] = [];
+    if (lastMove) parts.push(`Última jugada ${lastMove.san}.`);
+    if (inCheck) parts.push('Jaque.');
+    parts.push(isMyTurn ? 'Es tu turno.' : `Esperando a ${opponentName}.`);
+    return parts.join(' ');
+  })();
+
   return (
     <div className="page-shell cq-live-grid">
+      {/* Región accesible: anuncia jugadas, turno, jaque y resultado. */}
+      <div
+        role="status"
+        aria-live="polite"
+        style={{
+          position: 'absolute', width: 1, height: 1, padding: 0, margin: -1,
+          overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0,
+        }}
+      >
+        {liveAnnounce}
+      </div>
       {/* Toast queue (R8): notificaciones de eventos Realtime */}
       {toasts.length > 0 && (
         <div
@@ -1052,19 +1125,22 @@ export const LiveGamePage = () => {
           }}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cq-draw-offer-title"
             style={{
               background: 'var(--surface, #1c1f1a)', border: '1px solid var(--border, #2a2d27)',
               borderRadius: 12, padding: '24px 24px', maxWidth: 360, width: '100%', textAlign: 'center',
               boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
             }}
           >
-            <div style={{ fontSize: 40, marginBottom: 8 }}>🤝</div>
-            <h2 style={{ margin: '0 0 8px', fontSize: 20 }}>Tu rival ofrece tablas</h2>
+            <div style={{ fontSize: 40, marginBottom: 8 }} aria-hidden="true">🤝</div>
+            <h2 id="cq-draw-offer-title" style={{ margin: '0 0 8px', fontSize: 20 }}>Tu rival ofrece tablas</h2>
             <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--text-muted)' }}>
               Si aceptas, la partida termina en 1/2-1/2.
             </p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-              <Button variant="primary" onClick={acceptDraw} disabled={busy}>Aceptar tablas</Button>
+              <Button variant="primary" onClick={acceptDraw} disabled={busy} autoFocus>Aceptar tablas</Button>
               <Button variant="ghost" onClick={rejectDraw} disabled={busy}>Rechazar</Button>
             </div>
           </div>
@@ -1268,6 +1344,17 @@ const GameOverModal = ({
   state, myColor, whiteName, blackName, isTournament, onClose,
   onRematch, rematchPending, rematchCreating,
 }: GameOverModalProps) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  useFocusTrap(dialogRef, true);
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
   const winner = state.result === '1-0' ? 'white' : state.result === '0-1' ? 'black' : null;
   const isDraw = state.result === '1/2-1/2';
   const headline = (() => {
@@ -1306,6 +1393,11 @@ const GameOverModal = ({
         @keyframes cq-pop-in { from { transform: scale(0.9); opacity: 0 } to { transform: scale(1); opacity: 1 } }
       `}</style>
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         style={{
           background: 'var(--surface, #1c1f1a)',
@@ -1318,10 +1410,10 @@ const GameOverModal = ({
           animation: 'cq-pop-in 250ms ease-out',
         }}
       >
-        <div style={{ fontSize: 56, marginBottom: 8 }}>
+        <div style={{ fontSize: 56, marginBottom: 8 }} aria-hidden="true">
           {isDraw ? '🤝' : myColor && winner === myColor ? '🏆' : myColor && winner ? '😔' : '♟'}
         </div>
-        <h2 style={{ margin: '0 0 6px', fontSize: 28, fontWeight: 700 }}>{headline}</h2>
+        <h2 id={titleId} style={{ margin: '0 0 6px', fontSize: 28, fontWeight: 700 }}>{headline}</h2>
         <p style={{ margin: '0 0 4px', fontSize: 14, color: 'var(--text-muted)' }}>{reasonLabel}</p>
         <p style={{ margin: '0 0 24px', fontSize: 32, fontFamily: 'monospace', fontWeight: 700, letterSpacing: 2 }}>
           {state.result}

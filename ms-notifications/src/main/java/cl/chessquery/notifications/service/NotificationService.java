@@ -64,23 +64,17 @@ public class NotificationService {
     @Transactional
     public void notifyRegistration(Map<String, Object> payload) {
         Long recipientId  = toLong(payload.get("playerId"));
-        Object tournamentId   = payload.get("tournamentId");
-        Object tournamentName = payload.getOrDefault("tournamentName", "el torneo");
-        Object seedRating     = payload.get("seedRating");
+        String tName = String.valueOf(payload.getOrDefault("tournamentName", "el torneo"));
 
-        String subject = String.format("Inscripción confirmada en %s", tournamentName);
-        String body    = String.format(
-                "Te has inscrito en %s con rating de seed %s.",
-                tournamentName, seedRating);
+        // player.registered solo se emite cuando la inscripción queda CONFIRMED
+        // directo (torneo sin aprobación) → email de inscripción confirmada.
+        emailIfResolvable(recipientId,
+                String.format("Inscripción confirmada en %s", tName),
+                EmailTemplates.tournamentRegistration(
+                        playerNameResolver.resolveFirstName(recipientId), tName, false, portalUrl));
 
-        // Solo notificación in-app (sin email; los únicos emails son bienvenida e invitación).
         saveLog(recipientId, Channel.IN_APP, "player.registered",
-                String.format("Estás inscrito en %s", tournamentName),
-                payload, NotifStatus.SENT);
-        // Evitar log adicional vacío que decía "torneo %s" con ID raw.
-        if (tournamentName.equals("el torneo")) {
-            log.debug("player.registered sin tournamentName en payload (tournamentId={})", tournamentId);
-        }
+                String.format("Estás inscrito en %s", tName), payload, NotifStatus.SENT);
     }
 
     /**
@@ -91,14 +85,22 @@ public class NotificationService {
     public void notifyRegistrationPending(Map<String, Object> payload) {
         Long organizerId = toLong(payload.get("organizerId"));
         Long playerId    = toLong(payload.get("playerId"));
-        Object tournamentName = payload.getOrDefault("tournamentName", "tu torneo");
+        String tName = String.valueOf(payload.getOrDefault("tournamentName", "tu torneo"));
+
+        // Email al JUGADOR: confirmamos que recibimos su inscripción y queda en
+        // revisión del organizador (el torneo requiere aprobación).
+        emailIfResolvable(playerId,
+                String.format("Inscripción recibida en %s", tName),
+                EmailTemplates.tournamentRegistration(
+                        playerNameResolver.resolveFirstName(playerId), tName, true, portalUrl));
+
         if (organizerId == null) {
             log.debug("registration.pending sin organizerId, ignorado");
             return;
         }
         String playerName = playerNameResolver.resolve(playerId);
         String msg = String.format("Nueva inscripción de %s en %s — requiere tu aprobación",
-                playerName, tournamentName);
+                playerName, tName);
         saveLog(organizerId, Channel.IN_APP, "registration.pending", msg, payload, NotifStatus.SENT);
     }
 
@@ -109,13 +111,15 @@ public class NotificationService {
     @Transactional
     public void notifyRegistrationApproved(Map<String, Object> payload) {
         Long recipientId = toLong(payload.get("playerId"));
-        Object tournamentName = payload.getOrDefault("tournamentName", "el torneo");
+        String tName = String.valueOf(payload.getOrDefault("tournamentName", "el torneo"));
         if (recipientId == null) return;
-        String subject = "Tu inscripción fue aprobada";
-        String body    = String.format("Tu inscripción al torneo %s fue aprobada. ¡Nos vemos pronto!",
-                tournamentName);
+
+        emailIfResolvable(recipientId, "Tu inscripción fue aprobada",
+                EmailTemplates.tournamentApproved(
+                        playerNameResolver.resolveFirstName(recipientId), tName, portalUrl));
+
         saveLog(recipientId, Channel.IN_APP, "registration.approved",
-                String.format("¡Aprobado! Estás dentro de %s", tournamentName),
+                String.format("¡Aprobado! Estás dentro de %s", tName),
                 payload, NotifStatus.SENT);
     }
 
@@ -126,15 +130,18 @@ public class NotificationService {
     @Transactional
     public void notifyRegistrationRejected(Map<String, Object> payload) {
         Long recipientId = toLong(payload.get("playerId"));
-        Object tournamentName = payload.getOrDefault("tournamentName", "el torneo");
+        String tName = String.valueOf(payload.getOrDefault("tournamentName", "el torneo"));
         Object reason = payload.getOrDefault("reason", "");
         if (recipientId == null) return;
-        String subject = "Tu inscripción fue rechazada";
-        String reasonSuffix = (reason instanceof String s && !s.isBlank()) ? " — Motivo: " + s : "";
-        String body = String.format("Tu inscripción al torneo %s fue rechazada por el organizador.%s",
-                tournamentName, reasonSuffix);
+        String reasonStr = (reason instanceof String s && !s.isBlank()) ? s : null;
+        String reasonSuffix = reasonStr != null ? " — Motivo: " + reasonStr : "";
+
+        emailIfResolvable(recipientId, "Tu inscripción fue rechazada",
+                EmailTemplates.tournamentRejected(
+                        playerNameResolver.resolveFirstName(recipientId), tName, reasonStr, portalUrl));
+
         saveLog(recipientId, Channel.IN_APP, "registration.rejected",
-                String.format("Inscripción rechazada en %s%s", tournamentName, reasonSuffix),
+                String.format("Inscripción rechazada en %s%s", tName, reasonSuffix),
                 payload, NotifStatus.SENT);
     }
 
@@ -153,6 +160,16 @@ public class NotificationService {
         Object inviterName = payload.getOrDefault("inviterName", "tu rival");
         String email = (payload.get("email") instanceof String s && !s.isBlank()) ? s.trim() : null;
         String gameUrl = (payload.get("gameUrl") instanceof String u && !u.isBlank()) ? u.trim() : null;
+
+        // Invitaciones de torneo (emparejamiento): el evento solo trae playerId y
+        // gameId → resolvemos el email del jugador y construimos la URL con el
+        // portal para que el correo de convocatoria también salga.
+        if (email == null && recipientId != null) {
+            email = playerNameResolver.resolveEmail(recipientId);
+        }
+        if (gameUrl == null && gameId != null && portalUrl != null && !portalUrl.isBlank()) {
+            gameUrl = portalUrl.replaceAll("/+$", "") + "/play/" + gameId;
+        }
 
         // Email al correo invitado (sea jugador registrado o no). Sólo se envía
         // de verdad si hay SMTP configurado; si no, queda en log (no rompe nada).
@@ -281,6 +298,21 @@ public class NotificationService {
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
+
+    /**
+     * Envía un correo HTML resolviendo el email del jugador por su id (los
+     * eventos de torneo solo traen playerId). Si no hay email o SMTP, no rompe:
+     * la notificación in-app ya quedó persistida por el caller.
+     */
+    private void emailIfResolvable(Long recipientId, String subject, EmailTemplates.Content mail) {
+        if (recipientId == null) return;
+        String email = playerNameResolver.resolveEmail(recipientId);
+        if (email != null && !email.isBlank()) {
+            mockEmailService.sendHtmlEmail(recipientId, email, subject, mail.text(), mail.html());
+        } else {
+            log.debug("Sin email resoluble para player {} (asunto '{}'), se omite correo", recipientId, subject);
+        }
+    }
 
     private void saveLog(Long recipientId, Channel channel, String eventType,
                          String subject, Map<String, Object> payload, NotifStatus status) {

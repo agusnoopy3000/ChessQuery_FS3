@@ -95,6 +95,28 @@ vi.mock('@chessquery/ui-lib', () => ({
       ))}
     </div>
   ),
+  // Diálogo de confirmación: cuando está abierto, expone botones de confirmar
+  // (con su etiqueta) y cancelar para ejercitar ambas ramas.
+  ConfirmDialog: ({
+    open,
+    title,
+    confirmLabel,
+    onConfirm,
+    onClose,
+  }: {
+    open: boolean;
+    title?: ReactNode;
+    confirmLabel?: string;
+    onConfirm?: () => void;
+    onClose?: () => void;
+  }) =>
+    open ? (
+      <div data-testid="confirm-dialog">
+        <span>{title}</span>
+        <button onClick={onConfirm}>{confirmLabel ?? 'Confirmar'}</button>
+        <button onClick={onClose}>Cancelar</button>
+      </div>
+    ) : null,
 }));
 
 vi.mock('../components/CreateTournamentModal', () => ({
@@ -406,42 +428,40 @@ describe('OrganizerTournamentsPage', () => {
 
   // ── 3.5 Borrado ─────────────────────────────────────────────────────────
   it('borra un torneo tras confirmar', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     listTournamentsMock.mockResolvedValue({ content: FOUR });
     renderPage();
     await screen.findByRole('button', { name: /Open Verano/ });
 
     // El DRAFT (Open Verano) es borrable → su botón eliminar es el primero.
     fireEvent.click(screen.getAllByLabelText('Eliminar torneo')[0]);
+    // Se abre el diálogo: confirmar dispara el borrado.
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
     await waitFor(() => {
       expect(deleteTournamentMock).toHaveBeenCalledWith(1);
     });
-    confirmSpy.mockRestore();
   });
 
   it('no borra si el usuario cancela el confirm', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
     listTournamentsMock.mockResolvedValue({ content: FOUR });
     renderPage();
     await screen.findByRole('button', { name: /Open Verano/ });
 
     fireEvent.click(screen.getAllByLabelText('Eliminar torneo')[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
     expect(deleteTournamentMock).not.toHaveBeenCalled();
-    confirmSpy.mockRestore();
   });
 
   it('muestra ErrorAlert cuando el borrado falla', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     listTournamentsMock.mockResolvedValue({ content: FOUR });
     deleteTournamentMock.mockRejectedValue(new Error('no se puede'));
     renderPage();
     await screen.findByRole('button', { name: /Open Verano/ });
 
     fireEvent.click(screen.getAllByLabelText('Eliminar torneo')[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
     await waitFor(() => {
       expect(screen.getByText('No se pudo eliminar el torneo')).toBeInTheDocument();
     });
-    confirmSpy.mockRestore();
   });
 
   // ── 3.6 Generar ronda ───────────────────────────────────────────────────

@@ -8,8 +8,9 @@
   --card-contrast: oklch(18% 0.012 70 / 0.88);
 
   --text: oklch(96% 0.01 90);
-  --text-muted: oklch(77% 0.02 82);
-  --text-dim: oklch(57% 0.018 78);
+  --text-muted: oklch(78% 0.02 82);
+  /* Subido de 57% → 64% L para alcanzar contraste AA en texto chico sobre fondo oscuro. */
+  --text-dim: oklch(64% 0.02 80);
 
   --border: oklch(34% 0.015 72);
   --border-hi: oklch(44% 0.02 74);
@@ -30,8 +31,9 @@
   --cq-surface-r: #141614;
   --cq-input-bg: #0e100d;
   --cq-text: #e8ead4;
-  --cq-text-dim: #7a7d6e;
-  --cq-text-muted: #4a4d40;
+  /* Subidos para contraste AA: dim 7a→9a, muted 4a→6a sobre fondos oscuros. */
+  --cq-text-dim: #9a9c8c;
+  --cq-text-muted: #6a6d5e;
   --cq-border: #2a2d27;
   --cq-border-focus: #4a7c59;
   --cq-accent: #6abf74;
@@ -751,6 +753,24 @@ tbody tr:last-child td { border-bottom: none; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-hi); }
 
+/* ── Foco visible consistente para navegación por teclado ────────────────────
+   Anillo accent en cualquier elemento interactivo enfocado vía teclado. No
+   afecta el foco por mouse (:focus-visible). Los inputs conservan su propio
+   estilo (.input:focus) más abajo. */
+:where(button, a, summary, [role='button'], [role='tab'], [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* Animación de entrada para tarjetas/diálogos (cubierta por reduce-motion). */
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.pop-in { animation: pop-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
 @media (max-width: 1120px) {
   .hero-grid,
   .panel-grid,
@@ -761,16 +781,65 @@ tbody tr:last-child td { border-bottom: none; }
   }
 }
 
+/* ── Topbar móvil (hamburguesa) — oculto en desktop ───────────────────────── */
+.app-topbar {
+  display: none;
+  position: sticky;
+  top: 0;
+  z-index: 850;
+  align-items: center;
+  gap: 12px;
+  height: 54px;
+  padding: 0 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.app-topbar .hamburger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-size: 20px;
+  cursor: pointer;
+}
+.app-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  animation: fade-in 0.2s ease both;
+}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
 @media (max-width: 980px) {
   .app-shell {
     grid-template-columns: 1fr;
   }
 
+  .app-topbar {
+    display: flex;
+  }
+
+  /* El sidebar se vuelve un drawer deslizante fuera de pantalla */
   .sidebar {
-    position: static;
-    height: auto;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: min(82vw, var(--sidebar-w));
+    z-index: 1000;
+    border-right: 1px solid var(--border);
+    transform: translateX(-100%);
+    transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .sidebar.open {
+    transform: translateX(0);
+    box-shadow: 0 0 60px rgba(0, 0, 0, 0.55);
   }
 
   .main {

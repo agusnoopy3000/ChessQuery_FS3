@@ -1,6 +1,7 @@
 import { useState, ChangeEvent, FormEvent, ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Role, useAuth, translateAuthError } from '@chessquery/shared';
+import { Checkbox } from '@chessquery/ui-lib';
 import { organizerPanelUrl } from '../lib/urls';
 
 /* ── Logo SVG ── */
@@ -269,36 +270,6 @@ const Field = ({ label, type = 'text', placeholder = '', hint = '', error = '', 
   );
 };
 
-/* ── Checkbox ── */
-const Checkbox = ({ checked, onChange, children }: { checked: boolean; onChange: () => void; children: ReactNode }) => (
-  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', userSelect: 'none' }}>
-    <div
-      onClick={onChange}
-      style={{
-        width: 18,
-        height: 18,
-        borderRadius: 5,
-        border: `1.5px solid ${checked ? '#6abf74' : '#2a2d27'}`,
-        background: checked ? '#6abf74' : 'transparent',
-        flexShrink: 0,
-        marginTop: 1,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        transition: 'all 0.2s',
-        cursor: 'pointer',
-      }}
-    >
-      {checked && (
-        <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-          <path d="M1 4L4 7L9 1" stroke="#0e100d" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      )}
-    </div>
-    <span style={{ fontSize: 13, color: '#7a7d6e', lineHeight: 1.5 }}>{children}</span>
-  </label>
-);
-
 /* ── Page ── */
 export const RegisterPage = () => {
   const navigate = useNavigate();
@@ -363,7 +334,6 @@ export const RegisterPage = () => {
         firstName: form.nombre.trim(),
         lastName: form.apellido.trim(),
         role,
-        lichessUsername: role === 'PLAYER' ? form.lichess.trim() || undefined : undefined,
         clubName: role === 'ORGANIZER' ? form.club.trim() || undefined : undefined,
       });
       // Mostramos una confirmación de éxito breve (con animación) y recién luego
@@ -403,7 +373,7 @@ export const RegisterPage = () => {
       <div
         style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          minHeight: '100vh', background: '#111210', color: '#e8ead4', fontFamily: fontStack,
+          minHeight: '100dvh', background: '#111210', color: '#e8ead4', fontFamily: fontStack,
           textAlign: 'center', padding: 24, gap: 18,
         }}
       >
@@ -441,7 +411,7 @@ export const RegisterPage = () => {
       className="cq-register-page"
       style={{
         display: 'flex',
-        minHeight: '100vh',
+        minHeight: '100dvh',
         background: '#111210',
         color: '#e8ead4',
         fontFamily: fontStack,
@@ -457,7 +427,8 @@ export const RegisterPage = () => {
           to { opacity: 1; transform: translateY(0); }
         }
         @keyframes cq-shake { 10%,90%{transform:translateX(-1px)} 20%,80%{transform:translateX(2px)} 30%,50%,70%{transform:translateX(-4px)} 40%,60%{transform:translateX(4px)} }
-        .cq-register-page { overflow: hidden; }
+        /* Sin clip vertical: el formulario siempre se puede scrollear para rellenar. */
+        .cq-register-page { overflow-x: hidden; }
         .cq-register-left { flex: 0 0 480px; }
         .cq-register-right { flex: 1; animation: cq-register-panel 320ms ease-out both; }
         .cq-register-role-grid > * { animation: cq-register-role 280ms ease-out both; }
@@ -537,7 +508,12 @@ export const RegisterPage = () => {
           </p>
         </div>
 
-        <div className="cq-register-role-grid" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div
+          className="cq-register-role-grid"
+          role="group"
+          aria-label="Elegí tu rol"
+          style={{ display: 'flex', flexDirection: 'column', gap: 10 }}
+        >
           <RoleCard
             selected={role === 'PLAYER'}
             title="Jugador"
@@ -614,15 +590,7 @@ export const RegisterPage = () => {
             <Field label="Contraseña" type="password" name="password" autoComplete="new-password" value={form.password} onChange={handleChange} error={errors.password} hint="Mínimo 8 caracteres, con letras y números" />
             <Field label="Confirmar contraseña" type="password" name="confirmPassword" autoComplete="new-password" value={form.confirmPassword} onChange={handleChange} error={errors.confirmPassword} />
 
-            {role === 'PLAYER' ? (
-              <Field
-                label="Usuario de Lichess (opcional)"
-                name="lichess"
-                value={form.lichess}
-                onChange={handleChange}
-                hint="Permite mostrar tu ELO de plataforma por modalidad en tu perfil"
-              />
-            ) : (
+            {role === 'ORGANIZER' ? (
               <Field
                 label="Nombre del club u organización (opcional)"
                 name="club"
@@ -630,13 +598,18 @@ export const RegisterPage = () => {
                 onChange={handleChange}
                 hint="Podés agregar más clubes luego desde tu dashboard"
               />
+            ) : (
+              <div style={{ fontSize: 12.5, color: 'var(--cq-text-dim, #9a9c8c)', lineHeight: 1.5 }}>
+                Luego podrás vincular tus cuentas de Lichess y Chess.com desde tu perfil para ver tus
+                ratings por modalidad.
+              </div>
             )}
 
             <div style={{ height: 1, background: '#2a2d27', margin: '4px 0' }} />
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
-                <Checkbox checked={terms} onChange={() => setTerms((t) => !t)}>
+                <Checkbox checked={terms} onChange={() => setTerms((t) => !t)} alignStart>
                   Acepto los{' '}
                   <a href="#" style={{ color: '#6abf74', textDecoration: 'underline', textUnderlineOffset: 3 }} onClick={(e) => e.preventDefault()}>
                     Términos y Condiciones
@@ -649,7 +622,7 @@ export const RegisterPage = () => {
                 </Checkbox>
                 {errors.terms && <p role="alert" style={{ fontSize: 11, color: '#e05a5a', marginTop: 5, marginLeft: 28 }}>{errors.terms}</p>}
               </div>
-              <Checkbox checked={newsletter} onChange={() => setNewsletter((n) => !n)}>
+              <Checkbox checked={newsletter} onChange={() => setNewsletter((n) => !n)} alignStart>
                 Quiero recibir novedades, torneos y actualizaciones de ChessQuery (opcional).
               </Checkbox>
             </div>
@@ -714,9 +687,16 @@ interface RoleCardProps {
   onClick: () => void;
 }
 const RoleCard = ({ selected, title, description, badge, iconSvg, visual, onClick }: RoleCardProps) => (
-  <div
+  <button
+    type="button"
     onClick={onClick}
+    aria-pressed={selected}
     style={{
+      display: 'block',
+      width: '100%',
+      textAlign: 'left',
+      font: 'inherit',
+      color: 'inherit',
       borderRadius: 14,
       border: `1.5px solid ${selected ? '#4a7c59' : '#252820'}`,
       background: selected ? '#1e2b1f' : '#191c18',
@@ -762,5 +742,5 @@ const RoleCard = ({ selected, title, description, badge, iconSvg, visual, onClic
       </div>
     </div>
     {visual}
-  </div>
+  </button>
 );

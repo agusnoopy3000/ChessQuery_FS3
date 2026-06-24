@@ -14,6 +14,7 @@ import {
 } from '@chessquery/ui-lib';
 import { Tournament, Standing } from '@chessquery/shared';
 import { tournamentApi, type MyRegistration } from '../api';
+import { useMyPlayerId } from '../hooks/useMyPlayerId';
 
 interface RegistrationCTAProps {
   tournament: Tournament;
@@ -54,7 +55,7 @@ const RegistrationCTA = ({ tournament, myRegistration, loading, onRegister, regi
     };
     const m = meta[status];
     return (
-      <div style={{
+      <div role="status" aria-live="polite" style={{
         marginTop: 16, padding: '12px 14px',
         background: m.bg, border: `1px solid ${m.color}`, borderRadius: 8,
         display: 'flex', flexDirection: 'column', gap: 4,
@@ -82,7 +83,7 @@ const RegistrationCTA = ({ tournament, myRegistration, loading, onRegister, regi
         <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{reasonDisabled}</span>
       )}
       {error && (
-        <div style={{
+        <div role="alert" style={{
           background: 'rgba(224,90,90,0.1)', border: '1px solid #e05a5a',
           borderRadius: 8, padding: '8px 12px', color: '#e05a5a', fontSize: 13,
         }}>
@@ -106,6 +107,7 @@ interface StandingsResp {
 export const TournamentDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const myId = useMyPlayerId();
   const [tab, setTab] = useState<Tab>('info');
 
   const queryClient = useQueryClient();
@@ -149,7 +151,7 @@ export const TournamentDetailPage = () => {
 
   if (detail.isLoading) {
     return (
-      <div style={{ padding: 28, display: 'grid', gap: 12 }}>
+      <div style={{ padding: 'clamp(14px, 4vw, 28px)', display: 'grid', gap: 12 }}>
         <Skeleton height={120} />
         <Skeleton height={320} />
       </div>
@@ -158,7 +160,7 @@ export const TournamentDetailPage = () => {
 
   if (detail.isError || !detail.data) {
     return (
-      <div style={{ padding: 28 }}>
+      <div style={{ padding: 'clamp(14px, 4vw, 28px)' }}>
         <ErrorAlert title="Torneo no encontrado" onRetry={() => detail.refetch()} />
       </div>
     );
@@ -171,7 +173,7 @@ export const TournamentDetailPage = () => {
     : standingsData?.standings ?? standingsData?.entries ?? [];
 
   return (
-    <div style={{ padding: 28, display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ padding: 'clamp(14px, 4vw, 28px)', display: 'flex', flexDirection: 'column', gap: 20 }}>
       <button className="btn btn-ghost" style={{ alignSelf: 'flex-start' }} onClick={() => navigate('/tournaments')}>
         ← Volver a torneos
       </button>
@@ -291,6 +293,46 @@ export const TournamentDetailPage = () => {
               );
             })}
           </div>
+
+          {(() => {
+            const mine = round.data?.pairings.find(
+              (p) => myId != null && (p.whitePlayerId === myId || p.blackPlayerId === myId),
+            );
+            if (!mine) return null;
+            const oppName = mine.whitePlayerId === myId
+              ? (mine.blackPlayerName ?? 'tu rival')
+              : (mine.whitePlayerName ?? 'tu rival');
+            const myColor = mine.whitePlayerId === myId ? 'Blancas' : 'Negras';
+            const canPlay = mine.liveSessionId != null && !mine.result;
+            return (
+              <div
+                style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  gap: 14, flexWrap: 'wrap', marginBottom: 16, padding: '14px 16px',
+                  borderRadius: 12, border: '1px solid var(--accent-outline, rgba(106,191,116,0.34))',
+                  background: 'rgba(106,191,116,0.08)',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--accent)', fontWeight: 700 }}>
+                    Tu mesa · Ronda {selectedRound}
+                  </div>
+                  <div style={{ fontWeight: 700, marginTop: 3 }}>
+                    Mesa {mine.boardNumber} · {myColor} vs {oppName}
+                  </div>
+                </div>
+                {canPlay ? (
+                  <Button variant="primary" onClick={() => navigate(`/play/${mine.liveSessionId}`)}>
+                    ♞ Jugar mi partida →
+                  </Button>
+                ) : mine.result ? (
+                  <Badge variant="neutral">Terminada · {mine.result}</Badge>
+                ) : (
+                  <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Preparando tu partida…</span>
+                )}
+              </div>
+            );
+          })()}
 
           {round.isLoading ? (
             <Skeleton height={180} />

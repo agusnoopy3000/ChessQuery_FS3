@@ -14,7 +14,7 @@
 #   - Tope de heap JVM a 256 MB por microservicio (vs ~1 GB default).
 #     Suficiente para demo (50 req/s pico) y deja ~2 GB libres para
 #     Supabase + browser + sistema en una M1 de 8 GB.
-#   - No incluye: ms-etl, bff-admin, nginx
+#   - No incluye: ms-etl, nginx
 #   - Mantiene: ms-analytics y analytics_db para preservar métricas del perfil
 #     (apagados explícitamente al pasar solo los servicios de demo a
 #     `docker compose up`).

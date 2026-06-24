@@ -55,7 +55,7 @@ apply "${K8S_DIR}/hpa/hpa.yaml"
 DEPLOYMENTS=(
   rabbitmq redis
   ms-users ms-tournament ms-game ms-analytics ms-notifications api-gateway
-  ms-etl bff-player bff-organizer bff-admin frontend
+  ms-etl bff-player bff-organizer frontend
 )
 for d in "${DEPLOYMENTS[@]}"; do
   echo "▶ rollout status ${d}"
