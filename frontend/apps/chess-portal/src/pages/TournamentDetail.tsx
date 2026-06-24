@@ -151,7 +151,7 @@ export const TournamentDetailPage = () => {
 
   if (detail.isLoading) {
     return (
-      <div style={{ padding: 28, display: 'grid', gap: 12 }}>
+      <div style={{ padding: 'clamp(14px, 4vw, 28px)', display: 'grid', gap: 12 }}>
         <Skeleton height={120} />
         <Skeleton height={320} />
       </div>
@@ -160,7 +160,7 @@ export const TournamentDetailPage = () => {
 
   if (detail.isError || !detail.data) {
     return (
-      <div style={{ padding: 28 }}>
+      <div style={{ padding: 'clamp(14px, 4vw, 28px)' }}>
         <ErrorAlert title="Torneo no encontrado" onRetry={() => detail.refetch()} />
       </div>
     );
@@ -173,7 +173,7 @@ export const TournamentDetailPage = () => {
     : standingsData?.standings ?? standingsData?.entries ?? [];
 
   return (
-    <div style={{ padding: 28, display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ padding: 'clamp(14px, 4vw, 28px)', display: 'flex', flexDirection: 'column', gap: 20 }}>
       <button className="btn btn-ghost" style={{ alignSelf: 'flex-start' }} onClick={() => navigate('/tournaments')}>
         ← Volver a torneos
       </button>

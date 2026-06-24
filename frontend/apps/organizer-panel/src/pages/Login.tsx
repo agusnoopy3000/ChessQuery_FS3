@@ -302,6 +302,7 @@ export const LoginPage = () => {
 
   return (
     <div
+      className="cq-org-login-root"
       style={{
         display: 'flex',
         minHeight: '100dvh',
@@ -320,6 +321,10 @@ export const LoginPage = () => {
         @media (max-width: 880px) {
           .cq-org-login-right { padding: 28px 20px !important; }
           .cq-org-login-help { position: static !important; margin-bottom: 20px; text-align: right; }
+        }
+        @media (max-width: 560px) {
+          .cq-org-login-root { padding: 14px !important; }
+          .cq-org-login-right { padding: 22px 16px !important; }
         }
       `}</style>
 
@@ -423,7 +428,7 @@ export const LoginPage = () => {
         className="cq-org-login-right"
         style={{
           width: '100%',
-          maxWidth: 460,
+          maxWidth: 'clamp(280px, 92vw, 460px)',
           margin: 'auto',
           background: 'var(--cq-surface-r, #141614)',
           padding: '40px',

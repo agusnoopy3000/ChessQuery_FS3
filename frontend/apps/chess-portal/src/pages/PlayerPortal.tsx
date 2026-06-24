@@ -91,7 +91,7 @@ export const PlayerPortalPage = () => {
 
   if (dashboard.isLoading) {
     return (
-      <div style={{ padding: 28, display: 'grid', gap: 16, fontFamily: fontStack, maxWidth: 1100, margin: '0 auto' }}>
+      <div style={{ padding: 'clamp(14px, 4vw, 28px)', display: 'grid', gap: 16, fontFamily: fontStack, maxWidth: 1100, margin: '0 auto' }}>
         <Skeleton height={180} />
         <Skeleton height={140} />
         <Skeleton height={260} />
@@ -101,7 +101,7 @@ export const PlayerPortalPage = () => {
 
   if (dashboard.isError || !dashboard.data) {
     return (
-      <div style={{ padding: 28, fontFamily: fontStack }}>
+      <div style={{ padding: 'clamp(14px, 4vw, 28px)', fontFamily: fontStack }}>
         <ErrorAlert
           title="No se pudo cargar tu portal"
           message="Verifica la sesión o vuelve a intentar."
@@ -128,7 +128,7 @@ export const PlayerPortalPage = () => {
   return (
     <div
       style={{
-        padding: 28,
+        padding: 'clamp(14px, 4vw, 28px)',
         display: 'flex',
         flexDirection: 'column',
         gap: 20,

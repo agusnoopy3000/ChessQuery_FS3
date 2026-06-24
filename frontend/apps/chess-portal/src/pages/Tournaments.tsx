@@ -122,7 +122,7 @@ export const TournamentsPage = () => {
   return (
     <div
       style={{
-        padding: 28,
+        padding: 'clamp(14px, 4vw, 28px)',
         maxWidth: 1100,
         margin: '0 auto',
         fontFamily: fontStack,
