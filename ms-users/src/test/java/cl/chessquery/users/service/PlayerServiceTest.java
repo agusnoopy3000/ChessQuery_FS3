@@ -51,6 +51,7 @@ class PlayerServiceTest {
     @Mock private PlayerTitleHistoryRepository titleRepo;
     @Mock private EventPublisherService events;
     @Mock private LichessClient lichessClient;
+    @Mock private ChesscomClient chesscomClient;
     @Mock private EntityManager em;
 
     @InjectMocks private PlayerService service;
@@ -183,7 +184,7 @@ class PlayerServiceTest {
         @DisplayName("updateProfile_notFound_throws404")
         void updateProfile_notFound_throws404() {
             when(playerRepo.findById(1L)).thenReturn(Optional.empty());
-            UpdateProfileRequest req = new UpdateProfileRequest("A", "B", null, null, null);
+            UpdateProfileRequest req = new UpdateProfileRequest("A", "B", null, null, null, null);
             assertThatThrownBy(() -> service.updateProfile(1L, req))
                     .isInstanceOf(ApiException.class);
         }
@@ -194,7 +195,7 @@ class PlayerServiceTest {
             Player p = Player.builder().firstName("Old").lastName("Last").build();
             p.setId(1L);
             when(playerRepo.findById(1L)).thenReturn(Optional.of(p));
-            service.updateProfile(1L, new UpdateProfileRequest("New", "Name", null, null, null));
+            service.updateProfile(1L, new UpdateProfileRequest("New", "Name", null, null, null, null));
             assertThat(p.getFirstName()).isEqualTo("New");
             verify(events).publishUserUpdated(eq(1L), any());
         }
@@ -207,7 +208,7 @@ class PlayerServiceTest {
             when(playerRepo.findById(1L)).thenReturn(Optional.of(p));
             when(clubRepo.findById(99)).thenReturn(Optional.empty());
             assertThatThrownBy(() -> service.updateProfile(1L,
-                    new UpdateProfileRequest(null, null, 99, null, null)))
+                    new UpdateProfileRequest(null, null, 99, null, null, null)))
                     .isInstanceOf(ApiException.class)
                     .matches(e -> ((ApiException) e).getStatus() == 404);
         }
@@ -220,7 +221,7 @@ class PlayerServiceTest {
             when(playerRepo.findById(1L)).thenReturn(Optional.of(p));
             Club c = Club.builder().id(7).name("Club").build();
             when(clubRepo.findById(7)).thenReturn(Optional.of(c));
-            service.updateProfile(1L, new UpdateProfileRequest(null, null, 7, "Region", null));
+            service.updateProfile(1L, new UpdateProfileRequest(null, null, 7, "Region", null, null));
             assertThat(p.getClub()).isSameAs(c);
             assertThat(p.getRegion()).isEqualTo("Region");
         }
@@ -231,8 +232,38 @@ class PlayerServiceTest {
             Player p = Player.builder().firstName("A").build();
             p.setId(1L);
             when(playerRepo.findById(1L)).thenReturn(Optional.of(p));
-            service.updateProfile(1L, new UpdateProfileRequest(null, null, null, null, null));
+            service.updateProfile(1L, new UpdateProfileRequest(null, null, null, null, null, null));
             verify(events, never()).publishUserUpdated(any(), any());
+        }
+
+        @Test
+        @DisplayName("updateProfile_setsLichessUsername_whenFree")
+        void updateProfile_setsLichessUsername_whenFree() {
+            Player p = Player.builder().firstName("A").build();
+            p.setId(1L);
+            when(playerRepo.findById(1L)).thenReturn(Optional.of(p));
+            when(playerRepo.findByLichessUsername("magnus")).thenReturn(Optional.empty());
+
+            service.updateProfile(1L, new UpdateProfileRequest(null, null, null, null, "magnus", null));
+
+            assertThat(p.getLichessUsername()).isEqualTo("magnus");
+            verify(events).publishUserUpdated(eq(1L), any());
+        }
+
+        @Test
+        @DisplayName("updateProfile_lichessUsernameTaken_throws409")
+        void updateProfile_lichessUsernameTaken_throws409() {
+            Player p = Player.builder().firstName("A").build();
+            p.setId(1L);
+            Player other = Player.builder().firstName("B").lichessUsername("magnus").build();
+            other.setId(2L);
+            when(playerRepo.findById(1L)).thenReturn(Optional.of(p));
+            when(playerRepo.findByLichessUsername("magnus")).thenReturn(Optional.of(other));
+
+            assertThatThrownBy(() -> service.updateProfile(1L,
+                    new UpdateProfileRequest(null, null, null, null, "magnus", null)))
+                    .isInstanceOf(ApiException.class)
+                    .matches(e -> ((ApiException) e).getStatus() == 409);
         }
     }
 
@@ -438,6 +469,50 @@ class PlayerServiceTest {
             when(lichessClient.fetchRatings("ghost")).thenReturn(Optional.empty());
 
             service.syncLichess(1L);
+
+            verify(playerRepo, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("syncChesscom_noUsername_returnsProfileWithoutFetching")
+        void syncChesscom_noUsername_returnsProfileWithoutFetching() {
+            Player p = Player.builder().firstName("A").lastName("B").build(); // chesscomUsername null
+            p.setId(1L);
+            when(playerRepo.findById(1L)).thenReturn(Optional.of(p));
+
+            service.syncChesscom(1L);
+
+            verify(chesscomClient, never()).fetchRatings(any());
+            verify(playerRepo, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("syncChesscom_withRatings_setsElosAndSaves")
+        void syncChesscom_withRatings_setsElosAndSaves() {
+            Player p = Player.builder().firstName("A").lastName("B").chesscomUsername("hikaru").build();
+            p.setId(1L);
+            when(playerRepo.findById(1L)).thenReturn(Optional.of(p));
+            when(chesscomClient.fetchRatings("hikaru"))
+                    .thenReturn(Optional.of(new ChesscomClient.ChesscomRatings(3000, 3100, 2900, null)));
+
+            service.syncChesscom(1L);
+
+            assertThat(p.getEloChesscomBullet()).isEqualTo(3000);
+            assertThat(p.getEloChesscomBlitz()).isEqualTo(3100);
+            assertThat(p.getEloChesscomRapid()).isEqualTo(2900);
+            assertThat(p.getEloChesscomDaily()).isNull(); // null en el rating → no se setea
+            verify(playerRepo).save(p);
+        }
+
+        @Test
+        @DisplayName("syncChesscom_fetchEmpty_doesNotSave")
+        void syncChesscom_fetchEmpty_doesNotSave() {
+            Player p = Player.builder().chesscomUsername("ghost").build();
+            p.setId(1L);
+            when(playerRepo.findById(1L)).thenReturn(Optional.of(p));
+            when(chesscomClient.fetchRatings("ghost")).thenReturn(Optional.empty());
+
+            service.syncChesscom(1L);
 
             verify(playerRepo, never()).save(any());
         }

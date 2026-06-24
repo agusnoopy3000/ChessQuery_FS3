@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -47,6 +48,28 @@ export class PlayerController {
   @Get(':id/lichess')
   async lichessProfile(@Param('id') id: string) {
     return this.playerService.getLichessProfile(id);
+  }
+
+  @Get(':id/chesscom')
+  async chesscomProfile(@Param('id') id: string) {
+    return this.playerService.getChesscomProfile(id);
+  }
+
+  @Put('me/profile')
+  async updateMyProfile(
+    @Req() req: Request,
+    @Body()
+    body: {
+      firstName?: string;
+      lastName?: string;
+      clubId?: number;
+      region?: string;
+      lichessUsername?: string;
+      chesscomUsername?: string;
+    },
+  ) {
+    const userId = getUserId(req);
+    return this.playerService.updateMyProfile(userId, body);
   }
 
   @Get('search')

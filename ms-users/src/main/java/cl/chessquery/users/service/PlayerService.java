@@ -28,6 +28,7 @@ public class PlayerService {
     private final PlayerTitleHistoryRepository titleRepo;
     private final EventPublisherService       events;
     private final LichessClient               lichessClient;
+    private final ChesscomClient              chesscomClient;
 
     @PersistenceContext
     private EntityManager em;
@@ -344,6 +345,19 @@ public class PlayerService {
             p.setRegion(req.region());
             changed.add("region");
         }
+        if (StringUtils.hasText(req.lichessUsername())) {
+            String username = req.lichessUsername().trim();
+            // Pre-chequeo de unicidad (mismo criterio que en provision): si otro
+            // Player ya lo vinculó, 409 en vez de 500.
+            playerRepo.findByLichessUsername(username)
+                    .filter(other -> !other.getId().equals(p.getId()))
+                    .ifPresent(other -> {
+                        throw new ApiException(409, "LICHESS_USERNAME_TAKEN",
+                                "Ese usuario de Lichess ya está vinculado a otro jugador");
+                    });
+            p.setLichessUsername(username);
+            changed.add("lichessUsername");
+        }
         if (StringUtils.hasText(req.chesscomUsername())) {
             String username = req.chesscomUsername().trim();
             // Pre-chequeo de unicidad (mismo criterio que lichess_username en
@@ -425,6 +439,30 @@ public class PlayerService {
             p.setEnrichedAt(java.time.Instant.now());
             playerRepo.save(p);
             log.info("Lichess sync ok para player {} ({})", id, p.getLichessUsername());
+        });
+        return getProfile(id);
+    }
+
+    /**
+     * Sincroniza los ratings de Chess.com del jugador (por su chesscomUsername)
+     * llamando a la API pública, y los persiste en eloChesscom*. Espejo de
+     * {@link #syncLichess(Long)}. Si no tiene username, devuelve el perfil sin cambios.
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public PlayerProfileResponse syncChesscom(Long id) {
+        Player p = findOrThrow(id);
+        if (!StringUtils.hasText(p.getChesscomUsername())) {
+            return getProfile(id);
+        }
+        chesscomClient.fetchRatings(p.getChesscomUsername()).ifPresent(r -> {
+            if (r.bullet() != null) p.setEloChesscomBullet(r.bullet());
+            if (r.blitz() != null)  p.setEloChesscomBlitz(r.blitz());
+            if (r.rapid() != null)  p.setEloChesscomRapid(r.rapid());
+            if (r.daily() != null)  p.setEloChesscomDaily(r.daily());
+            p.setEnrichmentSource("CHESSCOM");
+            p.setEnrichedAt(java.time.Instant.now());
+            playerRepo.save(p);
+            log.info("Chess.com sync ok para player {} ({})", id, p.getChesscomUsername());
         });
         return getProfile(id);
     }
