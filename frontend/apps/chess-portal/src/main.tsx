@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, createSupabaseApiClient } from '@chessquery/shared';
 import 'sileo/styles.css';
 import '@chessquery/ui-lib';
+import '@chessquery/ui-lib/src/theme/sileo-theme.css';
 import { App } from './App';
 import { supabase } from './lib/supabase';
 

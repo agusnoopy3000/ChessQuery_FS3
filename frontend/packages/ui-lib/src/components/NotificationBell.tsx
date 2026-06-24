@@ -194,7 +194,7 @@ export const NotificationBell = ({
               position: 'absolute', top: -4, right: -4,
               minWidth: 18, height: 18, padding: '0 5px',
               borderRadius: 10,
-              background: '#e05a5a', color: '#fff',
+              background: 'var(--cq-error, #e05a5a)', color: '#fff',
               fontSize: 11, fontWeight: 700, lineHeight: '18px',
               border: '2px solid var(--bg, #111210)',
             }}
@@ -240,8 +240,8 @@ export const NotificationBell = ({
                 onClick={rowClickable ? go : undefined}
                 style={{
                   padding: '10px 14px',
-                  borderBottom: '1px solid rgba(255,255,255,0.04)',
-                  background: n.readAt ? 'transparent' : 'rgba(106,191,116,0.06)',
+                  borderBottom: '1px solid var(--border, #2a2d27)',
+                  background: n.readAt ? 'transparent' : 'var(--accent-dim)',
                   display: 'flex', gap: 10, alignItems: 'flex-start',
                   cursor: rowClickable ? 'pointer' : 'default',
                 }}
@@ -251,7 +251,7 @@ export const NotificationBell = ({
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text, #e8ead4)' }}>
                     {n.subject || n.eventType}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                     {formatRelative(n.createdAt)}
                   </div>
                   {isInvitation && link && onNavigate && (
@@ -259,15 +259,15 @@ export const NotificationBell = ({
                       onClick={(e) => { e.stopPropagation(); go(); }}
                       style={{
                         marginTop: 8, padding: '6px 12px', borderRadius: 6, border: 'none',
-                        background: '#6abf74', color: '#0e100d',
-                        fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                        background: 'var(--cq-accent, #6abf74)', color: 'var(--cq-input-bg, #0e100d)',
+                        fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
                       }}
                     >
                       Aceptar y unirse
                     </button>
                   )}
                   {!isInvitation && link && onNavigate && (
-                    <div style={{ marginTop: 4, fontSize: 11, color: '#6abf74', fontWeight: 600 }}>
+                    <div style={{ marginTop: 4, fontSize: 12, color: 'var(--cq-accent, #6abf74)', fontWeight: 600 }}>
                       Ver detalle →
                     </div>
                   )}
