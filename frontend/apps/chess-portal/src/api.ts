@@ -104,11 +104,16 @@ const normalizePlayer = (value: unknown): Player => {
     rut: asString(raw.rut) ?? null,
     fideId: asString(raw.fideId) ?? null,
     lichessUsername: asString(raw.lichessUsername) ?? null,
+    chesscomUsername: asString(raw.chesscomUsername) ?? null,
     eloNational: asNumber(raw.eloNational) ?? null,
     eloFideStandard: asNumber(raw.eloFideStandard) ?? null,
     eloFideRapid: asNumber(raw.eloFideRapid) ?? null,
     eloFideBlitz: asNumber(raw.eloFideBlitz) ?? null,
     eloPlatform: asNumber(raw.eloPlatform) ?? null,
+    eloChesscomBullet: asNumber(raw.eloChesscomBullet) ?? null,
+    eloChesscomBlitz: asNumber(raw.eloChesscomBlitz) ?? null,
+    eloChesscomRapid: asNumber(raw.eloChesscomRapid) ?? null,
+    eloChesscomDaily: asNumber(raw.eloChesscomDaily) ?? null,
     fideTitle: asString(raw.fideTitle ?? raw.currentTitle) ?? null,
     ageCategory: asString(raw.ageCategory) ?? null,
     countryId: asNumber(country.id) ?? null,
@@ -326,6 +331,19 @@ export const playerApi = {
 
   lichess: (id: string | number): Promise<LichessProfilePayload> =>
     api.get(`/api/player/${id}/lichess`).then((r) => normalizeLichess(r.data)),
+
+  chesscom: (id: string | number): Promise<LichessProfilePayload> =>
+    api.get(`/api/player/${id}/chesscom`).then((r) => normalizeLichess(r.data)),
+
+  updateProfile: (body: {
+    firstName?: string;
+    lastName?: string;
+    clubId?: number;
+    region?: string;
+    lichessUsername?: string;
+    chesscomUsername?: string;
+  }): Promise<Player> =>
+    api.put('/api/player/me/profile', body).then((r) => normalizePlayer(r.data)),
 
   findMatch: (): Promise<{
     you: Player;

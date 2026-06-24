@@ -334,7 +334,6 @@ export const RegisterPage = () => {
         firstName: form.nombre.trim(),
         lastName: form.apellido.trim(),
         role,
-        lichessUsername: role === 'PLAYER' ? form.lichess.trim() || undefined : undefined,
         clubName: role === 'ORGANIZER' ? form.club.trim() || undefined : undefined,
       });
       // Mostramos una confirmación de éxito breve (con animación) y recién luego
@@ -591,15 +590,7 @@ export const RegisterPage = () => {
             <Field label="Contraseña" type="password" name="password" autoComplete="new-password" value={form.password} onChange={handleChange} error={errors.password} hint="Mínimo 8 caracteres, con letras y números" />
             <Field label="Confirmar contraseña" type="password" name="confirmPassword" autoComplete="new-password" value={form.confirmPassword} onChange={handleChange} error={errors.confirmPassword} />
 
-            {role === 'PLAYER' ? (
-              <Field
-                label="Usuario de Lichess (opcional)"
-                name="lichess"
-                value={form.lichess}
-                onChange={handleChange}
-                hint="Permite mostrar tu ELO de plataforma por modalidad en tu perfil"
-              />
-            ) : (
+            {role === 'ORGANIZER' ? (
               <Field
                 label="Nombre del club u organización (opcional)"
                 name="club"
@@ -607,6 +598,11 @@ export const RegisterPage = () => {
                 onChange={handleChange}
                 hint="Podés agregar más clubes luego desde tu dashboard"
               />
+            ) : (
+              <div style={{ fontSize: 12.5, color: 'var(--cq-text-dim, #9a9c8c)', lineHeight: 1.5 }}>
+                Luego podrás vincular tus cuentas de Lichess y Chess.com desde tu perfil para ver tus
+                ratings por modalidad.
+              </div>
             )}
 
             <div style={{ height: 1, background: '#2a2d27', margin: '4px 0' }} />

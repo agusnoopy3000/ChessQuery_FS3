@@ -45,11 +45,16 @@ export interface Player {
   rut?: string | null;
   fideId?: string | null;
   lichessUsername?: string | null;
+  chesscomUsername?: string | null;
   eloNational?: number | null;
   eloFideStandard?: number | null;
   eloFideRapid?: number | null;
   eloFideBlitz?: number | null;
   eloPlatform?: number | null;
+  eloChesscomBullet?: number | null;
+  eloChesscomBlitz?: number | null;
+  eloChesscomRapid?: number | null;
+  eloChesscomDaily?: number | null;
   fideTitle?: string | null;
   ageCategory?: string | null;
   countryId?: number | null;

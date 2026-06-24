@@ -11,10 +11,16 @@ type QueryStub = {
 
 const dashboardQuery: QueryStub = { data: null, isLoading: false, isError: false, refetch: vi.fn() };
 const lichessQuery: QueryStub = { data: null, isLoading: false, isError: false, refetch: vi.fn() };
+const chesscomQuery: QueryStub = { data: null, isLoading: false, isError: false, refetch: vi.fn() };
 
 vi.mock('@tanstack/react-query', () => ({
-  useQuery: ({ queryKey }: { queryKey: unknown[] }) =>
-    Array.isArray(queryKey) && queryKey[1] === 'lichess' ? lichessQuery : dashboardQuery,
+  useQuery: ({ queryKey }: { queryKey: unknown[] }) => {
+    if (Array.isArray(queryKey) && queryKey[1] === 'lichess') return lichessQuery;
+    if (Array.isArray(queryKey) && queryKey[1] === 'chesscom') return chesscomQuery;
+    return dashboardQuery;
+  },
+  useMutation: () => ({ mutate: vi.fn(), isPending: false, isSuccess: false, isError: false, error: null }),
+  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
 vi.mock('@chessquery/ui-lib', () => {
@@ -26,6 +32,7 @@ vi.mock('@chessquery/ui-lib', () => {
   );
   return {
     Card: passthrough,
+    Button: ({ children }: { children?: React.ReactNode }) => <button>{children}</button>,
     RatingBadge: ({ rating, label }: { rating: number; label: string }) => (
       <div data-testid="rating">{label}:{rating}</div>
     ),
@@ -36,7 +43,7 @@ vi.mock('@chessquery/ui-lib', () => {
 });
 
 vi.mock('../api', () => ({
-  playerApi: { dashboard: vi.fn(), lichess: vi.fn() },
+  playerApi: { dashboard: vi.fn(), lichess: vi.fn(), chesscom: vi.fn(), updateProfile: vi.fn() },
 }));
 
 describe('MyDashboardPage', () => {
@@ -47,6 +54,9 @@ describe('MyDashboardPage', () => {
     lichessQuery.data = null;
     lichessQuery.isLoading = false;
     lichessQuery.isError = false;
+    chesscomQuery.data = null;
+    chesscomQuery.isLoading = false;
+    chesscomQuery.isError = false;
   });
 
   it('muestra skeletons mientras el dashboard carga', () => {
