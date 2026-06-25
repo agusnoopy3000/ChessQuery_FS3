@@ -316,9 +316,12 @@ export const LoginPage = () => {
       <style>{`
         @keyframes cq-spin { to { transform: rotate(360deg); } }
         @keyframes cq-slide-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-        /* Auth enfocado: solo el formulario, centrado y a pantalla completa. */
-        .cq-org-login-left { display: none; }
+        /* Web (>880px): panel decorativo + formulario en 2 columnas (el panel usa
+           display:flex inline). Móvil (≤880px): se OCULTA el panel y queda SOLO el
+           formulario, centrado a pantalla completa sin scroll. El !important gana
+           sobre el display:flex inline del panel. */
         @media (max-width: 880px) {
+          .cq-org-login-left { display: none !important; }
           .cq-org-login-right { padding: 28px 20px !important; }
           .cq-org-login-help { position: static !important; margin-bottom: 20px; text-align: right; }
         }
