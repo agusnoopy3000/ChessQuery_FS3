@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { sileo } from 'sileo';
 
 export interface NotificationItem {
   id: number;
@@ -62,9 +61,10 @@ const formatRelative = (iso: string | null): string => {
 };
 
 /**
- * Campana de notificaciones in-app + toasts emergentes (Sileo), parametrizable
- * por app. Polling cada 8s; cada notificación nueva (id > lastSeen) emite un
- * toast. La bandeja arranca vacía en cada sesión (baseline en sessionStorage).
+ * Campana de notificaciones in-app, parametrizable por app. Polling cada 8s;
+ * las notificaciones nuevas se acumulan en la bandeja (badge de no-leídas). La
+ * bandeja arranca vacía en cada sesión (baseline en sessionStorage). Sin toasts
+ * emergentes: la única superficie es la campana + su dropdown.
  */
 export const NotificationBell = ({
   listNotifications,
@@ -78,25 +78,8 @@ export const NotificationBell = ({
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const lastSeenIdRef = useRef<number | null>(null);
-  const initializedRef = useRef(false);
   const baselineRef = useRef<number | null>(null);
   const icon = eventIcon ?? defaultEventIcon;
-
-  const emitToast = useCallback((n: NotificationItem) => {
-    const link = resolveLink?.(n) ?? null;
-    const title = n.subject || (n.eventType === 'game.invitation' ? 'Invitación a partida' : 'Notificación');
-    const button = link && onNavigate
-      ? { title: n.eventType === 'game.invitation' ? 'Unirse' : 'Ver', onClick: () => onNavigate(link) }
-      : undefined;
-    if (n.eventType === 'game.invitation') {
-      sileo.info({ title, button });
-    } else if (n.eventType.startsWith('registration.rejected')) {
-      sileo.warning({ title });
-    } else {
-      sileo.success({ title, button });
-    }
-  }, [resolveLink, onNavigate]);
 
   const poll = useCallback(async () => {
     try {
@@ -116,22 +99,10 @@ export const NotificationBell = ({
       const sessionList = list.filter((n) => n.id > baseline);
       setItems(sessionList);
       setUnread(sessionList.filter((n) => !n.readAt).length);
-
-      if (!initializedRef.current) {
-        lastSeenIdRef.current = baseline;
-        initializedRef.current = true;
-        return;
-      }
-      const seen = lastSeenIdRef.current ?? baseline;
-      const fresh = sessionList.filter((n) => n.id > seen);
-      if (fresh.length > 0) {
-        for (const n of [...fresh].reverse()) emitToast(n);
-        lastSeenIdRef.current = fresh.reduce((m, n) => (n.id > m ? n.id : m), seen);
-      }
     } catch {
       /* backend caído: ignorar */
     }
-  }, [listNotifications, emitToast]);
+  }, [listNotifications]);
 
   useEffect(() => {
     poll();
