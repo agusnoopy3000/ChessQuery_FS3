@@ -349,7 +349,9 @@ export const LoginPage = () => {
         /* Web (>880px): panel decorativo + formulario en 2 columnas (el panel usa
            display:flex inline, así que en escritorio se ve normal). Móvil (≤880px):
            se OCULTA el panel y queda SOLO el formulario, centrado a pantalla completa
-           sin scroll. El !important gana sobre el display:flex inline del panel. */
+           sin scroll (el contenedor es flex con minHeight:100dvh y el form usa
+           margin:auto, por lo que el formulario queda centrado vertical y horizontal).
+           El !important gana sobre el display:flex inline del panel. */
         @media (max-width: 880px) {
           .cq-login-left { display: none !important; }
           .cq-login-right { padding: 28px 20px !important; }
