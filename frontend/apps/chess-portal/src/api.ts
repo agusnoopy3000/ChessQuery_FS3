@@ -555,11 +555,11 @@ export interface LiveGameSummary {
 }
 
 export const liveGameApi = {
-  create: (whiteEloBefore?: number) =>
+  create: (whiteEloBefore?: number, timeControl?: { initialMs: number; incrementMs: number }) =>
     api.post<LiveGameSummary>('/api/player/play/live', {
       whiteEloBefore,
-      timeControlInitialMs: 180_000,
-      timeControlIncrementMs: 0,
+      timeControlInitialMs: timeControl?.initialMs ?? 180_000,
+      timeControlIncrementMs: timeControl?.incrementMs ?? 0,
     }).then((r) => r.data),
   get: (id: number | string) =>
     api.get<LiveGameSummary>(`/api/player/play/live/${id}`).then((r) => r.data),

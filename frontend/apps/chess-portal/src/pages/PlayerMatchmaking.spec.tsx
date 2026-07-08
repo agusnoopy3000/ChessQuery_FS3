@@ -64,6 +64,23 @@ describe('PlayerMatchmakingPage', () => {
     expect(screen.getByRole('button', { name: /Empezar partida en vivo/i })).toBeInTheDocument();
   });
 
+  it('muestra los presets de modalidad con 3+0 seleccionado por defecto', () => {
+    render(<PlayerMatchmakingPage />);
+    // Presets representativos de cada familia visibles.
+    expect(screen.getByRole('button', { name: '1+0' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '30+20' })).toBeInTheDocument();
+    // El default (Blitz 3+0) queda marcado.
+    expect(screen.getByRole('button', { name: '3+0' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('permite cambiar la modalidad seleccionada', () => {
+    render(<PlayerMatchmakingPage />);
+    const bullet = screen.getByRole('button', { name: '1+0' });
+    fireEvent.click(bullet);
+    expect(bullet).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '3+0' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
   it('navega a /play/{id} al crear la partida exitosamente', () => {
     render(<PlayerMatchmakingPage />);
     fireEvent.click(screen.getByRole('button', { name: /Empezar partida en vivo/i }));
