@@ -55,6 +55,40 @@ public final class LiveGameDtos {
             String gameUrl
     ) {}
 
+    /** POST /games/live/{id}/invitations — crea una invitación con TTL (P1-03).
+     *  {@code color} es el color del invitado ('w'/'b', default 'b');
+     *  {@code ttlSeconds} el tiempo de vida antes de expirar (default 60). */
+    public record CreateInvitationRequest(
+            @NotBlank String email,
+            @Pattern(regexp = "^[wb]$", message = "color debe ser 'w' o 'b'")
+            String color,
+            Long ttlSeconds,
+            String gameUrl
+    ) {}
+
+    /** POST /games/live/invitations/{inviteId}/accept|decline. */
+    public record InvitationActionRequest(
+            @NotNull Long playerId,
+            String reason
+    ) {}
+
+    public record InvitationResponse(
+            Long id,
+            Long sessionId,
+            Long fromPlayerId,
+            Long toPlayerId,
+            String toEmail,
+            String inviteeColor,
+            Long timeControlInitialMs,
+            Long timeControlIncrementMs,
+            String status,
+            String declineReason,
+            Instant expiresAt,
+            Instant respondedAt,
+            Instant createdAt,
+            boolean matched
+    ) {}
+
     public record LiveMoveResponse(
             Integer moveNumber,
             String color,

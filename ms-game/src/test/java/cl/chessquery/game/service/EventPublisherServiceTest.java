@@ -181,6 +181,77 @@ class EventPublisherServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("invite.* (P1-03)")
+    class InviteEvents {
+
+        @Test
+        @DisplayName("publishInviteCreated_incluyeTtlColorYExpires")
+        void publishInviteCreated() {
+            java.time.Instant exp = java.time.Instant.parse("2026-07-08T12:00:00Z");
+            publisher.publishInviteCreated(77L, 50L, 1L, 2L, 180_000L, 2_000L, "b", exp, 60L);
+
+            Map<String, Object> event = capturePublishedEvent("invite.created");
+            assertThat(event.get("eventType")).isEqualTo("invite.created");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> payload = (Map<String, Object>) event.get("payload");
+            assertThat(payload).containsEntry("inviteId", 77L)
+                    .containsEntry("sessionId", 50L)
+                    .containsEntry("fromPlayerId", 1L)
+                    .containsEntry("toPlayerId", 2L)
+                    .containsEntry("timeControlInitialMs", 180_000L)
+                    .containsEntry("color", "b")
+                    .containsEntry("ttlSeconds", 60L)
+                    .containsEntry("expiresAt", "2026-07-08T12:00:00Z");
+        }
+
+        @Test
+        @DisplayName("publishInviteCreated_toPlayerIdNull_seMantieneNull")
+        void publishInviteCreated_nullPlayer() {
+            publisher.publishInviteCreated(1L, 2L, 3L, null, null, null, "w",
+                    java.time.Instant.now(), 60L);
+            Map<String, Object> event = capturePublishedEvent("invite.created");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> payload = (Map<String, Object>) event.get("payload");
+            assertThat(payload).containsKey("toPlayerId");
+            assertThat(payload.get("toPlayerId")).isNull();
+        }
+
+        @Test
+        @DisplayName("publishInviteAccepted_routingYPayload")
+        void publishInviteAccepted() {
+            publisher.publishInviteAccepted(77L, 50L, java.time.Instant.parse("2026-07-08T12:00:00Z"));
+            Map<String, Object> event = capturePublishedEvent("invite.accepted");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> payload = (Map<String, Object>) event.get("payload");
+            assertThat(payload).containsEntry("inviteId", 77L)
+                    .containsEntry("sessionId", 50L)
+                    .containsEntry("acceptedAt", "2026-07-08T12:00:00Z");
+        }
+
+        @Test
+        @DisplayName("publishInviteDeclined_reasonNull_usaStringVacio")
+        void publishInviteDeclined_nullReason() {
+            publisher.publishInviteDeclined(77L, null);
+            Map<String, Object> event = capturePublishedEvent("invite.declined");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> payload = (Map<String, Object>) event.get("payload");
+            assertThat(payload).containsEntry("inviteId", 77L).containsEntry("reason", "");
+        }
+
+        @Test
+        @DisplayName("publishInviteExpired_routingYPayload")
+        void publishInviteExpired() {
+            publisher.publishInviteExpired(77L, 50L, java.time.Instant.parse("2026-07-08T12:00:00Z"));
+            Map<String, Object> event = capturePublishedEvent("invite.expired");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> payload = (Map<String, Object>) event.get("payload");
+            assertThat(payload).containsEntry("inviteId", 77L)
+                    .containsEntry("sessionId", 50L)
+                    .containsEntry("expiredAt", "2026-07-08T12:00:00Z");
+        }
+    }
+
     @Test
     @DisplayName("publish_brokerThrows_doesNotPropagate")
     void publish_brokerThrows_doesNotPropagate() {

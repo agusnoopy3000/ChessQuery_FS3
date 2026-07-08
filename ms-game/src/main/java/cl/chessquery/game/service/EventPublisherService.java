@@ -72,6 +72,52 @@ public class EventPublisherService {
         publish("elo.updated", payload);
     }
 
+    /** Routing key: invite.created — invitación con TTL creada (P1-03). */
+    public void publishInviteCreated(Long inviteId, Long sessionId, Long fromPlayerId,
+                                     Long toPlayerId, Long tcInitialMs, Long tcIncrementMs,
+                                     String color, Instant expiresAt, long ttlSeconds) {
+        java.util.Map<String, Object> payload = new java.util.HashMap<>();
+        payload.put("inviteId", inviteId);
+        payload.put("sessionId", sessionId);
+        payload.put("fromPlayerId", fromPlayerId);
+        payload.put("toPlayerId", toPlayerId);   // puede ser null: invitado sin cuenta
+        payload.put("timeControlInitialMs", tcInitialMs);
+        payload.put("timeControlIncrementMs", tcIncrementMs);
+        payload.put("color", color);
+        payload.put("expiresAt", expiresAt != null ? expiresAt.toString() : null);
+        payload.put("ttlSeconds", ttlSeconds);
+        publish("invite.created", payload);
+    }
+
+    /** Routing key: invite.accepted. */
+    public void publishInviteAccepted(Long inviteId, Long sessionId, Instant acceptedAt) {
+        Map<String, Object> payload = Map.of(
+                "inviteId", inviteId,
+                "sessionId", sessionId,
+                "acceptedAt", acceptedAt != null ? acceptedAt.toString() : ""
+        );
+        publish("invite.accepted", payload);
+    }
+
+    /** Routing key: invite.declined. */
+    public void publishInviteDeclined(Long inviteId, String reason) {
+        Map<String, Object> payload = Map.of(
+                "inviteId", inviteId,
+                "reason", reason == null ? "" : reason
+        );
+        publish("invite.declined", payload);
+    }
+
+    /** Routing key: invite.expired — TTL vencido, la invitación caducó (P1-03). */
+    public void publishInviteExpired(Long inviteId, Long sessionId, Instant expiredAt) {
+        Map<String, Object> payload = Map.of(
+                "inviteId", inviteId,
+                "sessionId", sessionId,
+                "expiredAt", expiredAt != null ? expiredAt.toString() : ""
+        );
+        publish("invite.expired", payload);
+    }
+
     private void publish(String routingKey, Map<String, Object> payload) {
         Map<String, Object> event = Map.of(
                 "eventId",   UUID.randomUUID().toString(),

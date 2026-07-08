@@ -1,6 +1,8 @@
 package cl.chessquery.game.controller;
 
 import cl.chessquery.game.dto.LiveGameDtos.*;
+import cl.chessquery.game.entity.GameInvitation;
+import cl.chessquery.game.service.InvitationService;
 import cl.chessquery.game.service.LiveGameService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 public class LiveGameController {
 
     private final LiveGameService live;
+    private final InvitationService invitations;
 
     @Operation(summary = "Crear sesión live (creador = white)")
     @PostMapping
@@ -74,5 +77,40 @@ public class LiveGameController {
             @Valid @RequestBody InviteRequest req,
             @RequestHeader(value = "X-User-Id", required = false) Long inviterId) {
         return live.invitePlayer(id, req.email(), req.gameUrl(), inviterId);
+    }
+
+    @Operation(summary = "Crear invitación con TTL (P1-03) — envía push y arranca el countdown")
+    @PostMapping("/{id}/invitations")
+    @ResponseStatus(HttpStatus.CREATED)
+    public InvitationResponse createInvitation(
+            @PathVariable Long id,
+            @Valid @RequestBody CreateInvitationRequest req,
+            @RequestHeader(value = "X-User-Id", required = false) Long inviterId) {
+        // Reusa el flujo existente para el push in-app y la resolución del email → playerId.
+        java.util.Map<String, Object> push = live.invitePlayer(id, req.email(), req.gameUrl(), inviterId);
+        Long toPlayerId = push.get("playerId") instanceof Number n ? n.longValue() : null;
+        GameInvitation inv = invitations.create(id, inviterId, toPlayerId,
+                req.email(), req.color(), req.ttlSeconds());
+        return InvitationService.toResponse(inv);
+    }
+
+    @Operation(summary = "Estado de la invitación (para el countdown; expira perezosamente)")
+    @GetMapping("/invitations/{inviteId}")
+    public InvitationResponse getInvitation(@PathVariable Long inviteId) {
+        return InvitationService.toResponse(invitations.get(inviteId));
+    }
+
+    @Operation(summary = "El invitado acepta la invitación")
+    @PostMapping("/invitations/{inviteId}/accept")
+    public InvitationResponse acceptInvitation(
+            @PathVariable Long inviteId, @Valid @RequestBody InvitationActionRequest req) {
+        return InvitationService.toResponse(invitations.accept(inviteId, req.playerId()));
+    }
+
+    @Operation(summary = "El invitado rechaza la invitación (motivo opcional)")
+    @PostMapping("/invitations/{inviteId}/decline")
+    public InvitationResponse declineInvitation(
+            @PathVariable Long inviteId, @Valid @RequestBody InvitationActionRequest req) {
+        return InvitationService.toResponse(invitations.decline(inviteId, req.playerId(), req.reason()));
     }
 }

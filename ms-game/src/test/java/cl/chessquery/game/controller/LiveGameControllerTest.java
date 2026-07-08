@@ -1,6 +1,9 @@
 package cl.chessquery.game.controller;
 
 import cl.chessquery.game.dto.LiveGameDtos.LiveGameResponse;
+import cl.chessquery.game.entity.GameInvitation;
+import cl.chessquery.game.entity.GameInvitation.InvitationStatus;
+import cl.chessquery.game.service.InvitationService;
 import cl.chessquery.game.service.LiveGameService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,6 +34,18 @@ class LiveGameControllerTest {
 
     @Autowired private MockMvc mvc;
     @MockBean private LiveGameService live;
+    @MockBean private InvitationService invitations;
+
+    private GameInvitation sampleInvitation(InvitationStatus status) {
+        return GameInvitation.builder()
+                .id(77L).sessionId(1L).fromPlayerId(1L).toPlayerId(2L)
+                .toEmail("a@b.cl").inviteeColor("b")
+                .timeControlInitialMs(180_000L).timeControlIncrementMs(2_000L)
+                .status(status)
+                .expiresAt(java.time.Instant.parse("2026-07-08T12:00:00Z"))
+                .createdAt(java.time.Instant.parse("2026-07-08T11:59:00Z"))
+                .build();
+    }
 
     private LiveGameResponse sample(Long id, String status) {
         return new LiveGameResponse(id, 1L, 2L, status,
@@ -126,5 +141,66 @@ class LiveGameControllerTest {
                         .content("{\"email\":\"a@b.cl\",\"gameUrl\":\"https://x\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.matched").value(true));
+    }
+
+    @Test
+    @DisplayName("createInvitation_validBody_returns201YEstadoPending")
+    void createInvitation_returns201() throws Exception {
+        when(live.invitePlayer(eq(1L), eq("a@b.cl"), any(), any()))
+                .thenReturn(Map.of("matched", true, "playerId", 2L));
+        when(invitations.create(eq(1L), any(), eq(2L), eq("a@b.cl"), eq("b"), eq(60L)))
+                .thenReturn(sampleInvitation(InvitationStatus.PENDING));
+
+        mvc.perform(post("/games/live/1/invitations")
+                        .header("X-User-Id", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"a@b.cl\",\"color\":\"b\",\"ttlSeconds\":60}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.matched").value(true))
+                .andExpect(jsonPath("$.inviteeColor").value("b"));
+    }
+
+    @Test
+    @DisplayName("createInvitation_colorInvalido_returns400")
+    void createInvitation_invalidColor() throws Exception {
+        mvc.perform(post("/games/live/1/invitations")
+                        .header("X-User-Id", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"a@b.cl\",\"color\":\"x\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("getInvitation_returns200")
+    void getInvitation_returns200() throws Exception {
+        when(invitations.get(eq(77L))).thenReturn(sampleInvitation(InvitationStatus.PENDING));
+        mvc.perform(get("/games/live/invitations/77"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(77));
+    }
+
+    @Test
+    @DisplayName("acceptInvitation_returns200YAccepted")
+    void acceptInvitation_returns200() throws Exception {
+        when(invitations.accept(eq(77L), eq(2L)))
+                .thenReturn(sampleInvitation(InvitationStatus.ACCEPTED));
+        mvc.perform(post("/games/live/invitations/77/accept")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"playerId\":2}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACCEPTED"));
+    }
+
+    @Test
+    @DisplayName("declineInvitation_returns200YDeclined")
+    void declineInvitation_returns200() throws Exception {
+        when(invitations.decline(eq(77L), eq(2L), eq("no puedo")))
+                .thenReturn(sampleInvitation(InvitationStatus.DECLINED));
+        mvc.perform(post("/games/live/invitations/77/decline")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"playerId\":2,\"reason\":\"no puedo\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DECLINED"));
     }
 }
