@@ -99,6 +99,12 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop
+    properties:
+      hibernate:
+        # H2 no soporta la cláusula INSERT ... RETURNING que PostgreSQLDialect
+        # emite para claves IDENTITY desde Hibernate 6.5 (Spring Boot 3.3).
+        # En tests corremos sobre H2, así que usamos su dialecto nativo.
+        dialect: org.hibernate.dialect.H2Dialect
   flyway:
     enabled: false
   # Deshabilitar auto-config de RabbitMQ en tests
